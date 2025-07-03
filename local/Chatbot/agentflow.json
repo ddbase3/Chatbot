@@ -15,6 +15,9 @@
     { "id": "cfg-tg2", "type": "getconfigurationnode", "inputs": { "section": "telegram", "key": "me" } },
     { "id": "telegram", "type": "telegramsendmessage" },
    
+    { "id": "try-factcheck", "type": "tryarraygetnode", "inputs": { "path": "factcheck" } },
+    { "id": "claim", "type": "staticmessagenode" },
+    { "id": "factchecker", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo", "temperature": 0.3 } },
 
 
     {
@@ -47,6 +50,11 @@
     { "from": "cfg-tg2", "output": "value", "to": "telegram", "input": "chat_id" },
     { "from": "try-telegram", "output": "value", "to": "telegram", "input": "message" },
 
+    { "from": "j2a", "output": "array", "to": "try-factcheck", "input": "array" },
+    { "from": "cfg1", "output": "value", "to": "factchecker", "input": "apikey" },
+    { "from": "__input__", "output": "system-factcheck", "to": "factchecker", "input": "system" },
+    { "from": "try-factcheck", "output": "value", "to": "factchecker", "input": "prompt" },
+    { "from": "try-factcheck", "output": "value", "to": "claim", "input": "text" },
 
 
     { "from": "cfg2", "output": "value", "to": "trans", "input": "apikey" },

@@ -36,21 +36,54 @@ class ChatbotExtendedService implements IOutput {
 		$json = file_get_contents('plugin/Chatbot/local/Chatbot/agentflow.json');
                 $data = json_decode($json, true);
 
+		$systemFactcheck = file_get_contents('plugin/Chatbot/local/Chatbot/systemfactcheck.txt');
+
 		$flow = $this->agentflowfactory->createFromArray('strictflow', $data, $context);
 
-		$outputs = $flow->run(['system' => $system, 'prompt' => $prompt]);
+		$outputs = $flow->run([
+			'system' => $system,
+			'prompt' => $prompt,
+			'system-factcheck' => $systemFactcheck
+		]);
 
 		$message = $outputs['msg']['message'] ?? '[Keine Nachricht erhalten]';
+		$out = $message;
 
-		if (isset($outputs['msg']) && isset($outputs['msg']['message'])) {
-			return $outputs['msg']['message'];
-		}
+		$out .= $this->addFactCheck($outputs);
 
-                return 'Fehler: ' . json_encode($outputs);
+		return $out;
         }
 
         public function getHelp(): string {
                 return 'ChatbotExtendedService – nimmt eine Benutzereingabe entgegen, fragt OpenAI, gibt die Antwort aus nud ruft dabei weitere Services auf.';
         }
+
+	// Private methods
+
+	private function addFactCheck(array $outputs): string {
+		$out = '';
+		$factcheck = $outputs['factchecker']['response'] ?? '';
+		if (!empty($factcheck)) {
+			$claim = $outputs['claim']['message'] ?? '';
+			$data = json_decode($factcheck, true);
+			$emoji = ($data['result'] === 'Richtig') ? '✅' : '❌';
+			$resultClass = ($data['result'] === 'Richtig') ? 'richtig' : 'falsch';
+
+			$content = ''
+				. '<span class="label">Aussage:</span> ' . htmlspecialchars($claim) . '<br />'
+				. '<span class="label">Bewertung:</span> <span class="result ' . $resultClass . '">' . $emoji . ' ' . htmlspecialchars($data['result']) . '</span><br />'
+				. '<span class="label">Begründung:</span> ' . htmlspecialchars($data['reason']);
+
+			$out .= $this->renderInfoBox('fact', '🧐 Faktencheck', $content);
+		}
+		return $out;
+	}
+
+	private function renderInfoBox(string $type, string $title, string $contentHtml): string {
+		return '<div class="info-box info-' . htmlspecialchars($type) . '">' .
+		       '<div class="info-header">' . htmlspecialchars($title) . '</div>' .
+		       '<div class="info-body">' . $contentHtml . '</div>' .
+		       '</div>';
+	}
 }
 

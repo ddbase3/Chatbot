@@ -45,4 +45,39 @@
 			#chatbot .chat > .user { margin-left:50px; color:#009; }
 			#chatbot .chat > .assistent { margin-right:50px; color:#090; }
 			#chatbot textarea { display:block; width:100%; height:80px; }
+
+
+			.info-box {
+				border: 2px solid #ccc;
+				border-left-width: 6px;
+				border-radius: 6px;
+				padding: 0.8em 1em;
+				margin: 1em 0;
+				background-color: #fdfdfd;
+				font-family: sans-serif;
+				font-size: 0.95em;
+				line-height: 1.4;
+				box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+			}
+
+			.info-header {
+				font-weight: bold;
+				font-size: 1em;
+				margin-bottom: 0.4em;
+			}
+
+			.info-fact   { border-left-color: #0077cc; }
+			.info-weather{ border-left-color: #00aaff; }
+			.info-joke   { border-left-color: #ffaa00; }
+			.info-warning{ border-left-color: #cc0000; }
+
+			.label {
+				font-weight: bold;
+				display: inline-block;
+				width: 90px;
+				color: #333;
+			}
+
+			.result.richtig { color: #007700; font-weight: bold; }
+			.result.falsch  { color: #cc0000; font-weight: bold; }
 		</style>
