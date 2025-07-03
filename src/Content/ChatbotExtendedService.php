@@ -37,25 +37,29 @@ class ChatbotExtendedService implements IOutput {
                 $data = json_decode($json, true);
 
 		$systemFactcheck = file_get_contents('plugin/Chatbot/local/Chatbot/systemfactcheck.txt');
+		$systemWeather = file_get_contents('plugin/Chatbot/local/Chatbot/systemweather.txt');
 
 		$flow = $this->agentflowfactory->createFromArray('strictflow', $data, $context);
 
 		$outputs = $flow->run([
 			'system' => $system,
 			'prompt' => $prompt,
-			'system-factcheck' => $systemFactcheck
+			'system-factcheck' => $systemFactcheck,
+			'system-weather' => $systemWeather
 		]);
 
 		$message = $outputs['msg']['message'] ?? '[Keine Nachricht erhalten]';
 		$out = $message;
 
 		$out .= $this->addFactCheck($outputs);
+		$out .= $this->addJoke($outputs);
+		$out .= $this->addWeather($outputs);
 
 		return $out;
         }
 
         public function getHelp(): string {
-                return 'ChatbotExtendedService – nimmt eine Benutzereingabe entgegen, fragt OpenAI, gibt die Antwort aus nud ruft dabei weitere Services auf.';
+                return 'ChatbotExtendedService – nimmt eine Benutzereingabe entgegen, fragt OpenAI, gibt die Antwort aus und ruft dabei weitere Services auf.';
         }
 
 	// Private methods
@@ -78,6 +82,30 @@ class ChatbotExtendedService implements IOutput {
 		}
 		return $out;
 	}
+
+	private function addJoke(array $outputs): string {
+		$out = '';
+		$joke = $outputs['trans']['translated'] ?? '';
+		if (!empty($joke)) {
+			$content = '<span class="label">Joke:</span>' . htmlspecialchars($joke);
+			$out .= $this->renderInfoBox('joke', '😂 Witz des Tages', $content);
+		}
+		return $out;
+	}
+
+	private function addWeather(array $outputs): string {
+		$out = '';
+		$weather = $outputs['ai-weather']['response'] ?? '';
+		if (!empty($weather)) {
+			$content = '<span class="label">Wetter:</span>' . htmlspecialchars($weather);
+			$out .= $this->renderInfoBox('weather', '🌤  Wetterbericht', $content);
+		}
+		return $out;
+	}
+
+	/*
+	 * Für Warnungen: renderInfoBox('warning', '⚠️ Warnung', $content)
+	 */
 
 	private function renderInfoBox(string $type, string $title, string $contentHtml): string {
 		return '<div class="info-box info-' . htmlspecialchars($type) . '">' .

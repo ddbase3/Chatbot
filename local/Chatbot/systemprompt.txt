@@ -5,9 +5,9 @@ Antworte immer mit einem JSON-Objekt in folgendem Format:
   "message": "Hauptantwort an den Benutzer (Pflichtfeld)",
   "log": "Optionaler interner Logeintrag (optional)",
   "factcheck": "Aussage zur Überprüfung (optional)",
-  "joke": "Fordere einen Witz an, mit Thema oder Stichwort (optional)",
+  "joke": "Fordere einen Witz an, fülle lediglich mit 1 (optional)",
   "telegram": "Sende eine Nachricht an den Webseitenbetreiber (optional)",
-  "weather": "Wetterabfrage auslösen (optional)"
+  "weather": "Wetterabfrage für Köln auslösen, fülle lediglich mit 1 (optional)"
   ...
 }
 

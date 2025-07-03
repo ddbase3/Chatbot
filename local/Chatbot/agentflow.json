@@ -19,19 +19,16 @@
     { "id": "claim", "type": "staticmessagenode" },
     { "id": "factchecker", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo", "temperature": 0.3 } },
 
+    { "id": "try-joke", "type": "tryarraygetnode", "inputs": { "path": "joke" } },
+    { "id": "http-joke", "type": "httpgetnode", "inputs": { "url": "https://api.chucknorris.io/jokes/random" } },
+    { "id": "j2a-joke", "type": "jsontoarraynode" },
+    { "id": "get-joke", "type": "arraygetnode", "inputs": { "path": "value" } },
+    { "id": "cfg2", "type": "getconfigurationnode", "inputs": { "section": "deepltranslation", "key": "apikey" } },
+    { "id": "trans", "type": "deepltranslatenode", "inputs": { "source": "EN", "target": "DE" } },
 
-    {
-      "id": "cfg2",
-      "type": "getconfigurationnode",
-      "inputs": { "section": "deepltranslation", "key": "apikey" }
-    },
-    {
-      "id": "trans",
-      "type": "deepltranslatenode",
-      "inputs": { "source": "DE", "target": "EN" }
-    }
-
-
+    { "id": "try-weather", "type": "tryarraygetnode", "inputs": { "path": "weather" } },
+    { "id": "http-weather", "type": "httpgetnode", "inputs": { "url": "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,weathercode" } },
+    { "id": "ai-weather", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo", "temperature": 0.5 } }
   ],
   "connections": [
     { "from": "cfg1", "output": "value", "to": "ai", "input": "apikey" },
@@ -56,10 +53,18 @@
     { "from": "try-factcheck", "output": "value", "to": "factchecker", "input": "prompt" },
     { "from": "try-factcheck", "output": "value", "to": "claim", "input": "text" },
 
-
+    { "from": "j2a", "output": "array", "to": "try-joke", "input": "array" },
+    { "from": "try-joke", "output": "value", "to": "http-joke", "input": "active" },
     { "from": "cfg2", "output": "value", "to": "trans", "input": "apikey" },
-    { "from": "trans", "output": "translated", "to": "log", "input": "message" }
+    { "from": "http-joke", "output": "body", "to": "j2a-joke", "input": "json" },
+    { "from": "j2a-joke", "output": "array", "to": "get-joke", "input": "array" },
+    { "from": "get-joke", "output": "value", "to": "trans", "input": "text" },
 
+    { "from": "j2a", "output": "array", "to": "try-weather", "input": "array" },
+    { "from": "try-weather", "output": "value", "to": "http-weather", "input": "active" },
+    { "from": "cfg1", "output": "value", "to": "ai-weather", "input": "apikey" },
+    { "from": "__input__", "output": "system-weather", "to": "ai-weather", "input": "system" },
+    { "from": "http-weather", "output": "body", "to": "ai-weather", "input": "prompt" }
   ]
 }
 
