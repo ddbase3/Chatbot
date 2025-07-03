@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    { "id": "cfg1", "type": "getconfigurationnode", "inputs": { "section": "openaiconversation", "key": "apikey" } },
+    { "id": "ai", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo" } },
+    { "id": "j2a", "type": "jsontoarraynode" },
+
+    { "id": "try-message", "type": "tryarraygetnode", "inputs": { "path": "message" } },
+    { "id": "msg", "type": "staticmessagenode" },
+
+    { "id": "try-log", "type": "tryarraygetnode", "inputs": { "path": "log" } },
+    { "id": "log", "type": "loggernode", "inputs": { "scope": "chatbot" } },
+
+    { "id": "try-telegram", "type": "tryarraygetnode", "inputs": { "path": "telegram" } },
+    { "id": "cfg-tg1", "type": "getconfigurationnode", "inputs": { "section": "telegram", "key": "bottoken" } },
+    { "id": "cfg-tg2", "type": "getconfigurationnode", "inputs": { "section": "telegram", "key": "me" } },
+    { "id": "telegram", "type": "telegramsendmessage" },
+   
+
+
+    {
+      "id": "cfg2",
+      "type": "getconfigurationnode",
+      "inputs": { "section": "deepltranslation", "key": "apikey" }
+    },
+    {
+      "id": "trans",
+      "type": "deepltranslatenode",
+      "inputs": { "source": "DE", "target": "EN" }
+    }
+
+
+  ],
+  "connections": [
+    { "from": "cfg1", "output": "value", "to": "ai", "input": "apikey" },
+    { "from": "__input__", "output": "system", "to": "ai", "input": "system" },
+    { "from": "__input__", "output": "prompt", "to": "ai", "input": "prompt" },
+    { "from": "ai", "output": "response", "to": "j2a", "input": "json" },
+
+    { "from": "j2a", "output": "array", "to": "try-message", "input": "array" },
+    { "from": "try-message", "output": "value", "to": "msg", "input": "text" },
+
+    { "from": "j2a", "output": "array", "to": "try-log", "input": "array" },
+    { "from": "try-log", "output": "value", "to": "log", "input": "message" },
+
+    { "from": "j2a", "output": "array", "to": "try-telegram", "input": "array" },
+    { "from": "cfg-tg1", "output": "value", "to": "telegram", "input": "bot_token" },
+    { "from": "cfg-tg2", "output": "value", "to": "telegram", "input": "chat_id" },
+    { "from": "try-telegram", "output": "value", "to": "telegram", "input": "message" },
+
+
+
+    { "from": "cfg2", "output": "value", "to": "trans", "input": "apikey" },
+    { "from": "trans", "output": "translated", "to": "log", "input": "message" }
+
+  ]
+}
+
