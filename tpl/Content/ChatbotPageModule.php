@@ -30,7 +30,7 @@
 				        chatControl.append('<div class="user">' + message + '</div>');
 		                        scrollToBottom();
 
-				        $.post('chatbotdatahawkservice.php', { prompt: message }, function(result) {
+				        $.post('chatbotllamaservice.php', { prompt: message }, function(result) {
 		                                var response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
 						chatControl.append('<div class="assistent">' + response + '</div>');
 				                scrollToResponse();
