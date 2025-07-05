@@ -9,7 +9,7 @@
 		</section>
 
 		<script>
-		        $(function() {
+			document.addEventListener('DOMContentLoaded', () => {
 		                var chatControl = $('#chatbot .chat');
 				var msgControl = $('#chatbot textarea');
 
@@ -30,7 +30,7 @@
 				        chatControl.append('<div class="user">' + message + '</div>');
 		                        scrollToBottom();
 
-				        $.post('chatbotllamaservice.php', { prompt: message }, function(result) {
+					$.post('<?php echo $this->_['service']; ?>', { prompt: message }, function(result) {
 		                                var response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
 						chatControl.append('<div class="assistent">' + response + '</div>');
 				                scrollToResponse();

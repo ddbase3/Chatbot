@@ -37,7 +37,7 @@ class ChatbotDataHawkService implements IOutput {
 {
   "nodes": [
     {
-      "id": "cfg1",
+      "id": "cfg",
       "type": "getconfigurationnode",
       "inputs": {
         "section": "openaiconversation",
@@ -62,7 +62,7 @@ class ChatbotDataHawkService implements IOutput {
     }
   ],
   "connections": [
-    { "from": "cfg1", "output": "value", "to": "ai", "input": "apikey" },
+    { "from": "cfg", "output": "value", "to": "ai", "input": "apikey" },
     { "from": "__input__", "output": "system", "to": "ai", "input": "system" },
     { "from": "__input__", "output": "prompt", "to": "ai", "input": "prompt" },
     { "from": "ai", "output": "response", "to": "msg", "input": "text" },
