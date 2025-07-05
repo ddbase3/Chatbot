@@ -75,8 +75,15 @@ JSON;
 		$flow = $this->agentflowfactory->createFromArray('strictflow', $data, $context);
                 $outputs = $flow->run(['system' => $system, 'prompt' => $prompt]);
 
-		$message = $outputs['msg']['message'] ?? '';
+		$query = $outputs['msg']['message'] ?? '';
 		$report = $outputs['datahawk']['report'] ?? '';
+		$columns = $outputs['datahawk']['columns'] ?? '';
+		$sql = $outputs['datahawk']['sql'] ?? '';
+
+		$report .= '<script>console.log(' . json_decode($prompt) . ');</script>';
+		$report .= '<script>console.log(' .  json_encode(json_decode($query)) . ');</script>';
+		$report .= '<script>console.log(' . json_encode($sql) . ');</script>';
+		$report .= '<script>console.log(' . json_encode($columns) . ');</script>';
 
 		if (!empty($report)) return $report;
 
