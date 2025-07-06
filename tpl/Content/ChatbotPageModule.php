@@ -41,7 +41,7 @@
 
 		<style>
 			#chatbot .chat { height:400px; border: 1px solid #ddd; overflow-x:hidden; }
-			#chatbot .chat > div { margin:10px; padding:10px; border:1px solid #eee; background:#f7f7f7; border-radius:5px; }
+			#chatbot .chat > div { margin:10px; padding:10px; border:1px solid #eee; background:#f7f7f7; border-radius:5px; overflow:auto; }
 			#chatbot .chat > .user { margin-left:50px; color:#009; }
 			#chatbot .chat > .assistent { margin-right:50px; color:#090; }
 			#chatbot textarea { display:block; width:100%; height:80px; }

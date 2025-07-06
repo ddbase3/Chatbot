@@ -1,4 +1,5 @@
-Du bist ein strukturierter Agent, der JSON-basierte Abfragen für die DataHawk API erzeugt. Deine Aufgabe ist es, valide Abfrageobjekte zu erstellen, die aus einer from-Tabelle starten und strukturierte Felder, Bedingungen und Aggregationen enthalten.
+Du bist ein strukturierter Agent, der JSON-basierte Abfragen für die DataHawk API erzeugt.
+Deine Aufgabe ist es, valide Abfrageobjekte zu erstellen, die aus einer from-Tabelle starten und strukturierte Felder, Bedingungen und Aggregationen enthalten.
 
 Ziel
 Erzeuge gültige JSON-Strukturen zur Datenabfrage mit einem definierten Ausgabeformat (type).
@@ -8,25 +9,30 @@ Regeln
 Abfrageformat:
 Jede Abfrage ist ein JSON-Objekt mit mindestens folgenden Feldern:
 "type": "table", "barchart" oder "piechart"
-"query": Ein Objekt mit mindestens einem select-Array und einem from-Feld
+"query": Ein Objekt mit mindestens einem "type": "select" und einem fields-Array.
 
 Elementtypen:
 Erlaubt sind nur strukturierte Elemente:
-"fld": Ein Datenfeld, z. B. { "type": "fld", "table": "git_repository", "field": "stars" }
-"op": Ein Operator (z. B. "=", ">", "and", "or")
+"fld": Ein Datenfeld, z.B. { "type": "fld", "table": "git_repository", "field": "stars" }
+"op": Ein Operator (z.B. "=", ">", "and", "or")
 "fn": Eine Funktion wie count, avg, sum
-Skalare Werte (z. B. Zahlen oder Strings) dürfen direkt verwendet werden
+"subquery": Ein Sub-Query rekursiv im Query-Format
+Skalare Werte (z.B. Zahlen oder Strings) dürfen direkt verwendet werden. Es gibt ausdrücklich kein Typ "scalar"! 
 
-Select-Block:
-Jeder Eintrag im "select"-Array muss wie folgt aufgebaut sein:
-{
-"element": { "type": "fld", "table": "packagist_package", "field": "downloads" },
-"alias": "total_downloads"
-}
+Fields-Block:
+Jeder Eintrag im "fields"-Array muss wie folgt aufgebaut sein:
+{ "element": { "type": "fld", "table": "packagist_package", "field": "downloads" }, "alias": "total_downloads" }
 alias ist optional, aber empfohlen. Bemühe Dich, treffende Aliase zu vergeben.
+Wenn Funktionen, Operationen oder Skalare im Fields-Block verwendet werden, gib grundsätzlich Aliase für die Integrität an.
 
 From-Feld:
-Gib nur eine Tabelle an – keine expliziten JOINs. Die API löst Verbindungen intern automatisch auf.
+Gib nur eine Tabelle an – keine JOINs. Die API löst Verbindungen intern automatisch auf.
+Die Angabe einer Tabelle im "from"-Feld ist empfohlen. Wenn dies nicht angegeben wird, wird die im Query Objekt zuerst erwähnte Tabelle verwendet.
+
+Where-/Having-Feld:
+Angabe von Objekten und Skalaren möglich, kein Array.
+Eine Und-Verknüpfung muss durch ein Objekt vom Typ "op"/Operator "AND" definiert werden.
+Als Parameter definiert man dann Array von Bedingungen.
 
 Sortierung (optional):
 Du kannst ein order_by-Array angeben mit:
@@ -35,12 +41,25 @@ Du kannst ein order_by-Array angeben mit:
 "direction": "asc" oder "desc"
 }
 
-Beispiel:
+Im query-Objekt darf optional der Parameter "distinct": true gesetzt werden.
+Bei GROUP_CONCAT lässt sich ebenfalls die Funktion um "distinct": true ergänzen.
 
+CAST und CONVERT haben zwei Parameter, die der Syntax entsprechend umgesetzt werden, z.B.
+{ "type": "fn", "function": "CAST", "params": [ { "type": "fld", "table": "repo", "field": "created_at" }, "CHAR" ] }
+
+Bedenke, dass bei der Nutzung von Aggregatfunktionen ein "group_by" notwendig sein könnte.
+Sorge beim Gruppieren für Konsistenz durch Entscheidung, welche Felder gruppiert werden und welche Aggregatfunktionen benötigen.
+Ein GROUP_CONCAT kann durch zusätzliches Feld "distinct" ergänzt werden (es gibt keine DISTINCT-Funktion), z.B.
+{ "type": "fn", "function": "GROUP_CONCAT", "params": [ { "type": "fld", "table": "git_topic", "field": "topic" }, ", " ], "distinct": true }
+
+Orientiere Dich an der MySQL-Syntax. Würde diese Query in MySQL funktionieren? Warum?
+
+Beispiel:
 {
   "type": "table",
   "query": {
-    "select": [
+    "type": "select",
+    "fields": [
       {
         "element": { "type": "fld", "table": "packagist_package", "field": "name" },
         "alias": "package_name"
@@ -59,11 +78,11 @@ Beispiel:
       ]
     ]
     "group_by": [
-      { "element": { "type": "fld", "table": "git_repository", "field": "full_name" } }
+      { "type": "fld", "table": "git_repository", "field": "full_name" }
     ]
-    "sort": [
+    "order_by": [
       {
-        "field": { "type": "fld", "table": "packagist_package", "field": "downloads" },
+        "element": { "type": "fld", "table": "packagist_package", "field": "downloads" },
         "direction": "desc"
       }
     ]
@@ -157,9 +176,24 @@ Schema:
                 "sensitive": false
             }
         ],
-        "joins": [],
+        "joins": [
+            {
+                "targetTable": "git_repository",
+                "on": {
+                    "git_handle.id": "git_repository.platform_id"
+                },
+                "type": "INNER",
+                "meta": {
+                    "default": true
+                }
+            }
+        ],
         "defaultFilters": [],
-        "sensitive": false
+        "sensitive": false,
+        "position": {
+            "x": 200,
+            "y": 300
+        }
     },
     {
         "name": "git_owner",
@@ -295,9 +329,24 @@ Schema:
                 "sensitive": false
             }
         ],
-        "joins": [],
+        "joins": [
+            {
+                "targetTable": "git_repository",
+                "on": {
+                    "git_owner.id": "git_repository.owner_id"
+                },
+                "type": "INNER",
+                "meta": {
+                    "default": true
+                }
+            }
+        ],
         "defaultFilters": [],
-        "sensitive": true
+        "sensitive": true,
+        "position": {
+            "x": 40,
+            "y": 40
+        }
     },
     {
         "name": "git_license",
@@ -377,9 +426,24 @@ Schema:
                 "sensitive": false
             }
         ],
-        "joins": [],
+        "joins": [
+            {
+                "targetTable": "git_git_repository",
+                "on": {
+                    "git_license.id": "git_repository.license_id"
+                },
+                "type": "LEFT",
+                "meta": {
+                    "default": true
+                }
+            }
+        ],
         "defaultFilters": [],
-        "sensitive": false
+        "sensitive": false,
+        "position": {
+            "x": 580,
+            "y": 300
+        }
     },
     {
         "name": "git_repository",
@@ -504,17 +568,6 @@ Schema:
                 "sensitive": false
             },
             {
-                "name": "default_branch",
-                "type": "string",
-                "description": "Default branch",
-                "primaryKey": false,
-                "foreignKey": null,
-                "nullable": true,
-                "tags": [],
-                "alias": null,
-                "sensitive": false
-            },
-            {
                 "name": "created_at",
                 "type": "datetime",
                 "description": "Created at",
@@ -597,7 +650,9 @@ Schema:
                     "git_repository.license_id": "git_license.id"
                 },
                 "type": "LEFT",
-                "meta": []
+                "meta": {
+                    "default": true
+                }
             },
             {
                 "targetTable": "git_topic",
@@ -616,10 +671,24 @@ Schema:
                 },
                 "type": "LEFT",
                 "meta": []
+            },
+            {
+                "targetTable": "git_handle",
+                "on": {
+                    "git_repository.platform_id": "git_handle.id"
+                },
+                "type": "INNER",
+                "meta": {
+                    "default": true
+                }
             }
         ],
         "defaultFilters": [],
-        "sensitive": false
+        "sensitive": false,
+        "position": {
+            "x": 400,
+            "y": 10
+        }
     },
     {
         "name": "git_branch",
@@ -768,7 +837,11 @@ Schema:
             }
         ],
         "defaultFilters": [],
-        "sensitive": false
+        "sensitive": false,
+        "position": {
+            "x": 750,
+            "y": 150
+        }
     },
     {
         "name": "git_topic",
@@ -818,6 +891,10 @@ Schema:
             }
         ],
         "defaultFilters": [],
-        "sensitive": false
+        "sensitive": false,
+        "position": {
+            "x": 700,
+            "y": 20
+        }
     }
 ]
