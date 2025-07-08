@@ -12,6 +12,7 @@
 			document.addEventListener('DOMContentLoaded', () => {
 		                var chatControl = $('#chatbot .chat');
 				var msgControl = $('#chatbot textarea');
+				var form = $('#chatbot form');
 
 				function scrollToBottom() {
 					chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
@@ -23,7 +24,7 @@
 					chatControl.stop().animate({ scrollTop: scrollOffset - 10 }, 300);
 				}
 
-				$('#chatbot form').on('submit', function(e) {
+				form.on('submit', function(e) {
 		                        e.preventDefault();
 				        var message = msgControl.val().replace(/(?:\r\n|\r|\n)/g, '<br>');
 		                        msgControl.val('');
@@ -36,7 +37,14 @@
 				                scrollToResponse();
 		                        });
 				});
-		        });
+
+				msgControl.on('keydown', function(e) {
+					if (e.key === 'Enter' && !e.shiftKey) {
+						e.preventDefault();
+						form.submit();
+					}
+				});
+			});
 		</script>
 
 		<style>

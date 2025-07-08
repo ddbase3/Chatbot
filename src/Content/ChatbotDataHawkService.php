@@ -76,13 +76,17 @@ JSON;
                 $outputs = $flow->run(['system' => $system, 'prompt' => $prompt]);
 
 		$report = $outputs['datahawk']['report'] ?? '';
-		if (empty($report)) $report = 'Keine Daten gefunden.';
+		if (empty($report)) $report = '<p>Keine Daten gefunden.</p>';
 
 		$query = $outputs['msg']['message'] ?? '';
+		$response = $outputs['datahawk']['response'] ?? '';
 		$columns = $outputs['datahawk']['columns'] ?? '';
 		$sql = $outputs['datahawk']['sql'] ?? '';
 
+		$report = '<p>' . $response . '</p>' . $report;
+
 		$report .= '<script>console.log(' . json_encode($prompt) . ');</script>';
+		$report .= '<script>console.log(' . json_encode($response) . ');</script>';
 		$report .= '<script>console.log(' . json_encode(json_decode($query)) . ');</script>';
 		$report .= '<script>console.log(' . json_encode($sql) . ');</script>';
 		$report .= '<script>console.log(' . json_encode($columns) . ');</script>';
