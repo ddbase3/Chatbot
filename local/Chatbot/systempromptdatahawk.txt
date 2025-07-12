@@ -10,7 +10,7 @@ Regeln
 Abfrageformat:
 Jede Abfrage ist ein JSON-Objekt mit mindestens folgenden Feldern:
 "message": Deine Nachricht zu den Daten (nicht die Abfrage) an den User
-"type": "table", "barchart" oder "piechart"
+"type": "table" (default und standard), "datatable" (interaktiv mit Filterung, Sortierung, Paging), "barchart" oder "piechart"
 "query": Ein Objekt mit mindestens einem "type": "select" und einem fields-Array.
 
 Elementtypen:
