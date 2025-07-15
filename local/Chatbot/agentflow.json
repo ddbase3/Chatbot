@@ -2,6 +2,7 @@
   "nodes": [
     { "id": "cfg1", "type": "getconfigurationnode", "inputs": { "section": "openaiconversation", "key": "apikey" } },
     { "id": "ai", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo" } },
+    { "id": "debug", "type": "staticmessagenode" },
     { "id": "j2a", "type": "jsontoarraynode" },
 
     { "id": "try-message", "type": "tryarraygetnode", "inputs": { "path": "message" } },
@@ -34,6 +35,7 @@
     { "from": "cfg1", "output": "value", "to": "ai", "input": "apikey" },
     { "from": "__input__", "output": "system", "to": "ai", "input": "system" },
     { "from": "__input__", "output": "prompt", "to": "ai", "input": "prompt" },
+    { "from": "ai", "output": "response", "to": "debug", "input": "text" },
     { "from": "ai", "output": "response", "to": "j2a", "input": "json" },
 
     { "from": "j2a", "output": "array", "to": "try-message", "input": "array" },

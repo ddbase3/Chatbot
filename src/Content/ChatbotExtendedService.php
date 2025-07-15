@@ -51,6 +51,7 @@ class ChatbotExtendedService implements IOutput {
 		$message = $outputs['msg']['message'] ?? '[Keine Nachricht erhalten]';
 		$out = $message;
 
+		$out .= $this->addDebug($outputs);
 		$out .= $this->addFactCheck($outputs);
 		$out .= $this->addJoke($outputs);
 		$out .= $this->addWeather($outputs);
@@ -63,6 +64,19 @@ class ChatbotExtendedService implements IOutput {
         }
 
 	// Private methods
+
+	private function addDebug(array $outputs): string {
+		$out = '';
+		$debug = $outputs['debug']['message'] ?? '';
+		try {
+			$aiResponse = json_encode(json_decode($debug), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+			return '<script>console.log(' . $aiResponse . ');</script>';
+		} catch(\Throwable $e) {
+			$safe = json_encode($debug, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+			return '<script>console.log(' . $safe . ');</script>';
+		}
+		return $out;
+	}
 
 	private function addFactCheck(array $outputs): string {
 		$out = '';
