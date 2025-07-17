@@ -14,7 +14,7 @@
     { "id": "try-telegram", "type": "tryarraygetnode", "inputs": { "path": "telegram" } },
     { "id": "cfg-tg1", "type": "getconfigurationnode", "inputs": { "section": "telegram", "key": "bottoken" } },
     { "id": "cfg-tg2", "type": "getconfigurationnode", "inputs": { "section": "telegram", "key": "me" } },
-    { "id": "telegram", "type": "telegramsendmessage" },
+    { "id": "telegram", "type": "telegramsendmessage", "docks": { "logger": ["log-res"] }},
    
     { "id": "try-factcheck", "type": "tryarraygetnode", "inputs": { "path": "factcheck" } },
     { "id": "claim", "type": "staticmessagenode" },
@@ -30,6 +30,9 @@
     { "id": "try-weather", "type": "tryarraygetnode", "inputs": { "path": "weather" } },
     { "id": "http-weather", "type": "httpgetnode", "inputs": { "url": "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,weathercode" } },
     { "id": "ai-weather", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo", "temperature": 0.5 } }
+  ],
+  "resources": [
+    { "id": "log-res", "type": "loggerresource", "config": { "scope": "MissionBay" } }
   ],
   "connections": [
     { "from": "cfg1", "output": "value", "to": "ai", "input": "apikey" },
