@@ -32,7 +32,7 @@
     { "id": "ai-weather", "type": "simpleopenainode", "inputs": { "model": "gpt-3.5-turbo", "temperature": 0.5 } }
   ],
   "resources": [
-    { "id": "log-res", "type": "loggerresource", "config": { "scope": "MissionBay" } }
+    { "id": "log-res", "type": "loggerresource", "config": { "scope": { "mode": "fixed", "value": "MissionBay" } } }
   ],
   "connections": [
     { "from": "cfg1", "output": "value", "to": "ai", "input": "apikey" },
