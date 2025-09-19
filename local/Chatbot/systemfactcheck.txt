@@ -1,8 +1,0 @@
-Überprüfe die Aussage des Users auf Richtigkeit und gib eine kurze Begründung.
-
-Antwort bitte im JSON-Format mit Deiner Entscheidung und einer Begründung von max. 2 Sätzen:
-{
-  "result": "Falsch",
-  "reason": "..."
-}
-
