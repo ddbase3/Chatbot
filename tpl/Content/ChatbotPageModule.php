@@ -1,58 +1,107 @@
-		<section id="chatbot">
-			<div class="frame">
-				<div class="chat"></div>
-				<form>
-					<textarea name="prompt"></textarea>
-					<input type="submit" name="submit" value="Send" />
-				</form>
-			</div>
-		</section>
+<section id="chatbot">
+	<div class="frame">
+		<div class="chat"></div>
+		<form>
+			<textarea name="prompt"></textarea>
+			<div name="chatvoice"></div>
+			<input type="submit" name="submit" value="Send" />
+		</form>
+	</div>
+</section>
 
-		<script>
-			document.addEventListener('DOMContentLoaded', () => {
-		                var chatControl = $('#chatbot .chat');
-				var msgControl = $('#chatbot textarea');
-				var form = $('#chatbot form');
+<script src="plugin/Chatbot/assets/chatvoice/chatvoice.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+	const chatControl = $('#chatbot .chat');
+	const msgControl = $('#chatbot textarea');
+	const form = $('#chatbot form');
 
-				function scrollToBottom() {
-					chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
-				}
+	function scrollToBottom() {
+		chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
+	}
 
-				function scrollToResponse() {
-				        var last = chatControl.children().last();
-					var scrollOffset = last.offset().top - chatControl.offset().top + chatControl.scrollTop();
-					chatControl.stop().animate({ scrollTop: scrollOffset - 10 }, 300);
-				}
+	function scrollToResponse() {
+		const last = chatControl.children().last();
+		const scrollOffset = last.offset().top - chatControl.offset().top + chatControl.scrollTop();
+		chatControl.stop().animate({ scrollTop: scrollOffset - 10 }, 300);
+	}
 
-				form.on('submit', function(e) {
-		                        e.preventDefault();
-				        var message = msgControl.val().replace(/(?:\r\n|\r|\n)/g, '<br>');
-		                        msgControl.val('');
-				        chatControl.append('<div class="message user">' + message + '</div>');
-		                        scrollToBottom();
+	// --- submit handler ---
+	form.on('submit', function(e) {
+		e.preventDefault();
 
-					var loader = $('<div class="loading"><div class="spinner"></div></div>');
-					chatControl.append(loader);
-					scrollToBottom();
+		const message = msgControl.val().replace(/(?:\r\n|\r|\n)/g, '<br>');
+		msgControl.val('');
+		chatControl.append('<div class="message user">' + message + '</div>');
+		scrollToBottom();
 
-					$.post('<?php echo $this->_['service']; ?>', { prompt: message }, function(result) {
+		const loader = $('<div class="loading"><div class="spinner"></div></div>');
+		chatControl.append(loader);
+		scrollToBottom();
 
-						loader.remove();
+		$.post('<?php echo $this->_['service']; ?>', { prompt: message }, function(result) {
+			loader.remove();
 
-						var response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
-						chatControl.append('<div class="message assistent">' + response + '</div>');
-				                scrollToResponse();
-		                        });
-				});
+			const response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
+			chatControl.append('<div class="message assistent">' + response + '</div>');
+			scrollToResponse();
 
-				msgControl.on('keydown', function(e) {
-					if (e.key === 'Enter' && !e.shiftKey) {
-						e.preventDefault();
-						form.submit();
-					}
-				});
-			});
-		</script>
+			// pass reply to voice control
+			voiceCtrl.handleAssistantReply(response);
+		});
+	});
+
+	// --- enter-to-submit ---
+	msgControl.on('keydown', function(e) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			form.submit();
+		}
+	});
+
+	// --- init voice control ---
+	const voiceCtrl = new ChatVoiceControl({
+		stt: "browser",
+		tts: "browser",
+		lang: "auto",
+		availableLangs: [
+			{ code: "auto", label: "Auto" },
+			{ code: "de-DE", label: "Deutsch" },
+			{ code: "en-US", label: "English" },
+			{ code: "fr-FR", label: "Français" },
+			{ code: "es-ES", label: "Español" },
+			{ code: "it-IT", label: "Italiano" },
+			{ code: "pt-PT", label: "Português" },
+			{ code: "bg-BG", label: "Български" },
+			{ code: "ro-RO", label: "Română" },
+			{ code: "uk-UA", label: "Українська" },
+			{ code: "ru-RU", label: "Русский" }
+		],
+		events: {
+			onUserFinishedSpeaking: (text) => {
+				console.log("STT finished:", text);
+				// text ins textarea übernehmen (Mitschrieb)
+				const current = msgControl.val();
+				msgControl.val(current ? current + " " + text : text);
+			},
+			onSendRequested: (text) => {
+				console.log("Dialog autosend:", text);
+				// im Dialogmodus sofort senden
+				form.submit();
+			},
+			onAssistantReplied: (reply) => console.log("Assistant replied:", reply),
+			onTtsStarted: (txt) => console.log("TTS started:", txt),
+			onTtsFinished: () => console.log("TTS finished"),
+			onRecordingEnded: () => console.log("Recording ended"),
+			onError: (err) => console.error("VoiceControl Error:", err)
+		}
+	});
+
+	// attach voice control UI
+	voiceCtrl.attachTo(document.querySelector("#chatbot [name=chatvoice]"));
+});
+</script>
+
 
 		<style>
 			#chatbot .chat { height:400px; border: 1px solid #ddd; overflow-x:hidden; }
@@ -73,6 +122,12 @@
 				0% { transform: rotate(0deg); }
 				100% { transform: rotate(360deg); }
 			}
+
+
+
+			#chatbot [name="chatvoice"] { float: right; width: auto; }
+			#chatbot [name="chatvoice"] { text-align: right; }
+			#chatbot [name="chatvoice"] button, #chatbot [name="chatvoice"] select { width: auto; vertical-align: middle; margin-left: 4px; }
 
 
 			.info-box {
