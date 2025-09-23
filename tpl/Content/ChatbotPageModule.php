@@ -1,20 +1,27 @@
-<section id="chatbot">
+<section>
 	<div class="frame">
-		<div class="chat"></div>
-		<form>
-			<textarea name="prompt"></textarea>
-			<div name="chatvoice"></div>
-			<input type="submit" name="submit" value="Send" />
-		</form>
+		<div id="chatbot">
+			<p class="baseprompt">Wie kann ich Dir helfen?</p>
+			<div class="chat chatempty"></div>
+			<form class="chatform">
+				<textarea name="prompt"></textarea>
+				<div name="chatvoice"></div>
+				<input type="submit" name="submit" value="Send" />
+			</form>
+		</div>
 	</div>
 </section>
 
 <script src="plugin/Chatbot/assets/chatvoice/chatvoice.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+	const basePrompt = $('#chatbot .baseprompt');
 	const chatControl = $('#chatbot .chat');
 	const msgControl = $('#chatbot textarea');
 	const form = $('#chatbot form');
+	const serviceUrl = '<?php echo $this->_['service']; ?>';
+
+	basePrompt.load(serviceUrl + "?baseprompt");
 
 	function scrollToBottom() {
 		chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
@@ -30,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
 	form.on('submit', function(e) {
 		e.preventDefault();
 
+		chatControl.removeClass('chatempty');
+		basePrompt.remove();
+
 		const message = msgControl.val().replace(/(?:\r\n|\r|\n)/g, '<br>');
 		msgControl.val('');
 		chatControl.append('<div class="message user">' + message + '</div>');
@@ -39,12 +49,19 @@ document.addEventListener('DOMContentLoaded', () => {
 		chatControl.append(loader);
 		scrollToBottom();
 
-		$.post('<?php echo $this->_['service']; ?>', { prompt: message }, function(result) {
+		$.post(serviceUrl, { prompt: message }, function(result) {
 			loader.remove();
 
 			const response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
-			chatControl.append('<div class="message assistent">' + response + '</div>');
+			var respElem = $('<div class="message assistent">' + response + '</div>').appendTo(chatControl);
+			var toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
+			toolsElem.append('<a title="copy" href="#"><img src="plugin/Chatbot/assets/icons/copy.svg"></a>');
+			toolsElem.append('<a title="helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsup.svg"></a>');
+			toolsElem.append('<a title="not helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsdown.svg"></a>');
+			toolsElem.append('<a title="reload" href="#"><img src="plugin/Chatbot/assets/icons/reload.svg"></a>');
 			scrollToResponse();
+
+			$('a', toolsElem).on('click', function(e) { e.preventDefault(); });
 
 			// pass reply to voice control
 			voiceCtrl.handleAssistantReply(response);
@@ -104,12 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 		<style>
-			#chatbot .chat { height:400px; border: 1px solid #ddd; overflow-x:hidden; }
-			#chatbot .chat > .message { margin:10px; padding:10px; border:1px solid #eee; background:#f7f7f7; border-radius:5px; overflow:auto; }
-			#chatbot .chat > .user { margin-left:50px; color:#009; }
-			#chatbot .chat > .assistent { margin-right:50px; color:#090; }
-			#chatbot textarea { display:block; width:100%; height:80px; }
-
+			#chatbot .chat { height:400px; margin:0 0 20px 0; padding:0 10px; overflow-x:hidden; }
+			#chatbot .chat.chatempty { height:auto; }
+			#chatbot .baseprompt { min-height:30px; margin:100px 0 0; font-size:18pt; text-align:center; }
+			#chatbot .chat > .message { margin:10px 0 30px; overflow:auto; }
+			#chatbot .chat > .user { max-width:80%; margin-left:auto; padding:10px; border:1px solid #eee; border-radius:5px; background:#f7f7f7; color:#333; }
+			#chatbot .chat > .assistent { margin-right:50px; }
+			#chatbot .chatform { padding:10px 30px; border:1px solid #ddd; border-radius:30px; }
+			#chatbot textarea { width:100%; height:50px; padding:3px 10px; border:0; outline:none; resize:none; }
+			#chatbot textarea:focus { border:1px solid #eee; border-radius:5px; background:#f7f7f7; }
 
 			.loading { text-align: center; margin: 10px; }
 			.spinner {
@@ -128,6 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			#chatbot [name="chatvoice"] { float: right; width: auto; }
 			#chatbot [name="chatvoice"] { text-align: right; }
 			#chatbot [name="chatvoice"] button, #chatbot [name="chatvoice"] select { width: auto; vertical-align: middle; margin-left: 4px; }
+
+
+			#chatbot .chat-tools a { display:inline-block; margin:15px 10px 0; }
+			#chatbot .chat-tools img { width:16px; height:16px; opacity:0.5; }
 
 
 			.info-box {
