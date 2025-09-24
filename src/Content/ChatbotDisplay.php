@@ -2,6 +2,7 @@
 
 namespace Chatbot\Content;
 
+use Base3\Api\IAssetResolver;
 use Base3\Api\IDisplay;
 use Base3\Api\IMvcView;
 use Base3\Api\ISchemaProvider;
@@ -10,7 +11,10 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	private array $data;
 
-	public function __construct(private readonly IMvcView $view) {}
+	public function __construct(
+		private readonly IMvcView $view,
+		private readonly IAssetResolver $assetResolver
+	) {}
 
 	// Implementation of IBase
 
@@ -23,8 +27,12 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	public function getOutput($out = 'html') {
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
 		$this->view->setTemplate('Content/ChatbotDisplay.php');
+
 		$defaults = ['service' => 'chatbotservice.php'];
 		foreach (array_merge($defaults, $this->data) as $tag => $content) $this->view->assign($tag, $content);
+
+		$this->view->assign('resolve', fn($src) => $this->assetResolver->resolve($src));
+
 		return $this->view->loadTemplate();
 	}
 

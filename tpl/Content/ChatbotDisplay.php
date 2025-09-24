@@ -12,7 +12,7 @@
 	</div>
 </section>
 
-<script src="plugin/Chatbot/assets/chatvoice/chatvoice.js"></script>
+<script src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 	const basePrompt = $('#chatbot .baseprompt');
@@ -55,10 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			const response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
 			var respElem = $('<div class="message assistent">' + response + '</div>').appendTo(chatControl);
 			var toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
-			toolsElem.append('<a title="copy" href="#"><img src="plugin/Chatbot/assets/icons/copy.svg"></a>');
-			toolsElem.append('<a title="helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsup.svg"></a>');
-			toolsElem.append('<a title="not helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsdown.svg"></a>');
-			toolsElem.append('<a title="reload" href="#"><img src="plugin/Chatbot/assets/icons/reload.svg"></a>');
+			toolsElem.append('<a title="copy" href="#"><img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/copy.svg'); ?>"></a>');
+			toolsElem.append('<a title="helpful" href="#"><img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsup.svg'); ?>"></a>');
+			toolsElem.append('<a title="not helpful" href="#"><img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdown.svg'); ?>"></a>');
+			toolsElem.append('<a title="reload" href="#"><img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/reload.svg'); ?>"></a>');
 			scrollToResponse();
 
 			$('a', toolsElem).on('click', function(e) { e.preventDefault(); });
