@@ -21,7 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
 	const form = $('#chatbot form');
 	const serviceUrl = '<?php echo $this->_['service']; ?>';
 
-	basePrompt.load(serviceUrl + "?baseprompt");
+	$.get(serviceUrl, { baseprompt: 1 }, function(result) {
+		basePrompt.html(result);
+	});
 
 	function scrollToBottom() {
 		chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
