@@ -1,7 +1,7 @@
 <section>
 	<div class="frame">
 		<div id="chatbot">
-			<p class="baseprompt">Wie kann ich Dir helfen?</p>
+			<p class="baseprompt"></p>
 			<div class="chat chatempty"></div>
 			<form class="chatform">
 				<textarea name="prompt"></textarea>
@@ -68,6 +68,19 @@ document.addEventListener('DOMContentLoaded', () => {
 		});
 	});
 
+	// --- auto-growing msg control ---
+	msgControl
+		.on('input', function() {
+			this.style.height = 'auto';
+			const newHeight = Math.min(this.scrollHeight, 150);
+			this.style.height = Math.max(newHeight, 50) + 'px';
+		})
+		.each(function() {
+			this.style.height = 'auto';
+			const newHeight = Math.min(this.scrollHeight, 150);
+			this.style.height = Math.max(newHeight, 50) + 'px';
+		});
+
 	// --- enter-to-submit ---
 	msgControl.on('keydown', function(e) {
 		if (e.key === 'Enter' && !e.shiftKey) {
@@ -123,12 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
 		<style>
 			#chatbot .chat { height:400px; margin:0 0 20px 0; padding:0 10px; overflow-x:hidden; }
 			#chatbot .chat.chatempty { height:auto; }
-			#chatbot .baseprompt { min-height:30px; margin:100px 0 0; font-size:18pt; text-align:center; }
+			#chatbot .baseprompt { min-height:40px; margin:100px 0 0; font-size:18pt; text-align:center; }
 			#chatbot .chat > .message { margin:10px 0 30px; overflow:auto; }
 			#chatbot .chat > .user { max-width:80%; margin-left:auto; padding:10px; border:1px solid #eee; border-radius:5px; background:#f7f7f7; color:#333; }
 			#chatbot .chat > .assistent { margin-right:50px; }
 			#chatbot .chatform { padding:10px 30px; border:1px solid #ddd; border-radius:30px; }
-			#chatbot textarea { width:100%; height:50px; padding:3px 10px; border:0; outline:none; resize:none; }
+			#chatbot textarea { width:100%; min-height:50px; max-height:150px; overflow-y:auto; padding:3px 10px; border:0; outline:none; resize:none; }
 			#chatbot textarea:focus { border:1px solid #eee; border-radius:5px; background:#f7f7f7; }
 
 			.loading { text-align: center; margin: 10px; }

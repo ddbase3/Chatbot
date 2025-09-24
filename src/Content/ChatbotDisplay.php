@@ -2,28 +2,40 @@
 
 namespace Chatbot\Content;
 
+use Base3\Api\IDisplay;
 use Base3\Api\IMvcView;
 use Base3\Api\ISchemaProvider;
-use ModuledPage\Page\AbstractModuleContent;
 
-class ChatbotPageModule extends AbstractModuleContent implements ISchemaProvider {
+class ChatbotDisplay implements IDisplay, ISchemaProvider {
+
+	private array $data;
 
 	public function __construct(private readonly IMvcView $view) {}
 
 	// Implementation of IBase
 
 	public static function getName(): string {
-		return 'chatbotpagemodule';
+		return 'chatbotdisplay';
 	}
 
-	// Implementation of IPageModule
+	// Implementation of IOutput
 
-	public function getHtml() {
+	public function getOutput($out = 'html') {
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
-		$this->view->setTemplate('Content/ChatbotPageModule.php');
+		$this->view->setTemplate('Content/ChatbotDisplay.php');
 		$defaults = ['service' => 'chatbotservice.php'];
 		foreach (array_merge($defaults, $this->data) as $tag => $content) $this->view->assign($tag, $content);
 		return $this->view->loadTemplate();
+	}
+
+	public function getHelp() {
+		return 'Display a Chatbot.';
+	}
+
+	// Implementation of IDisplay
+
+	public function setData($data) {
+		$this->data = (array) $data;
 	}
 
 	// Implementation of ISchemaProvider
