@@ -5,8 +5,8 @@
 			<div class="chat chatempty"></div>
 			<form class="chatform">
 				<textarea name="prompt"></textarea>
+				<button type="submit" name="submit"><img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/send.svg'); ?>" /></button>
 				<div name="chatvoice"></div>
-				<input type="submit" name="submit" value="Send" />
 			</form>
 		</div>
 	</div>
@@ -66,9 +66,33 @@ document.addEventListener('DOMContentLoaded', () => {
 			$('a', toolsElem).on('click', function(e) { e.preventDefault(); });
 
 			// pass reply to voice control
-			voiceCtrl.handleAssistantReply(response);
+			const responseForVoice = cleanForVoice(response);
+			voiceCtrl.handleAssistantReply(responseForVoice);
 		});
 	});
+
+	function cleanForVoice(str) {
+		// remove HTML tags
+		let txt = str.replace(/<[^>]*>/g, ' ');
+
+		// remove markdown formatting
+		txt = txt
+			.replace(/(\*\*|__)(.*?)\1/g, '$2')   // bold
+			.replace(/(\*|_)(.*?)\1/g, '$2')      // italic
+			.replace(/`([^`]*)`/g, '$1')          // inline code
+			.replace(/```[\s\S]*?```/g, '')       // code blocks
+			.replace(/#+\s?(.*)/g, '$1')          // headings
+			.replace(/\[(.*?)\]\(.*?\)/g, '$1')   // links [text](url) → text
+			.replace(/!\[(.*?)\]\(.*?\)/g, '$1'); // images ![alt](url) → alt
+
+		// remove emojis
+		txt = txt.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+
+		// normalize whitespace
+		txt = txt.replace(/\s+/g, ' ').trim();
+
+		return txt;
+	}
 
 	// --- auto-growing msg control ---
 	msgControl
@@ -142,9 +166,11 @@ document.addEventListener('DOMContentLoaded', () => {
 			#chatbot .chat > .message { margin:10px 0 30px; overflow:auto; }
 			#chatbot .chat > .user { max-width:80%; margin-left:auto; padding:10px; border:1px solid #eee; border-radius:5px; background:#f7f7f7; color:#333; }
 			#chatbot .chat > .assistent { margin-right:50px; }
-			#chatbot .chatform { padding:10px 30px; border:1px solid #ddd; border-radius:30px; }
+			#chatbot .chatform { position:relative; padding:15px 30px 55px; border:1px solid #ddd; border-radius:30px; }
 			#chatbot textarea { width:100%; min-height:50px; max-height:150px; overflow-y:auto; padding:3px 10px; border:0; outline:none; resize:none; }
 			#chatbot textarea:focus { border:1px solid #eee; border-radius:5px; background:#f7f7f7; }
+			#chatbot [type="submit"] { float:right; box-sizing:content-box; width:20px; height:20px; padding:10px; background:#333; border:0; border-radius:20px; }
+			#chatbot [type="submit"] img { width:20px; height:20px; filter:invert(1); }
 
 			.loading { text-align: center; margin: 10px; }
 			.spinner {
@@ -160,9 +186,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-			#chatbot [name="chatvoice"] { float: right; width: auto; }
-			#chatbot [name="chatvoice"] { text-align: right; }
-			#chatbot [name="chatvoice"] button, #chatbot [name="chatvoice"] select { width: auto; vertical-align: middle; margin-left: 4px; }
+			#chatbot [name="chatvoice"] { float:right; width:auto; margin-right:25px; }
+			#chatbot [name="chatvoice"] button { box-sizing:content-box; width:20px; height:20px; padding:10px; border:0; cursor:pointer; }
+			#chatbot [name="chatvoice"] button { vertical-align: middle; margin-left: 4px; }
+			#chatbot [name="chatvoice"] button { background:no-repeat center transparent; background-size:20px 20px; opacity:0.5; }
+			#chatbot [name="chatvoice"] button.active { opacity:1; }
+			#chatbot [name="chatvoice"] button.microphone { background-image:url(<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/microphone.svg'); ?>); }
+			#chatbot [name="chatvoice"] button.speaker { background-image:url(<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/speaker.svg'); ?>); }
+			#chatbot [name="chatvoice"] button.dialogue { background-image:url(<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/dialogue.svg'); ?>); }
+			#chatbot [name="chatvoice"] select { width: auto; vertical-align: middle; margin-left: 18px;}
 
 
 			#chatbot .chat-tools a { display:inline-block; margin:15px 10px 0; }

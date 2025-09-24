@@ -1,8 +1,8 @@
 class ChatVoiceControl {
 	constructor(config = {}) {
 		this.config = Object.assign({
-			stt: "browser",        // "off" | "browser" | "service"
-			tts: "browser",        // "off" | "browser" | "service"
+			stt: "browser",
+			tts: "browser",
 			serviceUrls: {
 				stt: "/transcribe.php",
 				tts: "/speak.php"
@@ -26,9 +26,9 @@ class ChatVoiceControl {
 		this.container = document.createElement("div");
 		this.container.className = "chat-voice-controls";
 
-		this.btnMic = this._makeButton("🎤", "Start/stop microphone");
-		this.btnSpeaker = this._makeButton("🔈", "Toggle text-to-speech");
-		this.btnDialog = this._makeButton("🔁", "Toggle dialog mode");
+		this.btnMic = this._makeButton("Start/stop microphone", "microphone");
+		this.btnSpeaker = this._makeButton("Toggle text-to-speech", "speaker");
+		this.btnDialog = this._makeButton("Toggle dialog mode", "dialogue");
 
 		this.container.append(this.btnMic, this.btnSpeaker, this.btnDialog);
 
@@ -52,12 +52,12 @@ class ChatVoiceControl {
 		this.btnDialog.addEventListener("click", () => this.toggleDialog());
 	}
 
-	_makeButton(icon, label) {
+	_makeButton(label, className) {
 		const b = document.createElement("button");
 		b.type = "button";
-		b.textContent = icon;
 		b.title = label;
 		b.setAttribute("aria-label", label);
+		if (className) b.classList.add(className);
 		return b;
 	}
 
@@ -89,24 +89,18 @@ class ChatVoiceControl {
 					const text = e.results[0][0].transcript;
 					this._trigger("onUserFinishedSpeaking", text);
 
-					// in dialog mode: request sending
 					if (this.keepOn) {
 						this._trigger("onSendRequested", text);
 					}
 				};
 				this.recog.onend = () => {
 					this.isRecording = false;
-					this.btnMic.textContent = "🎤";
+					this.btnMic.classList.remove("active");
 					this._trigger("onRecordingEnded");
 				};
 				this.recog.onerror = e => {
 					if (e.error === "no-speech" && this.keepOn) {
-						// auto-exit dialog mode on silence
-						this.keepOn = false;
-						this.btnMic.style.display = "";
-						this.btnSpeaker.style.display = "";
-						this.btnDialog.textContent = "🔁";
-						this._trigger("onDialogEnded");
+						this._endDialogMode();
 					} else {
 						this._trigger("onError", e);
 					}
@@ -116,7 +110,7 @@ class ChatVoiceControl {
 				console.log("STT service mode started");
 			}
 			this.isRecording = true;
-			this.btnMic.textContent = "🛑";
+			this.btnMic.classList.add("active");
 		} catch (err) {
 			this._trigger("onError", err);
 		}
@@ -126,7 +120,7 @@ class ChatVoiceControl {
 		if (!this.isRecording) return;
 		if (this.recog) this.recog.stop();
 		this.isRecording = false;
-		this.btnMic.textContent = "🎤";
+		this.btnMic.classList.remove("active");
 	}
 
 	toggleMic() {
@@ -167,9 +161,10 @@ class ChatVoiceControl {
 
 	toggleSpeaker() {
 		this.speechEnabled = !this.speechEnabled;
-		this.btnSpeaker.textContent = this.speechEnabled ? "🔊" : "🔈";
-
-		if (!this.speechEnabled) {
+		if (this.speechEnabled) {
+			this.btnSpeaker.classList.add("active");
+		} else {
+			this.btnSpeaker.classList.remove("active");
 			if (this.config.tts === "browser") {
 				speechSynthesis.cancel();
 			} else if (this.config.tts === "service" && this.activeAudio) {
@@ -178,7 +173,6 @@ class ChatVoiceControl {
 				this.activeAudio = null;
 			}
 		}
-
 		this._trigger("onSpeakerToggled", this.speechEnabled);
 	}
 
@@ -186,32 +180,51 @@ class ChatVoiceControl {
 	toggleDialog() {
 		this.keepOn = !this.keepOn;
 		if (this.keepOn) {
-			this.btnMic.style.display = "none";
-			this.btnSpeaker.style.display = "none";
-			this.btnDialog.textContent = "⏹";
+			this.btnDialog.classList.add("active");
+
+			// mic on + speaker initially off
+			this.btnMic.classList.add("active");
+			this.btnMic.disabled = true;
+			this.btnSpeaker.classList.remove("active");
+			this.btnSpeaker.disabled = true;
+
 			this.startRecording();
 		} else {
-			this.btnMic.style.display = "";
-			this.btnSpeaker.style.display = "";
-			this.btnDialog.textContent = "🔁";
-			this.stopRecording();
-
-			// stop any ongoing TTS immediately
-			if (this.config.tts === "browser") {
-				speechSynthesis.cancel();
-			} else if (this.config.tts === "service" && this.activeAudio) {
-				this.activeAudio.pause();
-				this.activeAudio.currentTime = 0;
-				this.activeAudio = null;
-			}
-			this._trigger("onDialogEnded");
+			this._endDialogMode();
 		}
+	}
+
+	_endDialogMode() {
+		this.keepOn = false;
+		this.btnDialog.classList.remove("active");
+
+		// reset mic + speaker
+		this.btnMic.classList.remove("active");
+		this.btnMic.disabled = false;
+		this.btnSpeaker.classList.remove("active");
+		this.btnSpeaker.disabled = false;
+
+		this.stopRecording();
+
+		// stop TTS immediately
+		if (this.config.tts === "browser") {
+			speechSynthesis.cancel();
+		} else if (this.config.tts === "service" && this.activeAudio) {
+			this.activeAudio.pause();
+			this.activeAudio.currentTime = 0;
+			this.activeAudio = null;
+		}
+		this._trigger("onDialogEnded");
 	}
 
 	handleAssistantReply(replyText) {
 		this._trigger("onAssistantReplied", replyText);
 		if (this.speechEnabled || this.keepOn) {
+			if (this.keepOn) this.btnSpeaker.classList.add("active");
+
 			this.speak(replyText, () => {
+				if (this.keepOn) this.btnSpeaker.classList.remove("active");
+
 				this._trigger("onTtsFinished");
 				if (this.keepOn) this.startRecording();
 			});
