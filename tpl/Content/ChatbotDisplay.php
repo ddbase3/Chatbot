@@ -1,5 +1,3 @@
-<section>
-	<div class="frame">
 		<div id="chatbot">
 			<p class="baseprompt"></p>
 			<div class="chat chatempty"></div>
@@ -9,8 +7,6 @@
 				<div name="chatvoice"></div>
 			</form>
 		</div>
-	</div>
-</section>
 
 <script src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>"></script>
 <script>
