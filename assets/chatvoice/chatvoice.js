@@ -17,6 +17,10 @@ class ChatVoiceControl {
 		this.speechEnabled = false;
 		this.activeAudio = null;
 
+		// state flags
+		this._hadSpeechResult = false;
+		this._ttsInProgress = false;
+
 		this._buildUI();
 		this._bindShortcuts();
 	}
@@ -85,19 +89,28 @@ class ChatVoiceControl {
 				if (!SpeechRecognition) throw new Error("Browser STT not supported");
 				this.recog = new SpeechRecognition();
 				this.recog.lang = this.config.lang === "auto" ? "de-DE" : this.config.lang;
+
+				// reset flags for this recognition turn
+				this._hadSpeechResult = false;
+
 				this.recog.onresult = e => {
+					this._hadSpeechResult = true;
 					const text = e.results[0][0].transcript;
 					this._trigger("onUserFinishedSpeaking", text);
-
-					if (this.keepOn) {
-						this._trigger("onSendRequested", text);
-					}
+					if (this.keepOn) this._trigger("onSendRequested", text);
 				};
+
 				this.recog.onend = () => {
 					this.isRecording = false;
 					this.btnMic.classList.remove("active");
 					this._trigger("onRecordingEnded");
+
+					// auto-end dialog only when silence (no speech) and not in TTS
+					if (this.keepOn && !this._hadSpeechResult && !this._ttsInProgress) {
+						this._endDialogMode();
+					}
 				};
+
 				this.recog.onerror = e => {
 					if (e.error === "no-speech" && this.keepOn) {
 						this._endDialogMode();
@@ -105,6 +118,7 @@ class ChatVoiceControl {
 						this._trigger("onError", e);
 					}
 				};
+
 				this.recog.start();
 			} else if (this.config.stt === "service") {
 				console.log("STT service mode started");
@@ -136,7 +150,11 @@ class ChatVoiceControl {
 			if (this.config.tts === "browser") {
 				const u = new SpeechSynthesisUtterance(cleanText);
 				u.lang = this.config.lang === "auto" ? "de-DE" : this.config.lang;
-				if (onEnd) u.onend = onEnd;
+				this._ttsInProgress = true;
+				u.onend = () => {
+					this._ttsInProgress = false;
+					onEnd && onEnd();
+				};
 				speechSynthesis.speak(u);
 				this._trigger("onTtsStarted", cleanText);
 			} else if (this.config.tts === "service") {
@@ -145,14 +163,18 @@ class ChatVoiceControl {
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ text: cleanText, lang: this.config.lang })
 				})
-					.then(r => r.blob())
-					.then(blob => {
-						this.activeAudio = new Audio(URL.createObjectURL(blob));
-						if (onEnd) this.activeAudio.onended = onEnd;
-						this.activeAudio.play();
-						this._trigger("onTtsStarted", cleanText);
-					})
-					.catch(err => this._trigger("onError", err));
+				.then(r => r.blob())
+				.then(blob => {
+					this.activeAudio = new Audio(URL.createObjectURL(blob));
+					this._ttsInProgress = true;
+					this.activeAudio.onended = () => {
+						this._ttsInProgress = false;
+						onEnd && onEnd();
+					};
+					this.activeAudio.play();
+					this._trigger("onTtsStarted", cleanText);
+				})
+				.catch(err => this._trigger("onError", err));
 			}
 		} catch (err) {
 			this._trigger("onError", err);
@@ -172,6 +194,7 @@ class ChatVoiceControl {
 				this.activeAudio.currentTime = 0;
 				this.activeAudio = null;
 			}
+			this._ttsInProgress = false;
 		}
 		this._trigger("onSpeakerToggled", this.speechEnabled);
 	}
@@ -214,6 +237,7 @@ class ChatVoiceControl {
 			this.activeAudio.currentTime = 0;
 			this.activeAudio = null;
 		}
+		this._ttsInProgress = false;
 		this._trigger("onDialogEnded");
 	}
 
