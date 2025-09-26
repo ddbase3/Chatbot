@@ -79,8 +79,8 @@
 				// add tools
 				const toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
 				toolsElem.append('<a title="copy" href="#"><img src="plugin/Chatbot/assets/icons/copy.svg"></a>');
-				toolsElem.append('<a title="helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsup.svg"></a>');
-				toolsElem.append('<a title="not helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsdown.svg"></a>');
+				const likeBtn = $('<a title="helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsup.svg"></a>').appendTo(toolsElem);
+				const dislikeBtn = $('<a title="not helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsdown.svg"></a>').appendTo(toolsElem);
 				toolsElem.append('<a title="reload" href="#"><img src="plugin/Chatbot/assets/icons/reload.svg"></a>');
 				scrollToResponse();
 
@@ -108,16 +108,42 @@
 					}
 
 					if (action === 'helpful') {
-						console.log("Like clicked for message:", data.id);
+						const img = $link.find('img');
+						const isActive = img.attr('src').includes('thumbsupfill');
+
+						if (!isActive) {
+							// set active
+							img.attr('src', 'plugin/Chatbot/assets/icons/thumbsupfill.svg');
+							dislikeBtn.hide();
+							$.post(serviceUrl, { feedback: 'like', messageid: data.id }, function(res) { console.log(res); });
+						} else {
+							// remove feedback
+							img.attr('src', 'plugin/Chatbot/assets/icons/thumbsup.svg');
+							dislikeBtn.show();
+							$.post(serviceUrl, { feedback: 'like_removed', messageid: data.id }, function(res) { console.log(res); });
+						}
 					}
 
 					if (action === 'not helpful') {
-						console.log("Dislike clicked for message:", data.id);
+						const img = $link.find('img');
+						const isActive = img.attr('src').includes('thumbsdownfill');
+
+						if (!isActive) {
+							// set active
+							img.attr('src', 'plugin/Chatbot/assets/icons/thumbsdownfill.svg');
+							likeBtn.hide();
+							$.post(serviceUrl, { feedback: 'dislike', messageid: data.id }, function(res) { console.log(res); });
+						} else {
+							// remove feedback
+							img.attr('src', 'plugin/Chatbot/assets/icons/thumbsdown.svg');
+							likeBtn.show();
+							$.post(serviceUrl, { feedback: 'dislike_removed', messageid: data.id }, function(res) { console.log(res); });
+						}
 					}
 
 					if (action === 'reload') {
 						console.log("Reload clicked for message:", data.id);
-						// could trigger resend later
+						$.post(serviceUrl, { feedback: 'reload', messageid: data.id });
 					}
 				});
 
