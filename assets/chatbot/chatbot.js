@@ -60,8 +60,23 @@
 			$.post(serviceUrl, { prompt: messageHtml }, function(result) {
 				loader.remove();
 
-				const response = result.replace(/(?:\r\n|\r|\n)/g, '<br>');
-				const respElem = $('<div class="message assistent">' + response + '</div>').appendTo(chatControl);
+				// parse JSON result
+				let data;
+				try {
+					data = JSON.parse(result);
+				} catch (e) {
+					console.error("Invalid JSON response", e, result);
+					return;
+				}
+
+				// build assistant message
+				const respElem = $('<div class="message assistent"></div>')
+					.attr('id', data.id) // visible id for later reference
+					.attr('data-markdown', data.markdown || '') // store markdown for copy
+					.html(data.html || data.text) // show html output, fallback text
+					.appendTo(chatControl);
+
+				// add tools
 				const toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
 				toolsElem.append('<a title="copy" href="#"><img src="plugin/Chatbot/assets/icons/copy.svg"></a>');
 				toolsElem.append('<a title="helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsup.svg"></a>');
@@ -69,9 +84,45 @@
 				toolsElem.append('<a title="reload" href="#"><img src="plugin/Chatbot/assets/icons/reload.svg"></a>');
 				scrollToResponse();
 
-				$('a', toolsElem).on('click', function(e) { e.preventDefault(); });
+				// tools click handling
+				$('a', toolsElem).on('click', function(e) {
+					e.preventDefault();
 
-				const responseForVoice = cleanForVoice(response);
+					const $link = $(this);
+					const action = $link.attr('title');
+
+					if (action === 'copy') {
+						const markdown = respElem.attr('data-markdown') || '';
+						if (!markdown) return;
+
+						navigator.clipboard.writeText(markdown).then(() => {
+							const img = $link.find('img');
+							const oldSrc = img.attr('src');
+							img.attr('src', 'plugin/Chatbot/assets/icons/check.svg');
+							setTimeout(() => {
+								img.attr('src', oldSrc);
+							}, 2000);
+						}).catch(err => {
+							console.error("Clipboard copy failed:", err);
+						});
+					}
+
+					if (action === 'helpful') {
+						console.log("Like clicked for message:", data.id);
+					}
+
+					if (action === 'not helpful') {
+						console.log("Dislike clicked for message:", data.id);
+					}
+
+					if (action === 'reload') {
+						console.log("Reload clicked for message:", data.id);
+						// could trigger resend later
+					}
+				});
+
+				// prepare text for voice
+				const responseForVoice = cleanForVoice(data.text || '');
 				root._voiceCtrl && root._voiceCtrl.handleAssistantReply(responseForVoice);
 			});
 		}
