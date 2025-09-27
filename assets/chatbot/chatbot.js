@@ -81,7 +81,7 @@
 				toolsElem.append('<a title="copy" href="#"><img src="plugin/Chatbot/assets/icons/copy.svg"></a>');
 				const likeBtn = $('<a title="helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsup.svg"></a>').appendTo(toolsElem);
 				const dislikeBtn = $('<a title="not helpful" href="#"><img src="plugin/Chatbot/assets/icons/thumbsdown.svg"></a>').appendTo(toolsElem);
-				toolsElem.append('<a title="reload" href="#"><img src="plugin/Chatbot/assets/icons/reload.svg"></a>');
+				// toolsElem.append('<a title="reload" href="#"><img src="plugin/Chatbot/assets/icons/reload.svg"></a>');
 				scrollToResponse();
 
 				// tools click handling
