@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace ModuledPage;
+namespace Chatbot;
 
 use Base3\Api\ICheck;
 use Base3\Api\IContainer;
