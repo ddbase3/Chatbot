@@ -65,13 +65,14 @@
 				try {
 					data = JSON.parse(result);
 				} catch (e) {
-					console.error("Invalid JSON response", e, result);
-					return;
+					// console.error("Invalid JSON response", e, result);
+					// return;
+					data = { text: result };
 				}
 
 				// build assistant message
 				const respElem = $('<div class="message assistent"></div>')
-					.attr('id', data.id) // visible id for later reference
+					.attr('id', data.id || 0) // visible id for later reference
 					.attr('data-markdown', data.markdown || '') // store markdown for copy
 					.html(data.html || data.text) // show html output, fallback text
 					.appendTo(chatControl);
