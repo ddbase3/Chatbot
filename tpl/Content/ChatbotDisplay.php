@@ -18,7 +18,18 @@ document.addEventListener('DOMContentLoaded', () => {
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>');
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.js'); ?>');
 
-		initChatbot('#chatbot');
+		initChatbot('#chatbot', {
+			<?php if (!empty($this->_['lang'])) { ?>defaultLang: '<?php echo $this->_['lang']; ?>',<?php } ?>
+			icons: {
+				copy: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/copy.svg'); ?>',
+				check: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/check.svg'); ?>',
+				thumbsup: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsup.svg'); ?>',
+				thumbsupfill: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsupfill.svg'); ?>',
+				thumbsdown: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdown.svg'); ?>',
+				thumbsdownfill: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdownfill.svg'); ?>',
+				reload: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/reload.svg'); ?>'
+			}
+		});
 	})();
 });
 </script>
