@@ -46,7 +46,7 @@ The service fetches the OpenAI API key from configuration, builds a predefined f
 ```json
 {
   "nodes": [
-    {"id": "cfg", "type": "getconfigurationnode", "inputs": {"section": "openaiconversation", "key": "apikey"}},
+    {"id": "cfg", "type": "getconfigurationnode", "inputs": {"section": "openai", "key": "apikey"}},
     {"id": "ai", "type": "simpleopenainode", "inputs": {"model": "gpt-3.5-turbo"}},
     {"id": "log", "type": "loggernode", "inputs": {"scope": "development"}},
     {"id": "msg", "type": "staticmessagenode"}
@@ -73,7 +73,7 @@ Requires the following config section for OpenAI access:
 
 ```json
 {
-  "openaiconversation": {
+  "openai": {
     "apikey": "sk-..."
   }
 }
