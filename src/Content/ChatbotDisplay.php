@@ -31,7 +31,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		// Default values
 		$defaults = [
 			'service' => 'chatbotservice.php',
-			'lang' => ''
+			'lang' => '',
+			'sse' => false
 		];
 
 		foreach (array_merge($defaults, $this->data) as $tag => $content) {
@@ -71,6 +72,11 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'description' => 'Default language for voice control (e.g. "de-DE", "en-US", or "auto")',
 					'maxLength' => 20,
 					'default' => '',
+				],
+				'sse' => [
+					'type' => 'boolean',
+					'description' => 'Enable SSE streaming mode',
+					'default' => false
 				],
 			],
 			'required' => ['service'],

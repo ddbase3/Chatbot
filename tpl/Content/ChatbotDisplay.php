@@ -1,4 +1,4 @@
-<div id="chatbot" role="region" aria-label="Chatbot" data-service="<?php echo $this->_['service']; ?>">
+<div id="chatbot" role="region" aria-label="Chatbot" data-service="<?php echo $this->_['service']; ?>" data-sse="<?php echo !empty($this->_['sse']) ? '1' : '0'; ?>">
 	<p class="baseprompt"></p>
 	<div class="chat chatempty" aria-live="polite"></div>
 
