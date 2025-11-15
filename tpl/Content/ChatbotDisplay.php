@@ -12,8 +12,12 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-	(async function() {
+	var chatbotInitialized = false;
+
+	async function initChatbotWidget() {
+		if (chatbotInitialized) return;
+		chatbotInitialized = true;
+
 		await AssetLoader.loadCssAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.css'); ?>');
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>');
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.js'); ?>');
@@ -30,7 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
 				reload: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/reload.svg'); ?>'
 			}
 		});
-	})();
-});
+	}
+
+	if (document.readyState !== 'loading') {
+		initChatbotWidget();
+	} else {
+		document.addEventListener('DOMContentLoaded', initChatbotWidget);
+	}
 </script>
 
