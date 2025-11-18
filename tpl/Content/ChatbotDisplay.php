@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		await AssetLoader.loadCssAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.css'); ?>');
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>');
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.js'); ?>');
+		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/EventTransport/assets/eventtransportclient.js'); ?>');
 
 		initChatbot('#chatbot', {
 			<?php if (!empty($this->_['lang'])) { ?>defaultLang: '<?php echo $this->_['lang']; ?>',<?php } ?>
