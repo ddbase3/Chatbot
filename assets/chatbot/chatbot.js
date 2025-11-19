@@ -1,36 +1,18 @@
 (function() {
+
 	function initChatbot(rootSel = '#chatbot', config = {}) {
 		const root = document.querySelector(rootSel);
 		if (!root || root.dataset.inited === '1') return;
 		root.dataset.inited = '1';
 
 		const $root = $(root);
-		const basePrompt = $root.find('.baseprompt');
 		const chatControl = $root.find('.chat');
 		const msgControl = $root.find('textarea[name=prompt]');
 		const btnSend = $root.find('#chatSend');
-		const serviceUrl = root.getAttribute('data-service');
-
-		// --- Default icons (can be overridden)
-		const icons = Object.assign({
-			copy: 'plugin/Chatbot/assets/icons/copy.svg',
-			check: 'plugin/Chatbot/assets/icons/check.svg',
-			thumbsup: 'plugin/Chatbot/assets/icons/thumbsup.svg',
-			thumbsupfill: 'plugin/Chatbot/assets/icons/thumbsupfill.svg',
-			thumbsdown: 'plugin/Chatbot/assets/icons/thumbsdown.svg',
-			thumbsdownfill: 'plugin/Chatbot/assets/icons/thumbsdownfill.svg',
-			reload: 'plugin/Chatbot/assets/icons/reload.svg'
-		}, config.icons || {});
+		const basePrompt = $root.find('.baseprompt');
 
 		// ---------------------------------------------------------------------
-		// Load base prompt (non-streaming GET request)
-		// ---------------------------------------------------------------------
-		$.get(serviceUrl, { baseprompt: 1 }, function(result) {
-			basePrompt.html(result);
-		});
-
-		// ---------------------------------------------------------------------
-		// UI Utility Functions
+		// Utility
 		// ---------------------------------------------------------------------
 		function scrollToBottom() {
 			chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
@@ -38,8 +20,8 @@
 
 		function scrollToResponse() {
 			const last = chatControl.children().last();
-			const scrollOffset = last.offset().top - chatControl.offset().top + chatControl.scrollTop();
-			chatControl.stop().animate({ scrollTop: scrollOffset - 10 }, 300);
+			const offset = last.offset().top - chatControl.offset().top + chatControl.scrollTop();
+			chatControl.stop().animate({ scrollTop: offset - 10 }, 300);
 		}
 
 		function cleanForVoice(str) {
@@ -59,104 +41,164 @@
 		}
 
 		// ---------------------------------------------------------------------
-		// MAIN CHAT FUNCTION — EventTransport Streaming
+		// Base Prompt
+		// ---------------------------------------------------------------------
+		$.get(config.serviceUrl, { baseprompt: 1 }, res => {
+			basePrompt.html(res);
+		});
+
+		// ---------------------------------------------------------------------
+		// Main Chat Send
 		// ---------------------------------------------------------------------
 		async function sendMessage() {
 			const raw = msgControl.val() || '';
-			const plain = raw.replace(/(?:\r\n|\r|\n)/g, '\n').trim();
+			const plain = raw.trim();
 			if (!plain) return;
 
 			chatControl.removeClass('chatempty');
-			$root.find('.baseprompt').remove();
+			basePrompt.remove();
 
-			// print user message
-			const messageHtml = raw.replace(/(?:\r\n|\r|\n)/g, '<br>');
+			// Render user message
+			const userHtml = raw.replace(/\n/g, '<br>');
 			msgControl.val('');
-			chatControl.append('<div class="message user">' + messageHtml + '</div>');
+			chatControl.append('<div class="message user">' + userHtml + '</div>');
 			scrollToBottom();
 
-			// assistant message block (live filled)
+			// Assistant message wrapper
 			const respElem = $('<div class="message assistent"></div>').appendTo(chatControl);
+			const contentElem = $('<div class="assistant-content"></div>').appendTo(respElem);
+
+			// Tools only if enabled
+			let toolsElem = null;
+			if (config.useIcons) {
+				toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
+			}
+
 			let fullText = '';
+			let renderTimeout = null;
 
-			// live loader spinner
-			const loader = $('<div class="loading"><div class="spinner"></div></div>');
-			chatControl.append(loader);
-			scrollToBottom();
+			function scheduleRender() {
+				if (!config.useMarkdown) {
+					contentElem.text(fullText);
+					scrollToBottom();
+					return;
+				}
+				if (renderTimeout) return;
+				renderTimeout = setTimeout(() => {
+					contentElem.html(marked.parse(fullText));
+					renderTimeout = null;
+					scrollToBottom();
+				}, 60);
+			}
 
-			// Build streaming URL with prompt (GET → SSE)
-			const streamUrl = serviceUrl + '?prompt=' + encodeURIComponent(plain);
+			// REST MODE (no streaming)
+			if (config.transportMode === 'rest') {
+				// Loader spinner
+				const loader = $('<div class="loading"><div class="spinner"></div></div>');
+				chatControl.append(loader);
+				scrollToBottom();
 
-			// Create EventTransportClient (auto selects SSE as first choice)
+				const url = config.serviceUrl + '?prompt=' + encodeURIComponent(plain);
+				const result = await fetch(url).then(r => r.text());
+
+				fullText = result;
+				scheduleRender();
+				loader.remove();
+				scrollToBottom();
+
+				if (config.useVoice && root._voiceCtrl) {
+					const txt = cleanForVoice(contentElem.text());
+					root._voiceCtrl.handleAssistantReply(txt);
+				}
+				return;
+			}
+
+			// -----------------------------------------------------------------
+			// STREAMING VIA EventTransportClient
+			// -----------------------------------------------------------------
+			const streamUrl = config.serviceUrl + '?prompt=' + encodeURIComponent(plain);
+
 			const client = new EventTransportClient({
 				endpoint: streamUrl,
-				transport: 'auto',
+				transport: config.transportMode || 'auto',
 				events: ['token', 'done']
 			});
 
 			let finished = false;
 
-			// Connect to streaming endpoint
 			await client.connect((event, data) => {
 
-				// --- Token event (streamed piece of text)
 				if (event === 'token') {
 					if (typeof data === 'string') {
 						try { data = JSON.parse(data); } catch {}
 					}
-
 					const t = data.text || '';
 					fullText += t;
-					respElem.html(fullText.replace(/\n/g, '<br>'));
-					scrollToBottom();
+					scheduleRender();
 				}
 
-				// --- Done event (stream finished)
 				if (event === 'done') {
-					if (finished) return;   // avoid double termination
+					if (finished) return;
 					finished = true;
-					loader.remove();
 
-					// chat tools (copy, like, dislike)
-					const toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
+					if (config.useMarkdown) {
+						contentElem.html(marked.parse(fullText));
+					} else {
+						contentElem.text(fullText);
+					}
 
-					toolsElem.append(`<a title="copy" href="#"><img src="${icons.copy}"></a>`);
-					const likeBtn = $(`<a title="helpful" href="#"><img src="${icons.thumbsup}"></a>`).appendTo(toolsElem);
-					const dislikeBtn = $(`<a title="not helpful" href="#"><img src="${icons.thumbsdown}"></a>`).appendTo(toolsElem);
+					// Tools only if enabled
+					if (config.useIcons && toolsElem) {
+						const icons = config.icons || {};
+						const copyBtn = $(`<a title="copy" href="#" class="copy-btn"><img src="${icons.copy}"></a>`);
+						toolsElem.append(copyBtn);
+						toolsElem.append(`<a title="helpful" href="#"><img src="${icons.thumbsup}"></a>`);
+						toolsElem.append(`<a title="not helpful" href="#"><img src="${icons.thumbsdown}"></a>`);
+
+						copyBtn.on('click', function(e) {
+							e.preventDefault();
+							navigator.clipboard.writeText(fullText).then(() => {
+								const img = $(this).find('img');
+								img.attr('src', icons.check);
+								setTimeout(() => img.attr('src', icons.copy), 1000);
+							});
+						});
+					}
 
 					scrollToResponse();
 
-					// Prepare output for TTS
-					const responseForVoice = cleanForVoice(fullText);
-					root._voiceCtrl && root._voiceCtrl.handleAssistantReply(responseForVoice);
+					// Voice only if enabled
+					if (config.useVoice && root._voiceCtrl) {
+						const txt = cleanForVoice(contentElem.text());
+						root._voiceCtrl.handleAssistantReply(txt);
+					}
 
 					client.close();
 				}
 
-				// --- Error event
 				if (event === 'error') {
-					loader.remove();
-					respElem.append(`<div class="error">Connection error</div>`);
+					contentElem.append('<div class="error">Connection error</div>');
 					client.close();
 				}
 			});
 		}
 
 		// ---------------------------------------------------------------------
-		// INPUT & SEND TRIGGERS
+		// Input Events
 		// ---------------------------------------------------------------------
-		btnSend.off('click.chatbot').on('click.chatbot', function(e) {
+		btnSend.off('click.chatbot').on('click.chatbot', e => {
 			e.preventDefault();
 			sendMessage();
 		});
 
-		msgControl.off('keydown.chatbot').on('keydown.chatbot', function(e) {
+		msgControl.off('keydown.chatbot').on('keydown.chatbot', e => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
 				sendMessage();
 			}
 		});
 
+		// Auto-resize
 		msgControl.off('input.chatbot').on('input.chatbot', function() {
 			this.style.height = 'auto';
 			const newHeight = Math.min(this.scrollHeight, 150);
@@ -166,41 +208,36 @@
 		// ---------------------------------------------------------------------
 		// VOICE CONTROL
 		// ---------------------------------------------------------------------
-		const defaultLang = config.defaultLang || 'auto';
+		if (config.useVoice) {
+			const voiceCtrl = new ChatVoiceControl({
+				stt: 'browser',
+				tts: 'browser',
+				lang: config.defaultLang || 'auto',
+				availableLangs: [
+					{ code: 'auto', label: 'Auto' },
+					{ code: 'de-DE', label: 'Deutsch' },
+					{ code: 'en-US', label: 'English' },
+					{ code: 'fr-FR', label: 'Français' },
+					{ code: 'es-ES', label: 'Español' },
+					{ code: 'it-IT', label: 'Italiano' },
+					{ code: 'pt-PT', label: 'Português' },
+					{ code: 'bg-BG', label: 'Български' },
+					{ code: 'ro-RO', label: 'Română' },
+					{ code: 'uk-UA', label: 'Українська' },
+					{ code: 'ru-RU', label: 'Русский' }
+				],
+				events: {
+					onUserFinishedSpeaking: text => {
+						const cur = msgControl.val();
+						msgControl.val(cur ? cur + ' ' + text : text);
+					},
+					onSendRequested: () => sendMessage()
+				}
+			});
 
-		const voiceCtrl = new ChatVoiceControl({
-			stt: 'browser',
-			tts: 'browser',
-			lang: defaultLang,
-			availableLangs: [
-				{ code: 'auto', label: 'Auto' },
-				{ code: 'de-DE', label: 'Deutsch' },
-				{ code: 'en-US', label: 'English' },
-				{ code: 'fr-FR', label: 'Français' },
-				{ code: 'es-ES', label: 'Español' },
-				{ code: 'it-IT', label: 'Italiano' },
-				{ code: 'pt-PT', label: 'Português' },
-				{ code: 'bg-BG', label: 'Български' },
-				{ code: 'ro-RO', label: 'Română' },
-				{ code: 'uk-UA', label: 'Українська' },
-				{ code: 'ru-RU', label: 'Русский' }
-			],
-			events: {
-				onUserFinishedSpeaking: (text) => {
-					const current = msgControl.val();
-					msgControl.val(current ? current + ' ' + text : text);
-				},
-				onSendRequested: () => sendMessage(),
-				onAssistantReplied: (reply) => console.log('Assistant replied:', reply),
-				onTtsStarted: (txt) => console.log('TTS started:', txt),
-				onTtsFinished: () => console.log('TTS finished'),
-				onRecordingEnded: () => console.log('Recording ended'),
-				onError: (err) => console.error('VoiceControl Error:', err)
-			}
-		});
-
-		voiceCtrl.attachTo($root.find('[name=chatvoice]')[0]);
-		root._voiceCtrl = voiceCtrl;
+			voiceCtrl.attachTo($root.find('[name=chatvoice]')[0]);
+			root._voiceCtrl = voiceCtrl;
+		}
 	}
 
 	window.initChatbot = initChatbot;

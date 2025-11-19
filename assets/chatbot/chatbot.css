@@ -169,3 +169,17 @@
 .result.richtig { color: #007700; font-weight: bold; }
 .result.falsch  { color: #cc0000; font-weight: bold; }
 
+/* -----------------------------------------------------------
+   Feature Classes (added)
+   ----------------------------------------------------------- */
+
+/* Icons OFF */
+#chatbot.no-icons .chat-tools {
+	display: none !important;
+}
+
+/* Voice OFF */
+#chatbot.no-voice [name="chatvoice"] {
+	display: none !important;
+}
+
