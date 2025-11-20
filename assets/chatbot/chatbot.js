@@ -1,6 +1,7 @@
 (function() {
 
 	function initChatbot(rootSel = '#chatbot', config = {}) {
+
 		const root = document.querySelector(rootSel);
 		if (!root || root.dataset.inited === '1') return;
 		root.dataset.inited = '1';
@@ -14,6 +15,7 @@
 		// ---------------------------------------------------------------------
 		// Utility
 		// ---------------------------------------------------------------------
+
 		function scrollToBottom() {
 			chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
 		}
@@ -48,9 +50,37 @@
 		});
 
 		// ---------------------------------------------------------------------
+		// ICON BAR (used by REST and STREAMING)
+		// ---------------------------------------------------------------------
+
+		function renderIconBar(toolsElem, fullText) {
+			if (!config.useIcons || !toolsElem) return;
+
+			const icons = config.icons || {};
+			const copyBtn = $(
+				`<a title="copy" href="#" class="copy-btn"><img src="${icons.copy}"></a>`
+			);
+
+			toolsElem.append(copyBtn);
+			toolsElem.append(`<a title="helpful" href="#"><img src="${icons.thumbsup}"></a>`);
+			toolsElem.append(`<a title="not helpful" href="#"><img src="${icons.thumbsdown}"></a>`);
+
+			copyBtn.on('click', function(e) {
+				e.preventDefault();
+				navigator.clipboard.writeText(fullText).then(() => {
+					const img = $(this).find('img');
+					img.attr('src', icons.check);
+					setTimeout(() => img.attr('src', icons.copy), 1000);
+				});
+			});
+		}
+
+		// ---------------------------------------------------------------------
 		// Main Chat Send
 		// ---------------------------------------------------------------------
+
 		async function sendMessage() {
+
 			const raw = msgControl.val() || '';
 			const plain = raw.trim();
 			if (!plain) return;
@@ -58,7 +88,7 @@
 			chatControl.removeClass('chatempty');
 			basePrompt.remove();
 
-			// Render user message
+			// User message
 			const userHtml = raw.replace(/\n/g, '<br>');
 			msgControl.val('');
 			chatControl.append('<div class="message user">' + userHtml + '</div>');
@@ -68,7 +98,6 @@
 			const respElem = $('<div class="message assistent"></div>').appendTo(chatControl);
 			const contentElem = $('<div class="assistant-content"></div>').appendTo(respElem);
 
-			// Tools only if enabled
 			let toolsElem = null;
 			if (config.useIcons) {
 				toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
@@ -77,6 +106,7 @@
 			let fullText = '';
 			let renderTimeout = null;
 
+			// Markdown rendering batching
 			function scheduleRender() {
 				if (!config.useMarkdown) {
 					contentElem.text(fullText);
@@ -91,49 +121,56 @@
 				}, 60);
 			}
 
-			// REST MODE (no streaming)
+			// -----------------------------------------------------------------
+			// REST MODE
+			// -----------------------------------------------------------------
+
 			if (config.transportMode === 'rest') {
-			        // Loader spinner
-			        const loader = $('<div class="loading"><div class="spinner"></div></div>');
-			        chatControl.append(loader);
-			        scrollToBottom();
 
-			        try {
-			                const response = await fetch(config.serviceUrl, {
+				const loader = $('<div class="loading"><div class="spinner"></div></div>');
+				chatControl.append(loader);
+				scrollToBottom();
+
+				try {
+					const response = await fetch(config.serviceUrl, {
 						method: 'POST',
-			                        headers: {
-						        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-			                        },
+						headers: {
+							'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+						},
 						body: new URLSearchParams({ prompt: plain })
-			                });
+					});
 
-			                if (!response.ok) {
+					if (!response.ok) {
 						throw new Error('HTTP ' + response.status);
-			                }
+					}
 
-			                const result = await response.text();
+					fullText = await response.text();
+					scheduleRender();
 
-			                fullText = result;
-			                scheduleRender();
-			        } catch (err) {
-			                console.error('REST request failed:', err);
-			                contentElem.append('<div class="error">Fehler bei der Serveranfrage.</div>');
-			        } finally {
-				        loader.remove();
-			                scrollToBottom();
+				} catch (err) {
+					console.error('REST request failed:', err);
+					contentElem.append('<div class="error">Fehler bei der Serveranfrage.</div>');
+				} finally {
 
-			                if (config.useVoice && root._voiceCtrl) {
-			                        const txt = cleanForVoice(contentElem.text());
-					        root._voiceCtrl.handleAssistantReply(txt);
-			                }
-			        }
+					loader.remove();
+					scrollToBottom();
 
-			        return;
+					// Render icons (NEW)
+					renderIconBar(toolsElem, fullText);
+
+					if (config.useVoice && root._voiceCtrl) {
+						const txt = cleanForVoice(contentElem.text());
+						root._voiceCtrl.handleAssistantReply(txt);
+					}
+				}
+
+				return;
 			}
 
 			// -----------------------------------------------------------------
-			// STREAMING VIA EventTransportClient
+			// STREAMING MODE (EventTransportClient)
 			// -----------------------------------------------------------------
+
 			const streamUrl = config.serviceUrl + '?prompt=' + encodeURIComponent(plain);
 
 			const client = new EventTransportClient({
@@ -156,6 +193,7 @@
 				}
 
 				if (event === 'done') {
+
 					if (finished) return;
 					finished = true;
 
@@ -165,27 +203,11 @@
 						contentElem.text(fullText);
 					}
 
-					// Tools only if enabled
-					if (config.useIcons && toolsElem) {
-						const icons = config.icons || {};
-						const copyBtn = $(`<a title="copy" href="#" class="copy-btn"><img src="${icons.copy}"></a>`);
-						toolsElem.append(copyBtn);
-						toolsElem.append(`<a title="helpful" href="#"><img src="${icons.thumbsup}"></a>`);
-						toolsElem.append(`<a title="not helpful" href="#"><img src="${icons.thumbsdown}"></a>`);
-
-						copyBtn.on('click', function(e) {
-							e.preventDefault();
-							navigator.clipboard.writeText(fullText).then(() => {
-								const img = $(this).find('img');
-								img.attr('src', icons.check);
-								setTimeout(() => img.attr('src', icons.copy), 1000);
-							});
-						});
-					}
+					// Render icon bar (shared logic)
+					renderIconBar(toolsElem, fullText);
 
 					scrollToResponse();
 
-					// Voice only if enabled
 					if (config.useVoice && root._voiceCtrl) {
 						const txt = cleanForVoice(contentElem.text());
 						root._voiceCtrl.handleAssistantReply(txt);
@@ -204,6 +226,7 @@
 		// ---------------------------------------------------------------------
 		// Input Events
 		// ---------------------------------------------------------------------
+
 		btnSend.off('click.chatbot').on('click.chatbot', e => {
 			e.preventDefault();
 			sendMessage();
@@ -226,7 +249,9 @@
 		// ---------------------------------------------------------------------
 		// VOICE CONTROL
 		// ---------------------------------------------------------------------
+
 		if (config.useVoice) {
+
 			const voiceCtrl = new ChatVoiceControl({
 				stt: 'browser',
 				tts: 'browser',
@@ -236,7 +261,7 @@
 					{ code: 'de-DE', label: 'Deutsch' },
 					{ code: 'en-US', label: 'English' },
 					{ code: 'fr-FR', label: 'Français' },
-					{ code: 'es-ES', label: 'Español' },
+					{ code: 'es-ES', label: 'Esppañol' },
 					{ code: 'it-IT', label: 'Italiano' },
 					{ code: 'pt-PT', label: 'Português' },
 					{ code: 'bg-BG', label: 'Български' },
@@ -259,5 +284,6 @@
 	}
 
 	window.initChatbot = initChatbot;
+
 })();
 
