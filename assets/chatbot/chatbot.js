@@ -93,24 +93,42 @@
 
 			// REST MODE (no streaming)
 			if (config.transportMode === 'rest') {
-				// Loader spinner
-				const loader = $('<div class="loading"><div class="spinner"></div></div>');
-				chatControl.append(loader);
-				scrollToBottom();
+			        // Loader spinner
+			        const loader = $('<div class="loading"><div class="spinner"></div></div>');
+			        chatControl.append(loader);
+			        scrollToBottom();
 
-				const url = config.serviceUrl + '?prompt=' + encodeURIComponent(plain);
-				const result = await fetch(url).then(r => r.text());
+			        try {
+			                const response = await fetch(config.serviceUrl, {
+						method: 'POST',
+			                        headers: {
+						        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+			                        },
+						body: new URLSearchParams({ prompt: plain })
+			                });
 
-				fullText = result;
-				scheduleRender();
-				loader.remove();
-				scrollToBottom();
+			                if (!response.ok) {
+						throw new Error('HTTP ' + response.status);
+			                }
 
-				if (config.useVoice && root._voiceCtrl) {
-					const txt = cleanForVoice(contentElem.text());
-					root._voiceCtrl.handleAssistantReply(txt);
-				}
-				return;
+			                const result = await response.text();
+
+			                fullText = result;
+			                scheduleRender();
+			        } catch (err) {
+			                console.error('REST request failed:', err);
+			                contentElem.append('<div class="error">Fehler bei der Serveranfrage.</div>');
+			        } finally {
+				        loader.remove();
+			                scrollToBottom();
+
+			                if (config.useVoice && root._voiceCtrl) {
+			                        const txt = cleanForVoice(contentElem.text());
+					        root._voiceCtrl.handleAssistantReply(txt);
+			                }
+			        }
+
+			        return;
 			}
 
 			// -----------------------------------------------------------------
