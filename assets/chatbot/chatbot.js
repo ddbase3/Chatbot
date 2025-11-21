@@ -50,29 +50,107 @@
 		});
 
 		// ---------------------------------------------------------------------
-		// ICON BAR (used by REST and STREAMING)
+		// ICON BAR – Copy + Like + Dislike (mit Toggle)
 		// ---------------------------------------------------------------------
-
-		function renderIconBar(toolsElem, fullText) {
+		function renderIconBar(toolsElem, fullText, msgId) {
 			if (!config.useIcons || !toolsElem) return;
 
 			const icons = config.icons || {};
-			const copyBtn = $(
+
+			let likeBtn = $(
+				`<a title="helpful" href="#" class="like-btn"><img src="${icons.thumbsup}"></a>`
+			);
+			let dislikeBtn = $(
+				`<a title="not helpful" href="#" class="dislike-btn"><img src="${icons.thumbsdown}"></a>`
+			);
+			let copyBtn = $(
 				`<a title="copy" href="#" class="copy-btn"><img src="${icons.copy}"></a>`
 			);
 
-			toolsElem.append(copyBtn);
-			toolsElem.append(`<a title="helpful" href="#"><img src="${icons.thumbsup}"></a>`);
-			toolsElem.append(`<a title="not helpful" href="#"><img src="${icons.thumbsdown}"></a>`);
+			toolsElem.append(copyBtn, likeBtn, dislikeBtn);
 
-			copyBtn.on('click', function(e) {
+			// -------------------------------
+			// COPY
+			// -------------------------------
+			copyBtn.on("click", function(e) {
 				e.preventDefault();
 				navigator.clipboard.writeText(fullText).then(() => {
-					const img = $(this).find('img');
-					img.attr('src', icons.check);
-					setTimeout(() => img.attr('src', icons.copy), 1000);
+					const img = $(this).find("img");
+					img.attr("src", icons.check);
+					setTimeout(() => img.attr("src", icons.copy), 1000);
 				});
 			});
+
+			// -------------------------------
+			// LIKE / DISLIKE TOGGLE
+			// -------------------------------
+			const parentMsg = toolsElem.closest(".message.assistent");
+
+			if (!parentMsg.attr("data-feedback")) {
+				parentMsg.attr("data-feedback", "none");
+			}
+
+			function updateVisual() {
+				const state = parentMsg.attr("data-feedback");
+
+				if (state === "like") {
+					likeBtn.find("img").attr("src", icons.thumbsupfill);
+					dislikeBtn.hide();
+				}
+				else if (state === "dislike") {
+					dislikeBtn.find("img").attr("src", icons.thumbsdownfill);
+					likeBtn.hide();
+				}
+				else {
+					likeBtn.find("img").attr("src", icons.thumbsup);
+					dislikeBtn.find("img").attr("src", icons.thumbsdown);
+					likeBtn.show();
+					dislikeBtn.show();
+				}
+			}
+
+			function sendFeedback(type) {
+				if (!msgId) return;
+
+				$.post(
+					config.serviceUrl,
+					{ feedback: type, messageid: msgId },
+					function(res) { /* optional response */ },
+					"json"
+				);
+			}
+
+			likeBtn.on("click", function(e) {
+				e.preventDefault();
+				const s = parentMsg.attr("data-feedback");
+
+				if (s === "like") {
+					parentMsg.attr("data-feedback", "none");
+					sendFeedback("like");
+				} else {
+					parentMsg.attr("data-feedback", "like");
+					sendFeedback("like");
+				}
+
+				updateVisual();
+			});
+
+			dislikeBtn.on("click", function(e) {
+				e.preventDefault();
+				const s = parentMsg.attr("data-feedback");
+
+				if (s === "dislike") {
+					parentMsg.attr("data-feedback", "none");
+					sendFeedback("dislike");
+				} else {
+					parentMsg.attr("data-feedback", "dislike");
+					sendFeedback("dislike");
+				}
+
+				updateVisual();
+			});
+
+			updateVisual();
 		}
 
 		// ---------------------------------------------------------------------
@@ -94,7 +172,7 @@
 			chatControl.append('<div class="message user">' + userHtml + '</div>');
 			scrollToBottom();
 
-			// Assistant message wrapper
+			// Assistant Message block
 			const respElem = $('<div class="message assistent"></div>').appendTo(chatControl);
 			const contentElem = $('<div class="assistant-content"></div>').appendTo(respElem);
 
@@ -105,8 +183,8 @@
 
 			let fullText = '';
 			let renderTimeout = null;
+			let currentMessageId = null;
 
-			// Markdown rendering batching
 			function scheduleRender() {
 				if (!config.useMarkdown) {
 					contentElem.text(fullText);
@@ -144,7 +222,12 @@
 						throw new Error('HTTP ' + response.status);
 					}
 
-					fullText = await response.text();
+					const json = await response.json();
+
+					currentMessageId = json.id || ('msg_' + Date.now());
+					respElem.attr('data-msgid', currentMessageId);
+
+					fullText = json.text || '';
 					scheduleRender();
 
 				} catch (err) {
@@ -155,8 +238,7 @@
 					loader.remove();
 					scrollToBottom();
 
-					// Render icons (NEW)
-					renderIconBar(toolsElem, fullText);
+					renderIconBar(toolsElem, fullText, currentMessageId);
 
 					if (config.useVoice && root._voiceCtrl) {
 						const txt = cleanForVoice(contentElem.text());
@@ -168,7 +250,7 @@
 			}
 
 			// -----------------------------------------------------------------
-			// STREAMING MODE (EventTransportClient)
+			// STREAMING MODE
 			// -----------------------------------------------------------------
 
 			const streamUrl = config.serviceUrl + '?prompt=' + encodeURIComponent(plain);
@@ -176,26 +258,35 @@
 			const client = new EventTransportClient({
 				endpoint: streamUrl,
 				transport: config.transportMode || 'auto',
-				events: ['token', 'done']
+				events: ['msgid', 'token', 'done', 'error']
 			});
 
 			let finished = false;
 
 			await client.connect((event, data) => {
 
+				if (event === 'msgid') {
+					if (typeof data === 'string') try { data = JSON.parse(data); } catch {}
+					currentMessageId = data.id || data.msgid || ('msg_' + Date.now());
+					respElem.attr('data-msgid', currentMessageId);
+					return;
+				}
+
 				if (event === 'token') {
-					if (typeof data === 'string') {
-						try { data = JSON.parse(data); } catch {}
-					}
-					const t = data.text || '';
-					fullText += t;
+					if (typeof data === 'string') try { data = JSON.parse(data); } catch {}
+					fullText += data.text || '';
 					scheduleRender();
+					return;
 				}
 
 				if (event === 'done') {
-
 					if (finished) return;
 					finished = true;
+
+					if (!currentMessageId) {
+						currentMessageId = 'msg_' + Date.now();
+						respElem.attr('data-msgid', currentMessageId);
+					}
 
 					if (config.useMarkdown) {
 						contentElem.html(marked.parse(fullText));
@@ -203,9 +294,7 @@
 						contentElem.text(fullText);
 					}
 
-					// Render icon bar (shared logic)
-					renderIconBar(toolsElem, fullText);
-
+					renderIconBar(toolsElem, fullText, currentMessageId);
 					scrollToResponse();
 
 					if (config.useVoice && root._voiceCtrl) {
@@ -214,10 +303,12 @@
 					}
 
 					client.close();
+					return;
 				}
 
 				if (event === 'error') {
 					contentElem.append('<div class="error">Connection error</div>');
+					console.error('Streaming error event:', data);
 					client.close();
 				}
 			});
@@ -261,7 +352,7 @@
 					{ code: 'de-DE', label: 'Deutsch' },
 					{ code: 'en-US', label: 'English' },
 					{ code: 'fr-FR', label: 'Français' },
-					{ code: 'es-ES', label: 'Esppañol' },
+					{ code: 'es-ES', label: 'Español' },
 					{ code: 'it-IT', label: 'Italiano' },
 					{ code: 'pt-PT', label: 'Português' },
 					{ code: 'bg-BG', label: 'Български' },
