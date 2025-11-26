@@ -253,12 +253,13 @@
 			// STREAMING MODE
 			// -----------------------------------------------------------------
 
-			const streamUrl = config.serviceUrl + '?prompt=' + encodeURIComponent(plain);
+			const streamUrl = config.serviceUrl;
 
 			const client = new EventTransportClient({
 				endpoint: streamUrl,
 				transport: config.transportMode || 'auto',
-				events: ['msgid', 'token', 'done', 'error']
+				events: ['msgid', 'token', 'done', 'error'],
+				payload: { prompt: plain }
 			});
 
 			let finished = false;
