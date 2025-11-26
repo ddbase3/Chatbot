@@ -9,32 +9,42 @@ use Base3\Api\ISchemaProvider;
 
 class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
-	private array $data;
+	private array $data = [];
 
 	public function __construct(
 		private readonly IMvcView $view,
 		private readonly IAssetResolver $assetResolver
 	) {}
 
-	// Implementation of IBase
-
 	public static function getName(): string {
 		return 'chatbotdisplay';
 	}
 
-	// Implementation of IOutput
-
+	// ---------------------------------------------------------------------
+	// Render
+	// ---------------------------------------------------------------------
 	public function getOutput($out = 'html') {
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
 		$this->view->setTemplate('Content/ChatbotDisplay.php');
 
-		// Default values
 		$defaults = [
-			'service' => 'chatbotservice.php',
-			'lang' => ''
+			'service'        => 'chatbotservice.php',
+
+			// Features
+			'use_markdown'   => true,
+			'use_icons'      => true,
+			'use_voice'      => true,
+
+			// Transport
+			'transport_mode' => 'auto',	// auto | sse | websocket | rest
+
+			// Voice config
+			'default_lang'   => 'auto'
 		];
 
-		foreach (array_merge($defaults, $this->data) as $tag => $content) {
+		$config = array_merge($defaults, $this->data);
+
+		foreach ($config as $tag => $content) {
 			$this->view->assign($tag, $content);
 		}
 
@@ -44,38 +54,58 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	}
 
 	public function getHelp() {
-		return 'Display a Chatbot.';
+		return 'Display a configurable Chatbot widget.';
 	}
-
-	// Implementation of IDisplay
 
 	public function setData($data) {
 		$this->data = (array) $data;
 	}
 
-	// Implementation of ISchemaProvider
-
+	// ---------------------------------------------------------------------
+	// JSON Schema
+	// ---------------------------------------------------------------------
 	public function getSchema(): array {
-		$schema = [
+		return [
 			'$schema' => 'https://json-schema.org/draft-2020-12/schema',
 			'type' => 'object',
 			'properties' => [
+
 				'service' => [
 					'type' => 'string',
-					'description' => 'Service URL',
-					'maxLength' => 200,
-					'default' => 'chatbotservice.php',
+					'description' => 'Service URL (server endpoint)',
+					'default' => 'chatbotservice.php'
 				],
-				'lang' => [
+
+				'use_markdown' => [
+					'type' => 'boolean',
+					'description' => 'Enable markdown to HTML conversion',
+					'default' => true
+				],
+				'use_icons' => [
+					'type' => 'boolean',
+					'description' => 'Show dialog action icons (copy, like, dislike, reload)',
+					'default' => true
+				],
+				'use_voice' => [
+					'type' => 'boolean',
+					'description' => 'Enable voice controls and TTS/STT',
+					'default' => true
+				],
+
+				'transport_mode' => [
 					'type' => 'string',
-					'description' => 'Default language for voice control (e.g. "de-DE", "en-US", or "auto")',
-					'maxLength' => 20,
-					'default' => '',
+					'enum' => ['auto', 'sse', 'websocket', 'rest'],
+					'description' => 'Transport protocol for streaming responses',
+					'default' => 'auto'
 				],
+
+				'default_lang' => [
+					'type' => 'string',
+					'description' => 'Default language for voice control',
+					'default' => 'auto'
+				]
 			],
-			'required' => ['service'],
+			'required' => ['service']
 		];
-		return $schema;
 	}
 }
-

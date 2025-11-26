@@ -1,36 +1,72 @@
-<div id="chatbot" role="region" aria-label="Chatbot" data-service="<?php echo $this->_['service']; ?>">
-	<p class="baseprompt"></p>
-	<div class="chat chatempty" aria-live="polite"></div>
+<?php
+$chatbotClasses = [];
+if (empty($this->_['use_icons'])) $chatbotClasses[] = 'no-icons';
+if (empty($this->_['use_voice'])) $chatbotClasses[] = 'no-voice';
+$classAttr = $chatbotClasses ? ' class="' . implode(' ', $chatbotClasses) . '"' : '';
+?>
 
-	<div class="chatform">
-		<textarea id="chatMessage" name="prompt" aria-label="Type your message"></textarea>
-		<button type="button" id="chatSend" aria-label="Send message">
-			<img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/send.svg'); ?>" alt="Send" />
-		</button>
-		<div name="chatvoice"></div>
-	</div>
+<div id="chatbot"<?php echo $classAttr; ?> role="region" aria-label="Chatbot">
+        <p class="baseprompt"></p>
+        <div class="chat chatempty" aria-live="polite"></div>
+        <div class="chatform">
+                <textarea id="chatMessage" name="prompt" aria-label="Type your message"></textarea>
+                <button type="button" id="chatSend" aria-label="Send message">
+                        <img src="<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/send.svg'); ?>" alt="Send" />
+                </button>
+                <div name="chatvoice"></div>
+        </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-	(async function() {
-		await AssetLoader.loadCssAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.css'); ?>');
-		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>');
-		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.js'); ?>');
 
-		initChatbot('#chatbot', {
-			<?php if (!empty($this->_['lang'])) { ?>defaultLang: '<?php echo $this->_['lang']; ?>',<?php } ?>
-			icons: {
-				copy: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/copy.svg'); ?>',
-				check: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/check.svg'); ?>',
-				thumbsup: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsup.svg'); ?>',
-				thumbsupfill: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsupfill.svg'); ?>',
-				thumbsdown: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdown.svg'); ?>',
-				thumbsdownfill: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdownfill.svg'); ?>',
-				reload: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/reload.svg'); ?>'
-			}
-		});
-	})();
-});
+<script>
+
+function initChatbotWidget() {
+        (async function() {
+                await AssetLoader.loadCssAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.css'); ?>');
+<?php if (!empty($this->_['use_voice'])) { ?>
+                await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatvoice/chatvoice.js'); ?>');
+<?php } ?>
+<?php if (!empty($this->_['use_markdown'])) { ?>
+                await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/ClientStack/assets/marked/marked.js'); ?>');
+<?php } ?>
+<?php if ($this->_['transport_mode'] !== 'rest') { ?>
+                await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/EventTransport/assets/eventtransportclient.js'); ?>');
+<?php } ?>
+                await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.js'); ?>');
+
+                const chatbotConfig = {
+                        useMarkdown: <?php echo $this->_['use_markdown'] ? 'true' : 'false'; ?>,
+                        useIcons: <?php echo $this->_['use_icons'] ? 'true' : 'false'; ?>,
+                        useVoice: <?php echo $this->_['use_voice'] ? 'true' : 'false'; ?>,
+
+                        serviceUrl: '<?php echo $this->_['service']; ?>',
+                        transportMode: '<?php echo $this->_['transport_mode']; ?>',
+
+<?php if ($this->_['use_voice']) { ?>
+                        defaultLang: '<?php echo $this->_['default_lang']; ?>',
+                        icons: {
+                                copy: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/copy.svg'); ?>',
+                                check: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/check.svg'); ?>',
+                                thumbsup: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsup.svg'); ?>',
+                                thumbsupfill: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsupfill.svg'); ?>',
+                                thumbsdown: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdown.svg'); ?>',
+                                thumbsdownfill: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/thumbsdownfill.svg'); ?>',
+                                reload: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/reload.svg'); ?>'
+                        }
+<?php } ?>
+                };
+
+                initChatbot('#chatbot', chatbotConfig);
+        })();
+}
+
+if (document.readyState !== 'loading') {
+        initChatbotWidget();
+} else {
+        document.addEventListener('DOMContentLoaded', initChatbotWidget);
+}
+
+window.addEventListener('chatbot:init', initChatbotWidget);
+
 </script>
 
