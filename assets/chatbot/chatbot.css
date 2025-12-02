@@ -1,5 +1,5 @@
 #chatbot .chat {
-	height: 400px;
+	height: 500px;
 	margin: 0 0 20px 0;
 	padding: 0 10px;
 	overflow-x: hidden;
@@ -155,10 +155,10 @@
 	font-size: 1em;
 	margin-bottom: 0.4em;
 }
-.info-fact   { border-left-color: #0077cc; }
-.info-weather{ border-left-color: #00aaff; }
-.info-joke   { border-left-color: #ffaa00; }
-.info-warning{ border-left-color: #cc0000; }
+.info-fact { border-left-color: #0077cc; }
+.info-weather { border-left-color: #00aaff; }
+.info-joke { border-left-color: #ffaa00; }
+.info-warning { border-left-color: #cc0000; }
 
 .label {
 	font-weight: bold;
@@ -167,11 +167,11 @@
 	color: #333;
 }
 .result.richtig { color: #007700; font-weight: bold; }
-.result.falsch  { color: #cc0000; font-weight: bold; }
+.result.falsch { color: #cc0000; font-weight: bold; }
 
 /* -----------------------------------------------------------
-   Feature Classes (added)
-   ----------------------------------------------------------- */
+	Feature Classes (added)
+	----------------------------------------------------------- */
 
 /* Icons OFF */
 #chatbot.no-icons .chat-tools {
@@ -184,23 +184,166 @@
 }
 
 /* -----------------------------------------------------------
-   Tool Call Events (Phase 1 Live Updates)
-   ----------------------------------------------------------- */
+	Assistant Thinking (initial feedback) - no box
+	----------------------------------------------------------- */
+
+#chatbot .message.assistent .assistant-thinking {
+	display: inline-flex;
+	align-items: center;
+	padding: 0;
+	border-radius: 0;
+	background: transparent;
+}
+
+#chatbot .assistant-thinking .dots {
+	display: inline-flex;
+	gap: 6px;
+}
+
+#chatbot .assistant-thinking .dots i {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: rgba(0,0,0,0.35);
+	animation: dotPulse 1.2s infinite ease-in-out;
+}
+
+#chatbot .assistant-thinking .dots i:nth-child(2) { animation-delay: 0.15s; }
+#chatbot .assistant-thinking .dots i:nth-child(3) { animation-delay: 0.30s; }
+
+@keyframes dotPulse {
+	0%, 80%, 100% { opacity: 0.25; transform: scale(0.9); }
+	40% { opacity: 0.9; transform: scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#chatbot .assistant-thinking .dots i {
+		animation: none;
+		opacity: 0.6;
+	}
+}
+
+/* -----------------------------------------------------------
+	Tool Call Events (Phase 1 Live Updates) - no box
+	----------------------------------------------------------- */
 
 #chatbot .message.tool-event {
-		margin: 5px 0 5px 0;
-		padding: 0;
-		font-size: 13px;
-		color: #666;
-		font-weight: 600;
+	margin: 6px 0;
+	padding: 0;
+
+	/* Reserve space so expanding params usually doesn't require extra scrolling */
+	min-height: 44px;
+
+	border-radius: 0;
+	background: transparent;
+	border: 0;
+
+	font-size: 13px;
+	color: #666;
 }
 
-#chatbot .message.tool-event .params {
-		font-weight: normal;
-		color: #999;
-		font-size: 12px;
-		display: block;
-		margin-left: 20px;
-		margin-top: 2px;
+#chatbot .message.tool-event .tool-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
 }
 
+#chatbot .message.tool-event .tool-ic {
+	opacity: 0.75;
+}
+
+#chatbot .message.tool-event .tool-name {
+	opacity: 0.9;
+	font-weight: 600;
+}
+
+#chatbot .message.tool-event .tool-preview {
+	opacity: 0.78;
+	font-weight: 400;
+	margin-left: 4px;
+
+	/* Keep it readable without taking over the line */
+	max-width: 420px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	display: inline-block;
+	vertical-align: bottom;
+}
+
+#chatbot .message.tool-event .tool-meta {
+	opacity: 0.45;
+	font-size: 11px;
+	margin-left: 6px;
+}
+
+#chatbot .message.tool-event .tool-activity {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: rgba(0,0,0,0.22);
+	animation: toolPulse 1s infinite ease-in-out;
+}
+
+@keyframes toolPulse {
+	0%, 100% { opacity: 0.20; transform: scale(0.9); }
+	50% { opacity: 0.65; transform: scale(1.08); }
+}
+
+/* Fold-down */
+#chatbot .message.tool-event .tool-params {
+	margin-top: 4px;
+}
+
+/* Use a small custom arrow (visible but subtle) */
+#chatbot .message.tool-event .tool-params summary {
+	cursor: pointer;
+	user-select: none;
+
+	opacity: 0.72;
+	font-size: 11px;
+	line-height: 1.2;
+
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+
+	list-style: none;
+}
+
+/* Hide native marker */
+#chatbot .message.tool-event .tool-params summary::marker { content: ""; }
+#chatbot .message.tool-event .tool-params summary::-webkit-details-marker { display: none; }
+
+/* Custom arrow */
+#chatbot .message.tool-event .tool-params summary::before {
+	content: "▸";
+	font-size: 10px;
+	opacity: 0.60;
+	display: inline-block;
+	transform: translateY(-0.5px);
+}
+#chatbot .message.tool-event .tool-params[open] summary::before {
+	content: "▾";
+	opacity: 0.65;
+}
+
+/* Params: slightly darker for more contrast */
+#chatbot .message.tool-event .tool-params pre {
+	margin: 6px 0 0;
+	padding: 6px 0 0;
+	border-radius: 0;
+	background: transparent;
+	overflow: auto;
+	white-space: pre-wrap;
+	font-size: 12px;
+	color: #7f7f7f;
+	border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#chatbot .message.tool-event .tool-activity {
+		animation: none;
+		opacity: 0.6;
+	}
+}
