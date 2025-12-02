@@ -11,6 +11,12 @@
 		const btnSend = $root.find('#chatSend');
 		const basePrompt = $root.find('.baseprompt');
 
+		// Canvas elements
+		const canvasElem = $root.find('.chatbot-canvas');
+		const canvasTitleElem = $root.find('.chatbot-canvas .canvas-title');
+		const canvasContentElem = $root.find('.chatbot-canvas .canvas-content');
+		const canvasCloseBtn = $root.find('.chatbot-canvas .canvas-close');
+
 		// ---------------------------------------------------------------------
 		// Utility
 		// ---------------------------------------------------------------------
@@ -92,6 +98,136 @@
 			const el = chatControl[0];
 			return (el.scrollHeight - (el.scrollTop + el.clientHeight)) < threshold;
 		}
+
+		// ---------------------------------------------------------------------
+		// Canvas Controller (minimal)
+		// ---------------------------------------------------------------------
+
+		const canvasState = {
+			id: 'main',
+			isOpen: false
+		};
+
+		function canvasSetOpen(open) {
+			canvasState.isOpen = !!open;
+			if (canvasState.isOpen) {
+				root.classList.add('canvas-open');
+				canvasElem.attr('aria-hidden', 'false');
+			} else {
+				root.classList.remove('canvas-open');
+				canvasElem.attr('aria-hidden', 'true');
+			}
+		}
+
+		function canvasOpen(payload = {}) {
+			if (typeof payload === 'string') {
+				try { payload = JSON.parse(payload); } catch {}
+			}
+			const id = (payload && payload.id) ? String(payload.id) : 'main';
+			canvasState.id = id;
+
+			const title = payload && payload.title ? String(payload.title) : 'Canvas';
+			canvasTitleElem.text(title);
+
+			canvasSetOpen(true);
+		}
+
+		function canvasClose(payload = {}) {
+			if (typeof payload === 'string') {
+				try { payload = JSON.parse(payload); } catch {}
+			}
+			const id = (payload && payload.id) ? String(payload.id) : null;
+			if (id && id !== canvasState.id) {
+				return;
+			}
+			canvasSetOpen(false);
+		}
+
+		function renderCanvasBlocks(blocks, mode = 'replace') {
+			if (!Array.isArray(blocks)) blocks = [];
+
+			if (mode === 'replace') {
+				canvasContentElem.empty();
+			}
+
+			for (const block of blocks) {
+				if (!block || typeof block !== 'object') continue;
+
+				const type = (block.type || '').toLowerCase();
+
+				// HTML block
+				if (type === 'html') {
+					// Minimal start: allow tool to provide HTML. "sanitize" flag is reserved for later hardening.
+					// For production hardening you can introduce a sanitizer (DOMPurify) or server-side rendering.
+					const html = String(block.html || '');
+					const wrap = $('<div class="canvas-block canvas-block-html"></div>');
+					wrap.html(html);
+					canvasContentElem.append(wrap);
+					continue;
+				}
+
+				// Markdown block
+				if (type === 'markdown') {
+					const md = String(block.markdown || '');
+					const wrap = $('<div class="canvas-block canvas-block-markdown"></div>');
+					if (config.useMarkdown && window.marked) {
+						wrap.html(marked.parse(md));
+					} else {
+						wrap.text(md);
+					}
+					canvasContentElem.append(wrap);
+					continue;
+				}
+
+				// Tool block (canvas-internal widgets) - placeholder for later
+				if (type === 'tool') {
+					const toolName = String(block.tool || 'tool');
+					const wrap = $(`
+						<div class="canvas-block canvas-block-tool">
+							<div class="canvas-tool-title">Canvas Tool: ${escapeHtml(toolName)}</div>
+							<pre class="canvas-tool-params"></pre>
+						</div>
+					`);
+					try {
+						wrap.find('.canvas-tool-params').text(JSON.stringify(block.params || {}, null, 2));
+					} catch {
+						wrap.find('.canvas-tool-params').text('{}');
+					}
+					canvasContentElem.append(wrap);
+					continue;
+				}
+
+				// Unknown block
+				const wrap = $('<div class="canvas-block canvas-block-unknown"></div>');
+				wrap.text('Unknown canvas block.');
+				canvasContentElem.append(wrap);
+			}
+		}
+
+		function canvasRender(payload = {}) {
+			if (typeof payload === 'string') {
+				try { payload = JSON.parse(payload); } catch {}
+			}
+
+			const id = payload && payload.id ? String(payload.id) : 'main';
+			canvasState.id = id;
+
+			if (payload && payload.title) {
+				canvasTitleElem.text(String(payload.title));
+			}
+
+			const mode = payload && payload.mode ? String(payload.mode) : 'replace';
+			const blocks = payload && Array.isArray(payload.blocks) ? payload.blocks : [];
+
+			canvasSetOpen(true);
+			renderCanvasBlocks(blocks, mode);
+		}
+
+		// Local close button (pure UI close; assistant can also close via tool-triggered event)
+		canvasCloseBtn.off('click.chatbotCanvas').on('click.chatbotCanvas', e => {
+			e.preventDefault();
+			canvasClose({ id: canvasState.id });
+		});
 
 		// ---------------------------------------------------------------------
 		// Base Prompt
@@ -315,13 +451,35 @@
 			const client = new EventTransportClient({
 				endpoint: streamUrl,
 				transport: config.transportMode || 'auto',
-				events: ['msgid', 'token', 'done', 'error', 'tool.started', 'tool.finished'],
+				events: [
+					'msgid', 'token', 'done', 'error',
+					'tool.started', 'tool.finished',
+					'canvas.open', 'canvas.close', 'canvas.render'
+				],
 				payload: { prompt: plain }
 			});
 
 			let finished = false;
 
 			await client.connect((event, data) => {
+
+				// -----------------------------
+				// CANVAS EVENTS
+				// -----------------------------
+				if (event === 'canvas.open') {
+					canvasOpen(data);
+					return;
+				}
+
+				if (event === 'canvas.close') {
+					canvasClose(data);
+					return;
+				}
+
+				if (event === 'canvas.render') {
+					canvasRender(data);
+					return;
+				}
 
 				// -----------------------------
 				// MSGID
