@@ -183,3 +183,24 @@
 	display: none !important;
 }
 
+/* -----------------------------------------------------------
+   Tool Call Events (Phase 1 Live Updates)
+   ----------------------------------------------------------- */
+
+#chatbot .message.tool-event {
+		margin: 5px 0 5px 0;
+		padding: 0;
+		font-size: 13px;
+		color: #666;
+		font-weight: 600;
+}
+
+#chatbot .message.tool-event .params {
+		font-weight: normal;
+		color: #999;
+		font-size: 12px;
+		display: block;
+		margin-left: 20px;
+		margin-top: 2px;
+}
+
