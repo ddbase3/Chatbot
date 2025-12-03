@@ -1,8 +1,8 @@
 <?php
-$chatbotClasses = [];
-if (empty($this->_['use_icons'])) $chatbotClasses[] = 'no-icons';
-if (empty($this->_['use_voice'])) $chatbotClasses[] = 'no-voice';
-$classAttr = $chatbotClasses ? ' class="' . implode(' ', $chatbotClasses) . '"' : '';
+	$chatbotClasses = ['canvas-side'];  // canvas-side optional for different layout variants
+	if (empty($this->_['use_icons'])) $chatbotClasses[] = 'no-icons';
+	if (empty($this->_['use_voice'])) $chatbotClasses[] = 'no-voice';
+	$classAttr = $chatbotClasses ? ' class="' . implode(' ', $chatbotClasses) . '"' : '';
 ?>
 
 <div id="chatbot"<?php echo $classAttr; ?> role="region" aria-label="Chatbot">
@@ -10,16 +10,15 @@ $classAttr = $chatbotClasses ? ' class="' . implode(' ', $chatbotClasses) . '"' 
 
 	<div class="chatbot-main">
 		<div class="chat chatempty" aria-live="polite"></div>
-
-		<!-- Canvas Panel (initially hidden, controlled by JS via .canvas-open class + aria-hidden) -->
-		<aside class="chatbot-canvas" aria-label="Canvas" aria-hidden="true">
-			<div class="canvas-header">
-				<div class="canvas-title">Canvas</div>
-				<button type="button" class="canvas-close" aria-label="Close canvas">×</button>
-			</div>
-			<div class="canvas-content"></div>
-		</aside>
 	</div>
+
+	<aside class="chatbot-canvas" aria-label="Canvas" aria-hidden="true">
+		<div class="canvas-header">
+			<div class="canvas-title">Canvas</div>
+			<button type="button" class="canvas-close" aria-label="Close canvas">×</button>
+		</div>
+		<div class="canvas-content"></div>
+	</aside>
 
 	<div class="chatform">
 		<textarea id="chatMessage" name="prompt" aria-label="Type your message"></textarea>
@@ -29,7 +28,6 @@ $classAttr = $chatbotClasses ? ' class="' . implode(' ', $chatbotClasses) . '"' 
 		<div name="chatvoice"></div>
 	</div>
 </div>
-
 
 <script>
 

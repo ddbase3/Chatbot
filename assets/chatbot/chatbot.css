@@ -1,155 +1,248 @@
-#chatbot .chat {
-	height: 500px;
-	margin: 0 0 20px 0;
-	padding: 0 10px;
-	overflow-x: hidden;
-}
-#chatbot .chat.chatempty {
-	height: auto;
-}
-#chatbot .baseprompt {
-	min-height: 40px;
-	margin: 100px 0 0;
-	font-size: 18pt;
-	text-align: center;
-}
-#chatbot .chat > .message {
-	margin: 10px 0 30px;
-	overflow: auto;
-}
-#chatbot .chat > .user {
-	max-width: 80%;
-	margin-left: auto;
-	padding: 10px;
-	border: 1px solid #eee;
-	border-radius: 5px;
-	background: #f7f7f7;
-	color: #333;
-}
-#chatbot .chat > .assistent {
-	margin-right: 50px;
-}
-#chatbot .chatform {
-	position: relative;
-	padding: 15px 30px 55px;
-	border: 1px solid #ddd;
-	border-radius: 30px;
-}
-#chatbot textarea {
-	width: 100%;
-	box-sizing: border-box;
-	min-height: 50px;
-	max-height: 150px;
-	overflow-y: auto;
-	margin-bottom: 10px;
-	padding: 3px 10px;
-	background: transparent;
-	border: 0;
-	outline: none;
-	resize: none;
-}
-#chatbot textarea:focus {
-	border: 1px solid #eee;
-	border-radius: 5px;
-	background: #f7f7f7;
-}
-#chatbot button#chatSend {
-	float: right;
-	box-sizing: content-box;
-	width: 20px;
-	height: 20px;
-	padding: 10px;
-	background: #333;
-	border: 0;
-	border-radius: 20px;
-	cursor: pointer;
-}
-#chatbot button#chatSend img {
-	width: 20px;
-	height: 20px;
-	filter: invert(1);
-}
+/* ===========================================================
+   CHATBOT CSS (fixed-height container + 2 canvas layout modes)
+   Modes:
+   - default (no canvas): max-width: 64em
+   - .canvas-open: uses full available width
+   - Canvas layout:
+       A) .canvas-open (no .canvas-side): canvas beside chat (top row), form below full width
+       B) .canvas-open.canvas-side: canvas on the right full height, chat + form stacked left
+   Container height:
+   - set via --chatbot-h (defaults to 500px)
+   - nothing may overflow the container height (internal scrollers instead)
+   =========================================================== */
+
 
 /* -----------------------------------------------------------
-	Layout: Chat + Canvas
+   Container sizing rules
 ----------------------------------------------------------- */
 
+#chatbot {
+        /* You can override this from outside:
+           #chatbot { --chatbot-h: 620px; } */
+        --chatbot-h: 350px;
+
+        /* width behavior */
+        width: 100%;
+        max-width: 64em;                 /* when canvas is NOT open */
+        margin: 0 auto;
+
+        /* fixed height: nothing should "spreng" it */
+        height: var(--chatbot-h);
+        overflow: hidden;                /* hard guardrail */
+
+        /* overall layout */
+        display: grid;
+        gap: 16px;
+
+        /* default grid (no canvas) */
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto; /* baseprompt | main | form */
+        grid-template-areas:
+                "baseprompt"
+                "main"
+                "form";
+
+        /* allow children to shrink inside grid */
+        min-height: 0;
+}
+
+#chatbot.chatstarted {
+        --chatbot-h: 650px;
+}
+
+#chatbot.canvas-open {
+        /* when canvas open -> take full available width */
+        max-width: none;
+}
+
+/* Grid areas */
+#chatbot .baseprompt { grid-area: baseprompt; }
+#chatbot .chatbot-main { grid-area: main; }
+#chatbot .chatform { grid-area: form; }
+#chatbot .chatbot-canvas { grid-area: canvas; }
+
+
+/* -----------------------------------------------------------
+   Base prompt
+----------------------------------------------------------- */
+
+#chatbot .baseprompt {
+        min-height: 40px;
+        margin: 100px 0 0;
+        font-size: 18pt;
+        text-align: center;
+
+        /* important inside fixed-height container:
+           allow it to be clipped/scroll-managed by the main area */
+        overflow: hidden;
+}
+
+
+/* -----------------------------------------------------------
+   Chat + messages
+----------------------------------------------------------- */
+
+/* chatbot-main is just a grid cell wrapper */
 #chatbot .chatbot-main {
-	display: flex;
-	gap: 16px;
-	align-items: stretch;
+        display: block;
+        min-width: 0;
+        min-height: 0; /* critical for nested scrolling */
 }
 
-#chatbot .chatbot-main .chat {
-	flex: 1 1 auto;
-	min-width: 0;
+/* IMPORTANT: Chat must be the scroller, not the whole widget */
+#chatbot .chat {
+        height: 100%;          /* fill the "main" row */
+        margin: 0;
+        padding: 0 10px;
+        overflow: auto;        /* vertical scroll inside fixed container */
+        overflow-x: hidden;
+        min-height: 0;
 }
 
-/* Canvas hidden by default */
+#chatbot .chat.chatempty {
+        height: 100%;
+}
+
+#chatbot .chat > .message {
+        margin: 10px 0 30px;
+        overflow: auto;
+}
+
+#chatbot .chat > .user {
+        max-width: 80%;
+        margin-left: auto;
+        padding: 10px;
+        border: 1px solid #eee;
+        border-radius: 5px;
+        background: #f7f7f7;
+        color: #333;
+}
+
+#chatbot .chat > .assistent {
+        margin-right: 50px;
+}
+
+
+/* -----------------------------------------------------------
+   Form
+----------------------------------------------------------- */
+
+#chatbot .chatform {
+        position: relative;
+        padding: 15px 30px;     /* <-- your required padding */
+        border: 1px solid #ddd;
+        border-radius: 30px;
+
+        /* keep it from forcing height overflow */
+        min-height: 0;
+}
+
+#chatbot textarea {
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 50px;
+        max-height: 150px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        padding: 3px 10px;
+        background: transparent;
+        border: 0;
+        outline: none;
+        resize: none;
+}
+
+#chatbot textarea:focus {
+        border: 1px solid #eee;
+        border-radius: 5px;
+        background: #f7f7f7;
+}
+
+#chatbot button#chatSend {
+        float: right;
+        box-sizing: content-box;
+        width: 20px;
+        height: 20px;
+        padding: 10px;
+        background: #333;
+        border: 0;
+        border-radius: 20px;
+        cursor: pointer;
+}
+
+#chatbot button#chatSend img {
+        width: 20px;
+        height: 20px;
+        filter: invert(1);
+}
+
+
+/* -----------------------------------------------------------
+   Canvas (sibling, controlled by .canvas-open and layout mode)
+----------------------------------------------------------- */
+
 #chatbot .chatbot-canvas {
-	flex: 0 0 420px;
-	max-width: 520px;
-	min-width: 320px;
+        display: none;                 /* hidden by default */
 
-	display: none;
-	border: 1px solid #ddd;
-	border-radius: 14px;
-	background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 14px;
+        background: #fff;
+        overflow: hidden;
 
-	height: 500px;
-	overflow: hidden;
+        /* allow proper shrink + internal scrolling */
+        min-width: 320px;
+        min-height: 0;
 }
 
-/* Show canvas when root has class */
 #chatbot.canvas-open .chatbot-canvas {
-	display: flex;
-	flex-direction: column;
+        display: flex;
+        flex-direction: column;
 }
 
 #chatbot .chatbot-canvas .canvas-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
 
-	padding: 10px 12px;
-	border-bottom: 1px solid rgba(0,0,0,0.08);
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
 #chatbot .chatbot-canvas .canvas-title {
-	font-weight: 600;
-	font-size: 14px;
-	color: #333;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+        font-weight: 600;
+        font-size: 14px;
+        color: #333;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
 }
 
 #chatbot .chatbot-canvas .canvas-close {
-	box-sizing: content-box;
-	width: 18px;
-	height: 18px;
-	padding: 8px;
+        box-sizing: content-box;
+        width: 18px;
+        height: 18px;
+        padding: 8px;
 
-	border: 0;
-	border-radius: 10px;
-	background: transparent;
-	cursor: pointer;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        cursor: pointer;
 
-	font-size: 18px;
-	line-height: 18px;
-	color: #333;
-	opacity: 0.65;
+        font-size: 18px;
+        line-height: 18px;
+        color: #333;
+        opacity: 0.65;
 }
 #chatbot .chatbot-canvas .canvas-close:hover {
-	opacity: 1;
-	background: rgba(0,0,0,0.04);
+        opacity: 1;
+        background: rgba(0,0,0,0.04);
 }
 
 #chatbot .chatbot-canvas .canvas-content {
-	padding: 12px;
-	overflow: auto;
-	flex: 1 1 auto;
+        padding: 12px;
+        overflow: auto;               /* canvas scrolls internally */
+        flex: 1 1 auto;
+        min-height: 0;
 }
 
 #chatbot .chatbot-canvas .canvas-block {
@@ -157,128 +250,212 @@
 }
 
 #chatbot .chatbot-canvas .canvas-block-html .canvas-card {
-	border: 1px solid rgba(0,0,0,0.10);
-	border-radius: 10px;
-	padding: 12px;
-	background: #fafafa;
+        border: 1px solid rgba(0,0,0,0.10);
+        border-radius: 10px;
+        padding: 12px;
+        background: #fafafa;
 }
 
 #chatbot .chatbot-canvas .canvas-block-tool {
-	border: 1px dashed rgba(0,0,0,0.20);
-	border-radius: 10px;
-	padding: 12px;
-	background: #fcfcfc;
+        border: 1px dashed rgba(0,0,0,0.20);
+        border-radius: 10px;
+        padding: 12px;
+        background: #fcfcfc;
 }
 #chatbot .chatbot-canvas .canvas-tool-title {
-	font-weight: 600;
-	font-size: 13px;
-	margin-bottom: 8px;
-	color: #444;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 8px;
+        color: #444;
 }
 #chatbot .chatbot-canvas .canvas-tool-params {
-	margin: 0;
-	white-space: pre-wrap;
-	font-size: 12px;
-	color: #666;
+        margin: 0;
+        white-space: pre-wrap;
+        font-size: 12px;
+        color: #666;
 }
 
-/* Responsive: stack on small screens */
+
+/* -----------------------------------------------------------
+   LAYOUT MODE A:
+   Canvas beside chat (top row), form below full width
+   Active when: #chatbot.canvas-open and NOT .canvas-side
+----------------------------------------------------------- */
+
+#chatbot.canvas-open:not(.canvas-side) {
+        grid-template-columns: 1fr 420px;
+        grid-template-rows: auto 1fr auto;
+        grid-template-areas:
+                "baseprompt baseprompt"
+                "main       canvas"
+                "form       form";
+}
+
+/* canvas height is implicitly the "1fr" row height, i.e. within container */
+#chatbot.canvas-open:not(.canvas-side) .chatbot-canvas {
+        max-width: 520px;
+}
+
+
+/* -----------------------------------------------------------
+   LAYOUT MODE B:
+   Canvas right full height, left side stacks chat+form
+   Active when: #chatbot.canvas-open.canvas-side
+----------------------------------------------------------- */
+
+#chatbot.canvas-open.canvas-side {
+        /* left column: chat+form. right column: taller canvas */
+        grid-template-columns: minmax(18em, 1fr) minmax(22em, 48vw);
+        grid-template-rows: auto 1fr auto;
+        grid-template-areas:
+                "baseprompt canvas"
+                "main       canvas"
+                "form       canvas";
+}
+
+/* Canvas spans all rows => full widget height by definition */
+#chatbot.canvas-open.canvas-side .chatbot-canvas {
+        align-self: stretch;
+        max-width: none;  /* allow to grow wide (full available width) */
+}
+
+/* Ensure left column doesn't "spreng" the container:
+   - chat occupies the 1fr track and scrolls
+   - form stays auto height */
+#chatbot.canvas-open.canvas-side .chatbot-main,
+#chatbot.canvas-open.canvas-side .chat {
+        min-height: 0;
+}
+
+
+/* -----------------------------------------------------------
+   Responsive: stack on small screens
+----------------------------------------------------------- */
+
 @media (max-width: 900px) {
-	#chatbot .chatbot-main {
-		flex-direction: column;
-	}
-	#chatbot .chatbot-canvas {
-		height: 360px;
-		flex: 0 0 auto;
-		max-width: none;
-		min-width: 0;
-	}
+        #chatbot {
+                /* even when canvas is open, small screens should stack */
+                max-width: 64em; /* keep it readable */
+        }
+
+        #chatbot,
+        #chatbot.canvas-open:not(.canvas-side),
+        #chatbot.canvas-open.canvas-side {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto auto;
+                grid-template-areas:
+                        "baseprompt"
+                        "main"
+                        "canvas"
+                        "form";
+        }
+
+        /* give canvas a reasonable portion of the fixed height */
+        #chatbot.canvas-open .chatbot-canvas {
+                min-width: 0;
+        }
 }
 
-/* Loading spinner */
+
+/* -----------------------------------------------------------
+   Loading spinner
+----------------------------------------------------------- */
+
 .loading {
-	text-align: center;
-	margin: 10px;
+        text-align: center;
+        margin: 10px;
 }
 .spinner {
-	display: inline-block;
-	width: 24px;
-	height: 24px;
-	border: 3px solid #ccc;
-	border-top: 3px solid #0077cc;
-	border-radius: 50%;
-	animation: spin 1s linear infinite;
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border: 3px solid #ccc;
+        border-top: 3px solid #0077cc;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
 }
 @keyframes spin {
-	0% { transform: rotate(0deg); }
-	100% { transform: rotate(360deg); }
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
 }
 
-/* Voice control */
+
+/* -----------------------------------------------------------
+   Voice control
+----------------------------------------------------------- */
+
 #chatbot [name="chatvoice"] {
-	float: right;
-	width: auto;
-	margin-right: 25px;
+        float: right;
+        width: auto;
+        margin-right: 25px;
 }
 #chatbot [name="chatvoice"] button {
-	box-sizing: content-box;
-	width: 20px;
-	height: 20px;
-	padding: 10px;
-	border: 0;
-	cursor: pointer;
-	vertical-align: middle;
-	margin-left: 4px;
-	background: no-repeat center transparent;
-	background-size: 20px 20px;
-	opacity: 0.5;
+        box-sizing: content-box;
+        width: 20px;
+        height: 20px;
+        padding: 10px;
+        border: 0;
+        cursor: pointer;
+        vertical-align: middle;
+        margin-left: 4px;
+        background: no-repeat center transparent;
+        background-size: 20px 20px;
+        opacity: 0.5;
 }
 #chatbot [name="chatvoice"] button.active {
-	opacity: 1;
+        opacity: 1;
 }
 #chatbot [name="chatvoice"] button.microphone {
-	background-image: url("../icons/microphone.svg");
+        background-image: url("../icons/microphone.svg");
 }
 #chatbot [name="chatvoice"] button.speaker {
-	background-image: url("../icons/speaker.svg");
+        background-image: url("../icons/speaker.svg");
 }
 #chatbot [name="chatvoice"] button.dialogue {
-	background-image: url("../icons/dialogue.svg");
+        background-image: url("../icons/dialogue.svg");
 }
 #chatbot [name="chatvoice"] select {
-	width: auto;
-	vertical-align: middle;
-	margin-left: 18px;
+        width: auto;
+        vertical-align: middle;
+        margin-left: 18px;
 }
 
-/* Tools below assistant replies */
+
+/* -----------------------------------------------------------
+   Tools below assistant replies
+----------------------------------------------------------- */
+
 #chatbot .chat-tools a {
-	display: inline-block;
-	margin: 15px 10px 0;
+        display: inline-block;
+        margin: 15px 10px 0;
 }
 #chatbot .chat-tools img {
-	width: 16px;
-	height: 16px;
-	opacity: 0.5;
+        width: 16px;
+        height: 16px;
+        opacity: 0.5;
 }
 
-/* Info box styles */
+
+/* -----------------------------------------------------------
+   Info box styles
+----------------------------------------------------------- */
+
 .info-box {
-	border: 2px solid #ccc;
-	border-left-width: 6px;
-	border-radius: 6px;
-	padding: 0.8em 1em;
-	margin: 1em 0;
-	background-color: #fdfdfd;
-	font-family: sans-serif;
-	font-size: 0.95em;
-	line-height: 1.4;
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        border: 2px solid #ccc;
+        border-left-width: 6px;
+        border-radius: 6px;
+        padding: 0.8em 1em;
+        margin: 1em 0;
+        background-color: #fdfdfd;
+        font-family: sans-serif;
+        font-size: 0.95em;
+        line-height: 1.4;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .info-header {
-	font-weight: bold;
-	font-size: 1em;
-	margin-bottom: 0.4em;
+        font-weight: bold;
+        font-size: 1em;
+        margin-bottom: 0.4em;
 }
 .info-fact { border-left-color: #0077cc; }
 .info-weather { border-left-color: #00aaff; }
@@ -286,189 +463,175 @@
 .info-warning { border-left-color: #cc0000; }
 
 .label {
-	font-weight: bold;
-	display: inline-block;
-	width: 90px;
-	color: #333;
+        font-weight: bold;
+        display: inline-block;
+        width: 90px;
+        color: #333;
 }
 .result.richtig { color: #007700; font-weight: bold; }
 .result.falsch { color: #cc0000; font-weight: bold; }
 
+
 /* -----------------------------------------------------------
-	Feature Classes (added)
+   Feature Classes
 ----------------------------------------------------------- */
 
-/* Icons OFF */
 #chatbot.no-icons .chat-tools {
-	display: none !important;
+        display: none !important;
+}
+#chatbot.no-voice [name="chatvoice"] {
+        display: none !important;
 }
 
-/* Voice OFF */
-#chatbot.no-voice [name="chatvoice"] {
-	display: none !important;
-}
 
 /* -----------------------------------------------------------
-	Assistant Thinking (initial feedback) - no box
+   Assistant Thinking (initial feedback) - no box
 ----------------------------------------------------------- */
 
 #chatbot .message.assistent .assistant-thinking {
-	display: inline-flex;
-	align-items: center;
-	padding: 0;
-	border-radius: 0;
-	background: transparent;
+        display: inline-flex;
+        align-items: center;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
 }
 
 #chatbot .assistant-thinking .dots {
-	display: inline-flex;
-	gap: 6px;
+        display: inline-flex;
+        gap: 6px;
 }
 
 #chatbot .assistant-thinking .dots i {
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	background: rgba(0,0,0,0.35);
-	animation: dotPulse 1.2s infinite ease-in-out;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.35);
+        animation: dotPulse 1.2s infinite ease-in-out;
 }
 
 #chatbot .assistant-thinking .dots i:nth-child(2) { animation-delay: 0.15s; }
 #chatbot .assistant-thinking .dots i:nth-child(3) { animation-delay: 0.30s; }
 
 @keyframes dotPulse {
-	0%, 80%, 100% { opacity: 0.25; transform: scale(0.9); }
-	40% { opacity: 0.9; transform: scale(1.05); }
+        0%, 80%, 100% { opacity: 0.25; transform: scale(0.9); }
+        40% { opacity: 0.9; transform: scale(1.05); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	#chatbot .assistant-thinking .dots i {
-		animation: none;
-		opacity: 0.6;
-	}
+        #chatbot .assistant-thinking .dots i {
+                animation: none;
+                opacity: 0.6;
+        }
 }
 
+
 /* -----------------------------------------------------------
-	Tool Call Events (Phase 1 Live Updates) - no box
+   Tool Call Events (Phase 1 Live Updates) - no box
 ----------------------------------------------------------- */
 
 #chatbot .message.tool-event {
-	margin: 6px 0;
-	padding: 0;
-
-	/* Reserve space so expanding params usually doesn't require extra scrolling */
-	min-height: 44px;
-
-	border-radius: 0;
-	background: transparent;
-	border: 0;
-
-	font-size: 13px;
-	color: #666;
+        margin: 6px 0;
+        padding: 0;
+        min-height: 44px;
+        border-radius: 0;
+        background: transparent;
+        border: 0;
+        font-size: 13px;
+        color: #666;
 }
 
 #chatbot .message.tool-event .tool-badge {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
 }
 
 #chatbot .message.tool-event .tool-ic {
-	opacity: 0.75;
+        opacity: 0.75;
 }
 
 #chatbot .message.tool-event .tool-name {
-	opacity: 0.9;
-	font-weight: 600;
+        opacity: 0.9;
+        font-weight: 600;
 }
 
 #chatbot .message.tool-event .tool-preview {
-	opacity: 0.78;
-	font-weight: 400;
-	margin-left: 4px;
-
-	/* Keep it readable without taking over the line */
-	max-width: 420px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	display: inline-block;
-	vertical-align: bottom;
+        opacity: 0.78;
+        font-weight: 400;
+        margin-left: 4px;
+        max-width: 420px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: bottom;
 }
 
 #chatbot .message.tool-event .tool-meta {
-	opacity: 0.45;
-	font-size: 11px;
-	margin-left: 6px;
+        opacity: 0.45;
+        font-size: 11px;
+        margin-left: 6px;
 }
 
 #chatbot .message.tool-event .tool-activity {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: rgba(0,0,0,0.22);
-	animation: toolPulse 1s infinite ease-in-out;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(0,0,0,0.22);
+        animation: toolPulse 1s infinite ease-in-out;
 }
 
 @keyframes toolPulse {
-	0%, 100% { opacity: 0.20; transform: scale(0.9); }
-	50% { opacity: 0.65; transform: scale(1.08); }
+        0%, 100% { opacity: 0.20; transform: scale(0.9); }
+        50% { opacity: 0.65; transform: scale(1.08); }
 }
 
-/* Fold-down */
 #chatbot .message.tool-event .tool-params {
-	margin-top: 4px;
+        margin-top: 4px;
 }
 
-/* Use a small custom arrow (visible but subtle) */
 #chatbot .message.tool-event .tool-params summary {
-	cursor: pointer;
-	user-select: none;
-
-	opacity: 0.72;
-	font-size: 11px;
-	line-height: 1.2;
-
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-
-	list-style: none;
+        cursor: pointer;
+        user-select: none;
+        opacity: 0.72;
+        font-size: 11px;
+        line-height: 1.2;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        list-style: none;
 }
 
-/* Hide native marker */
 #chatbot .message.tool-event .tool-params summary::marker { content: ""; }
 #chatbot .message.tool-event .tool-params summary::-webkit-details-marker { display: none; }
 
-/* Custom arrow */
 #chatbot .message.tool-event .tool-params summary::before {
-	content: "▸";
-	font-size: 10px;
-	opacity: 0.60;
-	display: inline-block;
-	transform: translateY(-0.5px);
+        content: "▸";
+        font-size: 10px;
+        opacity: 0.60;
+        display: inline-block;
+        transform: translateY(-0.5px);
 }
 #chatbot .message.tool-event .tool-params[open] summary::before {
-	content: "▾";
-	opacity: 0.65;
+        content: "▾";
+        opacity: 0.65;
 }
 
-/* Params: slightly darker for more contrast */
 #chatbot .message.tool-event .tool-params pre {
-	margin: 6px 0 0;
-	padding: 6px 0 0;
-	border-radius: 0;
-	background: transparent;
-	overflow: auto;
-	white-space: pre-wrap;
-	font-size: 12px;
-	color: #7f7f7f;
-	border-top: 1px solid rgba(0,0,0,0.08);
+        margin: 6px 0 0;
+        padding: 6px 0 0;
+        border-radius: 0;
+        background: transparent;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-size: 12px;
+        color: #7f7f7f;
+        border-top: 1px solid rgba(0,0,0,0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {
-	#chatbot .message.tool-event .tool-activity {
-		animation: none;
-		opacity: 0.6;
-	}
+        #chatbot .message.tool-event .tool-activity {
+                animation: none;
+                opacity: 0.6;
+        }
 }

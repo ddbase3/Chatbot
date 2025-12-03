@@ -345,6 +345,7 @@
 
 			chatControl.removeClass('chatempty');
 			basePrompt.remove();
+			root.classList.add('chatstarted');
 
 			// User message
 			const userHtml = raw.replace(/\n/g, '<br>');
