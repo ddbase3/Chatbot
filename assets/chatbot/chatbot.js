@@ -17,6 +17,10 @@
 		const canvasContentElem = $root.find('.chatbot-canvas .canvas-content');
 		const canvasCloseBtn = $root.find('.chatbot-canvas .canvas-close');
 
+		// Suggestions container (bottom-right, styling via CSS)
+		const suggestionsContainer = $('<div class="chat-suggestions" aria-live="polite"></div>');
+		$root.find('.chatbot-main').append(suggestionsContainer);
+
 		// ---------------------------------------------------------------------
 		// Utility
 		// ---------------------------------------------------------------------
@@ -157,8 +161,6 @@
 
 				// HTML block
 				if (type === 'html') {
-					// Minimal start: allow tool to provide HTML. "sanitize" flag is reserved for later hardening.
-					// For production hardening you can introduce a sanitizer (DOMPurify) or server-side rendering.
 					const html = String(block.html || '');
 					const wrap = $('<div class="canvas-block canvas-block-html"></div>');
 					wrap.html(html);
@@ -223,7 +225,7 @@
 			renderCanvasBlocks(blocks, mode);
 		}
 
-		// Local close button (pure UI close; assistant can also close via tool-triggered event)
+		// Local close button
 		canvasCloseBtn.off('click.chatbotCanvas').on('click.chatbotCanvas', e => {
 			e.preventDefault();
 			canvasClose({ id: canvasState.id });
@@ -335,6 +337,80 @@
 		}
 
 		// ---------------------------------------------------------------------
+		// Prompt Suggestions
+		// ---------------------------------------------------------------------
+
+		function renderSuggestions(list) {
+			suggestionsContainer.removeClass('loading');
+			suggestionsContainer.empty();
+
+			if (!Array.isArray(list) || !list.length) {
+				suggestionsContainer.removeClass('has-suggestions');
+				return;
+			}
+
+			suggestionsContainer.addClass('has-suggestions');
+
+			const max = 3;
+			for (let i = 0; i < list.length && i < max; i++) {
+				let text = list[i];
+				if (typeof text !== 'string') continue;
+				text = text.trim();
+				if (!text) continue;
+
+				const btn = $('<button type="button" class="chat-suggestion"></button>');
+				btn.text(text);
+
+				btn.on('click', function(e) {
+					e.preventDefault();
+					const current = msgControl.val() || '';
+					if (!current.trim()) {
+						msgControl.val(text);
+					} else {
+						msgControl.val(current.replace(/\s*$/, ' ') + text);
+					}
+					msgControl.focus();
+					msgControl.trigger('input');
+				});
+
+				btn.on('dblclick', function(e) {
+					e.preventDefault();
+					const current = msgControl.val() || '';
+					if (!current.trim()) {
+						msgControl.val(text);
+					}
+					msgControl.focus();
+					msgControl.trigger('input');
+					sendMessage();
+				});
+
+				suggestionsContainer.append(btn);
+			}
+		}
+
+		function fetchSuggestions(lastMsgId) {
+			if (!config.serviceUrl) return;
+
+			const data = { suggestions: 1 };
+			if (lastMsgId) {
+				data.after = lastMsgId;
+			}
+
+			suggestionsContainer.addClass('loading');
+			suggestionsContainer.empty();
+
+			$.getJSON(config.serviceUrl, data)
+				.done(res => {
+					renderSuggestions(res);
+				})
+				.fail(() => {
+					suggestionsContainer.removeClass('loading');
+					suggestionsContainer.removeClass('has-suggestions');
+					suggestionsContainer.empty();
+				});
+		}
+
+		// ---------------------------------------------------------------------
 		// Main Chat Send
 		// ---------------------------------------------------------------------
 
@@ -342,6 +418,10 @@
 			const raw = msgControl.val() || '';
 			const plain = raw.trim();
 			if (!plain) return;
+
+			// Clear current suggestions while new answer is generated
+			suggestionsContainer.removeClass('has-suggestions loading');
+			suggestionsContainer.empty();
 
 			chatControl.removeClass('chatempty');
 			basePrompt.remove();
@@ -357,7 +437,7 @@
 			const respElem = $('<div class="message assistent"></div>').appendTo(chatControl);
 			const contentElem = $('<div class="assistant-content"></div>').appendTo(respElem);
 
-			// Initial "thinking" indicator (immediate feedback)
+			// Initial "thinking" indicator
 			const thinkingElem = $(`
 				<div class="assistant-thinking" aria-live="polite">
 					<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -438,6 +518,9 @@
 						const txt = cleanForVoice(contentElem.text());
 						root._voiceCtrl.handleAssistantReply(txt);
 					}
+
+					// After assistant answered: fetch prompt suggestions
+					fetchSuggestions(currentMessageId);
 				}
 
 				return;
@@ -503,6 +586,7 @@
 					if (typeof data === 'string') {
 						try { data = JSON.parse(data); } catch {}
 					}
+					console.log(data);
 					const toolName = data.label || data.tool || 'tool';
 					const args = data.args || {};
 
@@ -545,9 +629,9 @@
 				}
 
 				// -----------------------------
-				// TOOL FINISHED
+				// TOOL FINISHED (currently disabled)
 				// -----------------------------
-				if (false && event === 'tool.finished') { // deactivated, hiding happens too fast
+				if (false && event === 'tool.finished') {
 					if (typeof data === 'string') {
 						try { data = JSON.parse(data); } catch {}
 					}
@@ -602,6 +686,9 @@
 					}
 
 					client.close();
+
+					// After assistant answered: fetch prompt suggestions
+					fetchSuggestions(currentMessageId);
 					return;
 				}
 
@@ -610,7 +697,7 @@
 				// -----------------------------
 				if (event === 'error') {
 					hideThinking();
-					contentElem.append('<div class="error">Connection error</div>');
+					// contentElem.append('<div class="error">Connection error</div>');
 					console.error('Streaming error event:', data);
 					client.close();
 				}
