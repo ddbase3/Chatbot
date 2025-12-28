@@ -113,7 +113,7 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
-	 * Aget flow file name having a json array of base prompts.
+	 * Agent flow file name having a json array of base prompts.
 	 */
 	protected function getAgentFlowFile(): string {
 		return '';
@@ -162,29 +162,90 @@ class ChatbotService implements IOutput {
 	///////////////////////////////////////////////////////////////////////////////////////
 
 	/**
-	 * Returns 3 short, concrete suggestions as JSON array.
-	 * Keeps it language-neutral-ish but defaults to German.
+	 * Returns a simple suggestion prompt.
 	 */
-	protected function suggestPrompts(): string {
+	protected function getSimpleSuggestionPrompt(): string {
+		return 'Suggest three prompts.';
+	}
 
-		$last = (string)$this->request->request('prompt');
-		$hint = trim($last) !== '' ? $last : 'dein letztes Thema';
+	/**
+	 * Suggestion prompt file name having a json array of base prompts.
+	 */
+	protected function getSuggestionPromptFile(): string {
+		return '';
+	}
 
-		$suggestions = [
-			'Gib mir ein kurzes Beispiel dazu.',
-			'Welche nächsten Schritte empfiehlst du?',
-			'Fass das in 3 Bulletpoints zusammen.'
-		];
+	/**
+	 * Returns a simple suggestion agent flow configuration (array).
+	 */
+	protected function getSimpleSuggestionFlow(): string {
+		return null;
+	}
 
-		// Slightly adapt if we have any hint text
-		if (trim($hint) !== '' && $hint !== 'dein letztes Thema') {
-			$suggestions = [
-				'Gib mir ein kurzes Beispiel zu: ' . mb_substr($hint, 0, 40) . (mb_strlen($hint) > 40 ? '…' : ''),
-				'Welche 3 Optionen habe ich als Nächstes?',
-				'Mach daraus eine kurze Checkliste.'
-			];
+	/**
+	 * Suggestion agent flow file name having a json array of base prompts.
+	 */
+	protected function getSuggestionFlowFile(): string {
+		return '';
+	}
+
+	/**
+	 * Returns 3 short, concrete suggestions as JSON array.
+	 */
+	private function suggestPrompts(): string {
+
+		$context = $this->contextFactory->createContext();
+
+		// Load suggestions flow
+		$flowFile = $this->getSuggestionFlowFile();
+		$json = file_get_contents($flowFile);
+		$config = json_decode($json, true) ?? $this->getSimpleSuggestionFlow();
+
+		if (!$config) {
+			return $this->errorResponse("[Invalid Suggestions Flow JSON]");
 		}
 
-		return json_encode($suggestions, JSON_UNESCAPED_UNICODE);
+		$flow = $this->flowFactory->createFromArray("strictflow", $config, $context);
+
+		$systemFile = $this->getSuggestionPromptFile();
+		$systemPrompt = file_get_contents($systemFile) ?: $this->getSimpleSuggestionPrompt();
+
+		$userPrompt = "Generate suggestions.";
+
+		$inputs = [
+			'system' => $systemPrompt,
+			'prompt' => $userPrompt,
+			'mode'   => 'suggestions'
+		];
+
+		$output = $flow->run($inputs);
+
+		// Flow outputs are keyed by node id ("assistant"), then by port name ("message")
+		$msg = '';
+		if (isset($output['assistant']['message']['content'])) {
+			$msg = (string)$output['assistant']['message']['content'];
+		} elseif (isset($output['message']['content'])) {
+			// fallback, just in case
+			$msg = (string)$output['message']['content'];
+		}
+
+		// --- CLEAN JSON codeblock ---
+		$clean = trim($msg);
+		$clean = preg_replace('/^```json/i', '', $clean);
+		$clean = preg_replace('/^```/i', '', $clean);
+		$clean = preg_replace('/```$/', '', $clean);
+		$clean = trim($clean);
+
+		$decoded = json_decode($clean, true);
+
+		if (!is_array($decoded)) {
+			return json_encode([
+				'error' => 'Invalid JSON from suggestions model',
+				'raw'   => $msg,
+				'clean' => $clean
+			], JSON_UNESCAPED_UNICODE);
+		}
+
+		return json_encode($decoded, JSON_UNESCAPED_UNICODE);
 	}
 }
