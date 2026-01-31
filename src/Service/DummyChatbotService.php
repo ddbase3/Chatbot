@@ -27,7 +27,7 @@ class DummyChatbotService implements IOutput {
 		return 'dummychatbotservice';
 	}
 
-	public function getOutput($out = 'html'): string {
+	public function getOutput(string $out = 'html', bool $final = false): string {
 
 		// Provide a base-test prompt
 		if ($this->request->get('baseprompt') !== null) {
@@ -47,7 +47,7 @@ class DummyChatbotService implements IOutput {
 		return '';
 	}
 
-	public function getHelp() {
+	public function getHelp(): string {
 		return 'Help on DummyChatbotService.';
 	}
 

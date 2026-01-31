@@ -23,7 +23,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	// ---------------------------------------------------------------------
 	// Render
 	// ---------------------------------------------------------------------
-	public function getOutput($out = 'html') {
+	public function getOutput(string $out = 'html', bool $final = false): string {
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
 		$this->view->setTemplate('Content/ChatbotDisplay.php');
 
@@ -53,7 +53,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		return $this->view->loadTemplate();
 	}
 
-	public function getHelp() {
+	public function getHelp(): string {
 		return 'Display a configurable Chatbot widget.';
 	}
 
