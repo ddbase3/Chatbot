@@ -254,7 +254,7 @@ final class ChatbotServiceTest extends TestCase {
 
 			// Re-route suggestPrompts() without file IO by hijacking getOutput() branch:
 			// easiest is to override getOutput() suggestions branch:
-			public function getOutput($out = 'html'): string {
+			public function getOutput(string $out = 'html', bool $final = false): string {
 				if ($this->request->get('baseprompt') !== null) {
 					return $this->getBasePrompt();
 				}
