@@ -22,6 +22,43 @@
 		$root.find('.chatbot-main').append(suggestionsContainer);
 
 		// ---------------------------------------------------------------------
+		// Simple, reliable link handling
+		// ---------------------------------------------------------------------
+		// 1) Ensure rendered anchors have target/rel attributes
+		// 2) Also force opening in a new tab in case some global handler intercepts clicks
+		function patchLinksTargetBlank(scope) {
+			const $scope = scope && scope.jquery ? scope : $(scope);
+			if (!$scope || !$scope.length) return;
+
+			$scope.find('a[href]').each(function() {
+				const $a = $(this);
+				const href = String($a.attr('href') || '').trim();
+
+				if (!href || href.startsWith('#') || href.toLowerCase().startsWith('javascript:')) return;
+
+				$a.attr('target', '_blank');
+
+				const relRaw = String($a.attr('rel') || '');
+				const rel = relRaw.split(/\s+/).filter(Boolean);
+				if (!rel.includes('noopener')) rel.push('noopener');
+				if (!rel.includes('noreferrer')) rel.push('noreferrer');
+				$a.attr('rel', rel.join(' '));
+			});
+		}
+
+		$root.off('click.chatbotLinks').on('click.chatbotLinks', '.assistant-content a[href], .chatbot-canvas a[href]', function(e) {
+			const href = String($(this).attr('href') || '').trim();
+
+			if (!href || href.startsWith('#') || href.toLowerCase().startsWith('javascript:')) return;
+
+			// Force a new tab even if other scripts try to intercept navigation
+			e.preventDefault();
+			e.stopPropagation();
+
+			window.open(href, '_blank', 'noopener,noreferrer');
+		});
+
+		// ---------------------------------------------------------------------
 		// Utility
 		// ---------------------------------------------------------------------
 
@@ -164,6 +201,7 @@
 					const html = String(block.html || '');
 					const wrap = $('<div class="canvas-block canvas-block-html"></div>');
 					wrap.html(html);
+					patchLinksTargetBlank(wrap);
 					canvasContentElem.append(wrap);
 					continue;
 				}
@@ -174,6 +212,7 @@
 					const wrap = $('<div class="canvas-block canvas-block-markdown"></div>');
 					if (config.useMarkdown && window.marked) {
 						wrap.html(marked.parse(md));
+						patchLinksTargetBlank(wrap);
 					} else {
 						wrap.text(md);
 					}
@@ -236,6 +275,7 @@
 		// ---------------------------------------------------------------------
 		$.get(config.serviceUrl, { baseprompt: 1 }, res => {
 			basePrompt.html(res);
+			patchLinksTargetBlank(basePrompt);
 		});
 
 		// ---------------------------------------------------------------------
@@ -463,12 +503,14 @@
 			function scheduleRender() {
 				if (!config.useMarkdown) {
 					contentElem.text(fullText);
+					patchLinksTargetBlank(contentElem);
 					scrollToBottom();
 					return;
 				}
 				if (renderTimeout) return;
 				renderTimeout = setTimeout(() => {
 					contentElem.html(marked.parse(fullText));
+					patchLinksTargetBlank(contentElem);
 					renderTimeout = null;
 					scrollToBottom();
 				}, 60);
@@ -673,8 +715,10 @@
 
 					if (config.useMarkdown) {
 						contentElem.html(marked.parse(fullText));
+						patchLinksTargetBlank(contentElem);
 					} else {
 						contentElem.text(fullText);
+						patchLinksTargetBlank(contentElem);
 					}
 
 					renderIconBar(toolsElem, fullText, currentMessageId);
