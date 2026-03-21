@@ -55,6 +55,52 @@
 			return $('<div>').text(str || '').html();
 		}
 
+		function parseEventPayload(data) {
+			if (typeof data !== 'string') {
+				return data;
+			}
+
+			try {
+				return JSON.parse(data);
+			} catch {
+				return data;
+			}
+		}
+
+		function patchLinksTargetBlank(scope) {
+			const $scope = scope && scope.jquery ? scope : $(scope);
+			if (!$scope || !$scope.length) return;
+
+			$scope.find('a[href]').each(function() {
+				const $a = $(this);
+				const href = String($a.attr('href') || '').trim();
+
+				if (!href || href.startsWith('#') || href.toLowerCase().startsWith('javascript:')) {
+					return;
+				}
+
+				$a.attr('target', '_blank');
+
+				const relRaw = String($a.attr('rel') || '');
+				const rel = relRaw.split(/\s+/).filter(Boolean);
+
+				if (!rel.includes('noopener')) rel.push('noopener');
+				if (!rel.includes('noreferrer')) rel.push('noreferrer');
+
+				$a.attr('rel', rel.join(' '));
+			});
+		}
+
+		function renderMarkdownOrText(targetElem, text) {
+			if (config.useMarkdown && window.marked) {
+				targetElem.html(marked.parse(text));
+				patchLinksTargetBlank(targetElem);
+				return;
+			}
+
+			targetElem.text(text);
+		}
+
 		function toolArgsPreview(toolName, args, maxLen = 110) {
 			let s = '';
 
@@ -124,9 +170,8 @@
 		}
 
 		function canvasOpen(payload = {}) {
-			if (typeof payload === 'string') {
-				try { payload = JSON.parse(payload); } catch {}
-			}
+			payload = parseEventPayload(payload);
+
 			const id = (payload && payload.id) ? String(payload.id) : 'main';
 			canvasState.id = id;
 
@@ -137,9 +182,8 @@
 		}
 
 		function canvasClose(payload = {}) {
-			if (typeof payload === 'string') {
-				try { payload = JSON.parse(payload); } catch {}
-			}
+			payload = parseEventPayload(payload);
+
 			const id = (payload && payload.id) ? String(payload.id) : null;
 			if (id && id !== canvasState.id) {
 				return;
@@ -164,6 +208,7 @@
 					const html = String(block.html || '');
 					const wrap = $('<div class="canvas-block canvas-block-html"></div>');
 					wrap.html(html);
+					patchLinksTargetBlank(wrap);
 					canvasContentElem.append(wrap);
 					continue;
 				}
@@ -172,11 +217,7 @@
 				if (type === 'markdown') {
 					const md = String(block.markdown || '');
 					const wrap = $('<div class="canvas-block canvas-block-markdown"></div>');
-					if (config.useMarkdown && window.marked) {
-						wrap.html(marked.parse(md));
-					} else {
-						wrap.text(md);
-					}
+					renderMarkdownOrText(wrap, md);
 					canvasContentElem.append(wrap);
 					continue;
 				}
@@ -207,9 +248,7 @@
 		}
 
 		function canvasRender(payload = {}) {
-			if (typeof payload === 'string') {
-				try { payload = JSON.parse(payload); } catch {}
-			}
+			payload = parseEventPayload(payload);
 
 			const id = payload && payload.id ? String(payload.id) : 'main';
 			canvasState.id = id;
@@ -234,13 +273,16 @@
 		// ---------------------------------------------------------------------
 		// Base Prompt
 		// ---------------------------------------------------------------------
+
 		$.get(config.serviceUrl, { baseprompt: 1 }, res => {
 			basePrompt.html(res);
+			patchLinksTargetBlank(basePrompt);
 		});
 
 		// ---------------------------------------------------------------------
 		// Icon Bar – Copy + Like + Dislike (with toggle)
 		// ---------------------------------------------------------------------
+
 		function renderIconBar(toolsElem, fullText, msgId) {
 			if (!config.useIcons || !toolsElem) return;
 
@@ -259,34 +301,34 @@
 			toolsElem.append(copyBtn, likeBtn, dislikeBtn);
 
 			// Copy
-			copyBtn.on("click", function(e) {
+			copyBtn.on('click', function(e) {
 				e.preventDefault();
 				navigator.clipboard.writeText(fullText).then(() => {
-					const img = $(this).find("img");
-					img.attr("src", icons.check);
-					setTimeout(() => img.attr("src", icons.copy), 1000);
+					const img = $(this).find('img');
+					img.attr('src', icons.check);
+					setTimeout(() => img.attr('src', icons.copy), 1000);
 				});
 			});
 
 			// Like / Dislike
-			const parentMsg = toolsElem.closest(".message.assistent");
+			const parentMsg = toolsElem.closest('.message.assistent');
 
-			if (!parentMsg.attr("data-feedback")) {
-				parentMsg.attr("data-feedback", "none");
+			if (!parentMsg.attr('data-feedback')) {
+				parentMsg.attr('data-feedback', 'none');
 			}
 
 			function updateVisual() {
-				const state = parentMsg.attr("data-feedback");
+				const state = parentMsg.attr('data-feedback');
 
-				if (state === "like") {
-					likeBtn.find("img").attr("src", icons.thumbsupfill);
+				if (state === 'like') {
+					likeBtn.find('img').attr('src', icons.thumbsupfill);
 					dislikeBtn.hide();
-				} else if (state === "dislike") {
-					dislikeBtn.find("img").attr("src", icons.thumbsdownfill);
+				} else if (state === 'dislike') {
+					dislikeBtn.find('img').attr('src', icons.thumbsdownfill);
 					likeBtn.hide();
 				} else {
-					likeBtn.find("img").attr("src", icons.thumbsup);
-					dislikeBtn.find("img").attr("src", icons.thumbsdown);
+					likeBtn.find('img').attr('src', icons.thumbsup);
+					dislikeBtn.find('img').attr('src', icons.thumbsdown);
 					likeBtn.show();
 					dislikeBtn.show();
 				}
@@ -299,35 +341,35 @@
 					config.serviceUrl,
 					{ feedback: type, messageid: msgId },
 					function(res) { /* optional */ },
-					"json"
+					'json'
 				);
 			}
 
-			likeBtn.on("click", function(e) {
+			likeBtn.on('click', function(e) {
 				e.preventDefault();
-				const s = parentMsg.attr("data-feedback");
+				const s = parentMsg.attr('data-feedback');
 
-				if (s === "like") {
-					parentMsg.attr("data-feedback", "none");
-					sendFeedback("like");
+				if (s === 'like') {
+					parentMsg.attr('data-feedback', 'none');
+					sendFeedback('like');
 				} else {
-					parentMsg.attr("data-feedback", "like");
-					sendFeedback("like");
+					parentMsg.attr('data-feedback', 'like');
+					sendFeedback('like');
 				}
 
 				updateVisual();
 			});
 
-			dislikeBtn.on("click", function(e) {
+			dislikeBtn.on('click', function(e) {
 				e.preventDefault();
-				const s = parentMsg.attr("data-feedback");
+				const s = parentMsg.attr('data-feedback');
 
-				if (s === "dislike") {
-					parentMsg.attr("data-feedback", "none");
-					sendFeedback("dislike");
+				if (s === 'dislike') {
+					parentMsg.attr('data-feedback', 'none');
+					sendFeedback('dislike');
 				} else {
-					parentMsg.attr("data-feedback", "dislike");
-					sendFeedback("dislike");
+					parentMsg.attr('data-feedback', 'dislike');
+					sendFeedback('dislike');
 				}
 
 				updateVisual();
@@ -461,14 +503,10 @@
 			respElem.attr('data-toolcount', '0');
 
 			function scheduleRender() {
-				if (!config.useMarkdown) {
-					contentElem.text(fullText);
-					scrollToBottom();
-					return;
-				}
 				if (renderTimeout) return;
+
 				renderTimeout = setTimeout(() => {
-					contentElem.html(marked.parse(fullText));
+					renderMarkdownOrText(contentElem, fullText);
 					renderTimeout = null;
 					scrollToBottom();
 				}, 60);
@@ -503,7 +541,7 @@
 
 					fullText = json.text || '';
 					hideThinking();
-					scheduleRender();
+					renderMarkdownOrText(contentElem, fullText);
 				} catch (err) {
 					console.error('REST request failed:', err);
 					hideThinking();
@@ -569,10 +607,14 @@
 				// MSGID
 				// -----------------------------
 				if (event === 'msgid') {
-					if (typeof data === 'string') {
-						try { data = JSON.parse(data); } catch {}
+					data = parseEventPayload(data);
+
+					if (data && typeof data === 'object') {
+						currentMessageId = data.id || data.msgid || ('msg_' + Date.now());
+					} else {
+						currentMessageId = 'msg_' + Date.now();
 					}
-					currentMessageId = data.id || data.msgid || ('msg_' + Date.now());
+
 					respElem.attr('data-msgid', currentMessageId);
 					return;
 				}
@@ -583,12 +625,11 @@
 				if (event === 'tool.started') {
 					hideThinking();
 
-					if (typeof data === 'string') {
-						try { data = JSON.parse(data); } catch {}
-					}
-					console.log(data);
-					const toolName = data.label || data.tool || 'tool';
-					const args = data.args || {};
+					data = parseEventPayload(data);
+					const payload = (data && typeof data === 'object') ? data : {};
+
+					const toolName = payload.label || payload.tool || 'tool';
+					const args = payload.args || {};
 
 					const prevCount = parseInt(respElem.attr('data-toolcount') || '0', 10);
 					const callIndex = prevCount + 1;
@@ -632,10 +673,9 @@
 				// TOOL FINISHED (currently disabled)
 				// -----------------------------
 				if (false && event === 'tool.finished') {
-					if (typeof data === 'string') {
-						try { data = JSON.parse(data); } catch {}
-					}
-					const toolName = data.tool || 'tool';
+					data = parseEventPayload(data);
+					const payload = (data && typeof data === 'object') ? data : {};
+					const toolName = payload.tool || 'tool';
 					chatControl.find('.tool-event[data-tool="' + toolName + '"]').remove();
 					return;
 				}
@@ -649,11 +689,19 @@
 					// Remove all tool events when token stream starts
 					chatControl.find('.tool-event').remove();
 
+					let tokenText = '';
+
 					if (typeof data === 'string') {
-						try { data = JSON.parse(data); } catch {}
+						tokenText = data;
+					} else if (data && typeof data === 'object') {
+						tokenText = String(data.text ?? data.token ?? data.content ?? '');
 					}
-					fullText += data.text || '';
-					scheduleRender();
+
+					if (tokenText !== '') {
+						fullText += tokenText;
+						scheduleRender();
+					}
+
 					return;
 				}
 
@@ -671,11 +719,7 @@
 						respElem.attr('data-msgid', currentMessageId);
 					}
 
-					if (config.useMarkdown) {
-						contentElem.html(marked.parse(fullText));
-					} else {
-						contentElem.text(fullText);
-					}
+					renderMarkdownOrText(contentElem, fullText);
 
 					renderIconBar(toolsElem, fullText, currentMessageId);
 					scrollToResponse();
@@ -697,7 +741,6 @@
 				// -----------------------------
 				if (event === 'error') {
 					hideThinking();
-					// contentElem.append('<div class="error">Connection error</div>');
 					console.error('Streaming error event:', data);
 					client.close();
 				}
