@@ -129,7 +129,7 @@
 
 #chatbot .chatform {
 	position: relative;
-	padding: 15px 30px;     /* <-- your required padding */
+	padding: 15px 30px;
 	border: 1px solid #ddd;
 	border-radius: 30px;
 
@@ -143,7 +143,7 @@
 	min-height: 50px;
 	max-height: 150px;
 	overflow-y: auto;
-	margin-bottom: 10px;
+	margin-bottom: 12px;
 	padding: 3px 10px;
 	background: transparent;
 	border: 0;
@@ -157,16 +157,38 @@
 	background: #f7f7f7;
 }
 
+#chatbot .chat-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	min-height: 40px;
+}
+
+#chatbot .chat-actions-left,
+#chatbot .chat-actions-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+#chatbot .chat-actions-right {
+	margin-left: auto;
+}
+
 #chatbot button#chatSend {
-	float: right;
 	box-sizing: content-box;
 	width: 20px;
 	height: 20px;
 	padding: 10px;
+	margin: 0 10px;
 	background: #333;
 	border: 0;
 	border-radius: 20px;
 	cursor: pointer;
+	flex: 0 0 auto;
 }
 
 #chatbot button#chatSend img {
@@ -354,6 +376,14 @@
 	#chatbot.canvas-open .chatbot-canvas {
 		min-width: 0;
 	}
+
+	#chatbot .chat-actions {
+		align-items: flex-start;
+	}
+
+	#chatbot .chat-actions-right {
+		margin-left: 0;
+	}
 }
 
 
@@ -381,14 +411,99 @@
 
 
 /* -----------------------------------------------------------
+   Shared action popovers
+----------------------------------------------------------- */
+
+#chatbot .chat-action-popover {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+}
+
+#chatbot .chat-action-popover .popover-toggle {
+	position: relative;
+	z-index: 2;
+}
+
+#chatbot .chat-action-popover .popover-panel {
+	position: absolute;
+	left: 0;
+	bottom: calc(100% + 10px);
+	display: none;
+	min-width: 240px;
+	max-width: 320px;
+	padding: 12px 14px;
+	border: 1px solid #ddd;
+	border-radius: 14px;
+	background: #fff;
+	box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+	z-index: 20;
+}
+
+#chatbot .chat-action-popover.open .popover-panel {
+	display: block;
+}
+
+#chatbot .chat-action-popover .popover-title {
+	margin: 0 0 10px;
+	font-size: 13px;
+	font-weight: 600;
+	color: #333;
+}
+
+#chatbot .chat-action-popover .popover-text {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.45;
+	color: #666;
+}
+
+#chatbot .chat-action-popover .popover-row {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0;
+}
+
+#chatbot .chat-action-popover .popover-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #444;
+}
+
+#chatbot .chat-action-popover select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 7px 10px;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	background: #fff;
+	font-size: 13px;
+	color: #333;
+	outline: none;
+}
+
+#chatbot .chat-action-popover select:focus {
+	border-color: #bbb;
+}
+
+
+/* -----------------------------------------------------------
    Voice control
 ----------------------------------------------------------- */
 
 #chatbot [name="chatvoice"] {
-	float: right;
+	display: flex;
+	align-items: center;
 	width: auto;
-	margin-right: 25px;
 }
+
+#chatbot [name="chatvoice"] .chat-voice-controls {
+	display: flex;
+	align-items: center;
+	gap: 0;
+}
+
 #chatbot [name="chatvoice"] button {
 	box-sizing: content-box;
 	width: 20px;
@@ -402,22 +517,81 @@
 	background-size: 20px 20px;
 	opacity: 0.5;
 }
+
 #chatbot [name="chatvoice"] button.active {
 	opacity: 1;
 }
+
 #chatbot [name="chatvoice"] button.microphone {
 	background-image: url("../icons/microphone.svg");
 }
+
 #chatbot [name="chatvoice"] button.speaker {
 	background-image: url("../icons/speaker.svg");
 }
+
 #chatbot [name="chatvoice"] button.dialogue {
 	background-image: url("../icons/dialogue.svg");
 }
-#chatbot [name="chatvoice"] select {
+
+#chatbot [name="chatvoice"] button.gear {
+	background-image: url("../icons/gear.svg");
+}
+
+/* voice popover should open above-left from the button */
+#chatbot [name="chatvoice"] .chat-action-popover .popover-panel {
+	left: auto;
+	right: 0;
+}
+
+
+/* -----------------------------------------------------------
+   Thread control
+----------------------------------------------------------- */
+
+#chatbot [name="chatthreads"] {
+	display: flex;
+	align-items: center;
 	width: auto;
+}
+
+#chatbot [name="chatthreads"] .chat-threads-controls {
+	display: flex;
+	align-items: center;
+	gap: 0;
+}
+
+#chatbot [name="chatthreads"] button {
+	box-sizing: content-box;
+	width: 20px;
+	height: 20px;
+	padding: 10px;
+	border: 0;
+	cursor: pointer;
 	vertical-align: middle;
-	margin-left: 18px;
+	margin-right: 4px;
+	background: no-repeat center transparent;
+	background-size: 20px 20px;
+	opacity: 0.5;
+}
+
+#chatbot [name="chatthreads"] button:hover,
+#chatbot [name="chatthreads"] button.active {
+	opacity: 1;
+}
+
+#chatbot [name="chatthreads"] button.list {
+	background-image: url("../icons/list.svg");
+}
+
+#chatbot [name="chatthreads"] button.plus {
+	background-image: url("../icons/plus.svg");
+}
+
+/* threads popover stays above-right from the button */
+#chatbot [name="chatthreads"] .chat-action-popover .popover-panel {
+	left: 0;
+	right: auto;
 }
 
 
@@ -480,6 +654,9 @@
 	display: none !important;
 }
 #chatbot.no-voice [name="chatvoice"] {
+	display: none !important;
+}
+#chatbot.no-threads [name="chatthreads"] {
 	display: none !important;
 }
 

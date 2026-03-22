@@ -34,9 +34,10 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'use_markdown'   => true,
 			'use_icons'      => true,
 			'use_voice'      => true,
+			'use_threads'    => true,
 
 			// Transport
-			'transport_mode' => 'auto',	// auto | sse | websocket | rest
+			'transport_mode' => 'auto',     // auto | sse | websocket | rest
 
 			// Voice config
 			'default_lang'   => 'auto'
@@ -89,6 +90,11 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 				'use_voice' => [
 					'type' => 'boolean',
 					'description' => 'Enable voice controls and TTS/STT',
+					'default' => true
+				],
+				'use_threads' => [
+					'type' => 'boolean',
+					'description' => 'Enable multiple chat threads within the widget',
 					'default' => true
 				],
 

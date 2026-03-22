@@ -10,6 +10,7 @@
 		const msgControl = $root.find('textarea[name=prompt]');
 		const btnSend = $root.find('#chatSend');
 		const basePrompt = $root.find('.baseprompt');
+		const threadsHost = $root.find('[name=chatthreads]');
 
 		// Canvas elements
 		const canvasElem = $root.find('.chatbot-canvas');
@@ -769,6 +770,22 @@
 			const newHeight = Math.min(this.scrollHeight, 150);
 			this.style.height = Math.max(newHeight, 50) + 'px';
 		}).trigger('input');
+
+		// ---------------------------------------------------------------------
+		// Threads Control
+		// ---------------------------------------------------------------------
+
+		if (config.useThreads && typeof ChatThreadsControl !== 'undefined' && threadsHost.length) {
+			const threadsCtrl = new ChatThreadsControl({
+				events: {
+					onListRequested: () => {},
+					onNewThreadRequested: () => {}
+				}
+			});
+
+			threadsCtrl.attachTo(threadsHost[0]);
+			root._threadsCtrl = threadsCtrl;
+		}
 
 		// ---------------------------------------------------------------------
 		// Voice Control

@@ -20,6 +20,7 @@ class ChatVoiceControl {
 		// state flags
 		this._hadSpeechResult = false;
 		this._ttsInProgress = false;
+		this._settingsOpen = false;
 
 		this._buildUI();
 		this._bindShortcuts();
@@ -36,7 +37,29 @@ class ChatVoiceControl {
 
 		this.container.append(this.btnMic, this.btnSpeaker, this.btnDialog);
 
+		this.settingsWrap = document.createElement("div");
+		this.settingsWrap.className = "chat-action-popover";
+
+		this.btnSettings = this._makeButton("Voice settings", "gear popover-toggle");
+		this.settingsWrap.appendChild(this.btnSettings);
+
+		this.settingsPanel = document.createElement("div");
+		this.settingsPanel.className = "popover-panel";
+		this.settingsPanel.setAttribute("aria-hidden", "true");
+
+		const title = document.createElement("div");
+		title.className = "popover-title";
+		title.textContent = "Voice options";
+		this.settingsPanel.appendChild(title);
+
 		if (this.config.availableLangs) {
+			const row = document.createElement("div");
+			row.className = "popover-row";
+
+			const label = document.createElement("label");
+			label.className = "popover-label";
+			label.textContent = "Language for STT / TTS";
+
 			this.langSelect = document.createElement("select");
 			this.config.availableLangs.forEach(opt => {
 				const o = document.createElement("option");
@@ -45,15 +68,48 @@ class ChatVoiceControl {
 				if (opt.code === this.config.lang) o.selected = true;
 				this.langSelect.appendChild(o);
 			});
+
 			this.langSelect.addEventListener("change", () => {
 				this.config.lang = this.langSelect.value;
 			});
-			this.container.appendChild(this.langSelect);
+
+			label.appendChild(this.langSelect);
+			row.appendChild(label);
+			this.settingsPanel.appendChild(row);
+		} else {
+			const txt = document.createElement("p");
+			txt.className = "popover-text";
+			txt.textContent = "No voice options available.";
+			this.settingsPanel.appendChild(txt);
 		}
+
+		this.settingsWrap.appendChild(this.settingsPanel);
+		this.container.appendChild(this.settingsWrap);
 
 		this.btnMic.addEventListener("click", () => this.toggleMic());
 		this.btnSpeaker.addEventListener("click", () => this.toggleSpeaker());
 		this.btnDialog.addEventListener("click", () => this.toggleDialog());
+		this.btnSettings.addEventListener("click", e => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.toggleSettings();
+		});
+
+		this.settingsPanel.addEventListener("click", e => {
+			e.stopPropagation();
+		});
+
+		document.addEventListener("click", e => {
+			if (!this.settingsWrap.contains(e.target)) {
+				this.closeSettings();
+			}
+		});
+
+		document.addEventListener("keydown", e => {
+			if (e.key === "Escape") {
+				this.closeSettings();
+			}
+		});
 	}
 
 	_makeButton(label, className) {
@@ -61,12 +117,35 @@ class ChatVoiceControl {
 		b.type = "button";
 		b.title = label;
 		b.setAttribute("aria-label", label);
-		if (className) b.classList.add(className);
+		if (className) {
+			className.split(/\s+/).forEach(cls => {
+				if (cls) b.classList.add(cls);
+			});
+		}
 		return b;
 	}
 
 	attachTo(el) {
 		el.appendChild(this.container);
+	}
+
+	openSettings() {
+		this._settingsOpen = true;
+		this.settingsWrap.classList.add("open");
+		this.btnSettings.classList.add("active");
+		this.settingsPanel.setAttribute("aria-hidden", "false");
+	}
+
+	closeSettings() {
+		this._settingsOpen = false;
+		this.settingsWrap.classList.remove("open");
+		this.btnSettings.classList.remove("active");
+		this.settingsPanel.setAttribute("aria-hidden", "true");
+	}
+
+	toggleSettings() {
+		if (this._settingsOpen) this.closeSettings();
+		else this.openSettings();
 	}
 
 	// ---------- Events ----------
@@ -265,11 +344,10 @@ class ChatVoiceControl {
 	// ---------- Accessibility ----------
 	_bindShortcuts() {
 		document.addEventListener("keydown", e => {
-			if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+			if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
 			if (e.code === "Space") { e.preventDefault(); this.toggleMic(); }
 			if (e.key === "l") this.toggleSpeaker();
 			if (e.key === "d") this.toggleDialog();
 		});
 	}
 }
-
