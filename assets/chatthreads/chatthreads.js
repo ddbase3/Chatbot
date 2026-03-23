@@ -38,7 +38,7 @@ class ChatThreadsControl {
 
 		this.popoverWrap.appendChild(this.popoverPanel);
 
-		this.btnNew = this._makeButton("Start new chat", "plus");
+		this.btnNew = this._makeButton("Start new chat", "chat");
 
 		this.container.append(this.popoverWrap, this.btnNew);
 

@@ -584,8 +584,8 @@
 	background-image: url("../icons/list.svg");
 }
 
-#chatbot [name="chatthreads"] button.plus {
-	background-image: url("../icons/plus.svg");
+#chatbot [name="chatthreads"] button.chat {
+	background-image: url("../icons/chat.svg");
 }
 
 /* threads popover stays above-right from the button */
