@@ -87,7 +87,7 @@ Requires the following config section for OpenAI access:
 
 ## License
 
-GPL License. See `LICENSE` file.
+GPL-3.0 License. See `LICENSE` file.
 
 ## Author
 
