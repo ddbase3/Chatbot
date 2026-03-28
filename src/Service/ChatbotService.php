@@ -36,17 +36,14 @@ class ChatbotService implements IOutput {
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
 
-		// Provide a base-test prompt
 		if ($this->request->get('baseprompt') !== null) {
 			return $this->getBasePrompt();
 		}
 
-		// Streaming request
 		if ($this->request->request('prompt') !== null) {
 			return $this->runStreamingFlow();
 		}
 
-		// Suggestion
 		if ($this->request->request('suggestions') !== null) {
 			return $this->suggestPrompts();
 		}
@@ -83,24 +80,24 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
-	 * Resturns a base prompt for showing when start working with the chatbot.
+	 * Returns a base prompt for showing when start working with the chatbot.
 	 * Read prompts from JSON array and return a random entry.
 	 */
-        protected function getBasePrompt(): string {
+	protected function getBasePrompt(): string {
 		$file = $this->getBasePromptFile();
 
-		if (empty($file)) {
+		if ($file === '') {
 			return $this->getSimpleBasePrompt();
 		}
 
-                $prompts = @json_decode((string) @file_get_contents($file), true);
+		$prompts = @json_decode((string) @file_get_contents($file), true);
 
-                if (!is_array($prompts) || $prompts === []) {
-                        return $this->getSimpleBasePrompt();
-                }
+		if (!is_array($prompts) || $prompts === []) {
+			return $this->getSimpleBasePrompt();
+		}
 
-                return (string) $prompts[array_rand($prompts)];
-        }
+		return (string) $prompts[array_rand($prompts)];
+	}
 
 	///////////////////////////////////////////////////////////////////////////////////////
 	// Assistant answer
@@ -114,21 +111,21 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
-	 * System prompt file name having a json array of base prompts.
+	 * System prompt file name.
 	 */
 	protected function getSystemPromptFile(): string {
 		return '';
 	}
 
 	/**
-	 * Returns a simple agent flow configuration (array).
+	 * Returns a simple agent flow configuration.
 	 */
-	protected function getSimpleAgentFlow(): string {
+	protected function getSimpleAgentFlow(): ?array {
 		return null;
 	}
 
 	/**
-	 * Agent flow file name having a json array of base prompts.
+	 * Agent flow file name.
 	 */
 	protected function getAgentFlowFile(): string {
 		return '';
@@ -145,30 +142,31 @@ class ChatbotService implements IOutput {
 		$flowFile = $this->getAgentFlowFile();
 		$systemFile = $this->getSystemPromptFile();
 
-		$json = file_get_contents($flowFile);
-		$config = json_decode($json, true) ?? $this->getSimpleAgentFlow();
+		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
+		$config = is_string($json) ? json_decode($json, true) : null;
+		$config ??= $this->getSimpleAgentFlow();
 
-		if (!$config) {
-			return $this->errorResponse("[Invalid Flow JSON]");
+		if (!is_array($config) || $config === []) {
+			return $this->errorResponse('[Invalid Flow JSON]');
 		}
 
-		$flow = $this->flowFactory->createFromArray("strictflow", $config, $context);
+		$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
 
-		$systemPrompt = file_get_contents($systemFile) ?: $this->getSimpleSystemPrompt();
-		$userPrompt = (string)$this->request->request('prompt');
+		$systemPrompt = $systemFile !== ''
+			? ((string) @file_get_contents($systemFile) ?: $this->getSimpleSystemPrompt())
+			: $this->getSimpleSystemPrompt();
+
+		$userPrompt = (string) $this->request->request('prompt');
 
 		$inputs = [
 			'system' => $systemPrompt,
 			'user' => $userPrompt
 		];
 
-		// The StreamingAiAssistantNode opens the SSE stream internally.
 		$flow->run($inputs);
 
-		// Necessary, otherwise mime type error.
 		exit;
 
-		// Nothing else to output here, the stream is already running.
 		return '';
 	}
 
@@ -184,21 +182,21 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
-	 * Suggestion prompt file name having a json array of base prompts.
+	 * Suggestion prompt file name.
 	 */
 	protected function getSuggestionPromptFile(): string {
 		return '';
 	}
 
 	/**
-	 * Returns a simple suggestion agent flow configuration (array).
+	 * Returns a simple suggestion agent flow configuration.
 	 */
-	protected function getSimpleSuggestionFlow(): string {
+	protected function getSimpleSuggestionFlow(): ?array {
 		return null;
 	}
 
 	/**
-	 * Suggestion agent flow file name having a json array of base prompts.
+	 * Suggestion agent flow file name.
 	 */
 	protected function getSuggestionFlowFile(): string {
 		return '';
@@ -207,44 +205,43 @@ class ChatbotService implements IOutput {
 	/**
 	 * Returns 3 short, concrete suggestions as JSON array.
 	 */
-	private function suggestPrompts(): string {
+	protected function suggestPrompts(): string {
 
 		$context = $this->contextFactory->createContext();
 
-		// Load suggestions flow
 		$flowFile = $this->getSuggestionFlowFile();
-		$json = file_get_contents($flowFile);
-		$config = json_decode($json, true) ?? $this->getSimpleSuggestionFlow();
+		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
+		$config = is_string($json) ? json_decode($json, true) : null;
+		$config ??= $this->getSimpleSuggestionFlow();
 
-		if (!$config) {
-			return $this->errorResponse("[Invalid Suggestions Flow JSON]");
+		if (!is_array($config) || $config === []) {
+			return $this->errorResponse('[Invalid Suggestions Flow JSON]');
 		}
 
-		$flow = $this->flowFactory->createFromArray("strictflow", $config, $context);
+		$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
 
 		$systemFile = $this->getSuggestionPromptFile();
-		$systemPrompt = file_get_contents($systemFile) ?: $this->getSimpleSuggestionPrompt();
+		$systemPrompt = $systemFile !== ''
+			? ((string) @file_get_contents($systemFile) ?: $this->getSimpleSuggestionPrompt())
+			: $this->getSimpleSuggestionPrompt();
 
-		$userPrompt = "Generate suggestions.";
+		$userPrompt = 'Generate suggestions.';
 
 		$inputs = [
 			'system' => $systemPrompt,
 			'prompt' => $userPrompt,
-			'mode'   => 'suggestions'
+			'mode' => 'suggestions'
 		];
 
 		$output = $flow->run($inputs);
 
-		// Flow outputs are keyed by node id ("assistant"), then by port name ("message")
 		$msg = '';
 		if (isset($output['assistant']['message']['content'])) {
-			$msg = (string)$output['assistant']['message']['content'];
+			$msg = (string) $output['assistant']['message']['content'];
 		} elseif (isset($output['message']['content'])) {
-			// fallback, just in case
-			$msg = (string)$output['message']['content'];
+			$msg = (string) $output['message']['content'];
 		}
 
-		// --- CLEAN JSON codeblock ---
 		$clean = trim($msg);
 		$clean = preg_replace('/^```json/i', '', $clean);
 		$clean = preg_replace('/^```/i', '', $clean);
@@ -256,11 +253,25 @@ class ChatbotService implements IOutput {
 		if (!is_array($decoded)) {
 			return json_encode([
 				'error' => 'Invalid JSON from suggestions model',
-				'raw'   => $msg,
+				'raw' => $msg,
 				'clean' => $clean
 			], JSON_UNESCAPED_UNICODE);
 		}
 
 		return json_encode($decoded, JSON_UNESCAPED_UNICODE);
+	}
+
+	/**
+	 * Returns a JSON error object.
+	 */
+	protected function errorResponse(string $msg): string {
+		return json_encode([
+			'id' => uniqid('msg_', true),
+			'type' => 'error',
+			'text' => $msg,
+			'meta' => [
+				'timestamp' => gmdate('c')
+			]
+		], JSON_UNESCAPED_UNICODE);
 	}
 }
