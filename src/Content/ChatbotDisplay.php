@@ -38,24 +38,30 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	// ---------------------------------------------------------------------
 	// Render
 	// ---------------------------------------------------------------------
+
 	public function getOutput(string $out = 'html', bool $final = false): string {
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
 		$this->view->setTemplate('Content/ChatbotDisplay.php');
 
 		$defaults = [
-			'service'        => 'chatbotservice.php',
+			'service' => 'chatbotservice.php',
 
 			// Features
-			'use_markdown'   => true,
-			'use_icons'      => true,
-			'use_voice'      => true,
-			'use_threads'    => true,
+			'use_markdown' => true,
+			'use_icons' => true,
+			'use_voice' => true,
+			'use_threads' => true,
 
 			// Transport
-			'transport_mode' => 'auto',     // auto | sse | websocket | rest
+			'transport_mode' => 'auto',
+
+			// Reference context
+			'reference_mode' => 'url',
+			'reference' => [],
+			'reference_provider' => '',
 
 			// Voice config
-			'default_lang'   => 'auto'
+			'default_lang' => 'auto'
 		];
 
 		$config = array_merge($defaults, $this->data);
@@ -80,6 +86,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	// ---------------------------------------------------------------------
 	// JSON Schema
 	// ---------------------------------------------------------------------
+
 	public function getSchema(): array {
 		return [
 			'$schema' => 'https://json-schema.org/draft-2020-12/schema',
@@ -118,6 +125,23 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'enum' => ['auto', 'sse', 'websocket', 'rest'],
 					'description' => 'Transport protocol for streaming responses',
 					'default' => 'auto'
+				],
+
+				'reference_mode' => [
+					'type' => 'string',
+					'enum' => ['none', 'url', 'custom', 'provider'],
+					'description' => 'Defines how client-side context reference is sent with each request',
+					'default' => 'url'
+				],
+				'reference' => [
+					'type' => 'object',
+					'description' => 'Static reference payload for reference_mode=custom',
+					'default' => []
+				],
+				'reference_provider' => [
+					'type' => 'string',
+					'description' => 'Global JavaScript function name for reference_mode=provider',
+					'default' => ''
 				],
 
 				'default_lang' => [

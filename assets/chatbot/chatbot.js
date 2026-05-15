@@ -68,6 +68,96 @@
 			}
 		}
 
+		function getGlobalValue(path) {
+			if (!path || typeof path !== 'string') return null;
+
+			const parts = path.split('.');
+			let value = window;
+
+			for (const part of parts) {
+				if (!part || value == null || (typeof value !== 'object' && typeof value !== 'function')) {
+					return null;
+				}
+
+				value = value[part];
+			}
+
+			return value;
+		}
+
+		function normalizeReference(reference) {
+			if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+				return null;
+			}
+
+			return {
+				...reference,
+				sentAt: new Date().toISOString()
+			};
+		}
+
+		function getDefaultReference() {
+			return normalizeReference({
+				type: 'page',
+				url: window.location.href,
+				title: document.title || '',
+				referrer: document.referrer || ''
+			});
+		}
+
+		function getReferencePayload() {
+			const mode = String(config.referenceMode || 'url').toLowerCase();
+
+			if (mode === 'none') {
+				return null;
+			}
+
+			if (mode === 'custom') {
+				return normalizeReference(config.reference || null);
+			}
+
+			if (mode === 'provider') {
+				const providerName = String(config.referenceProvider || '').trim();
+				const provider = getGlobalValue(providerName);
+
+				if (typeof provider !== 'function') {
+					return null;
+				}
+
+				return normalizeReference(provider({
+					root,
+					config
+				}));
+			}
+
+			return getDefaultReference();
+		}
+
+		function encodeBase64Url(str) {
+			const bytes = new TextEncoder().encode(str);
+			let binary = '';
+
+			for (const byte of bytes) {
+				binary += String.fromCharCode(byte);
+			}
+
+			return btoa(binary)
+				.replace(/\+/g, '-')
+				.replace(/\//g, '_')
+				.replace(/=+$/g, '');
+		}
+
+		function appendReference(data) {
+			const reference = getReferencePayload();
+
+			if (reference) {
+				data.reference = encodeBase64Url(JSON.stringify(reference));
+				data.reference_format = 'base64json';
+			}
+
+			return data;
+		}
+		
 		function patchLinksTargetBlank(scope) {
 			const $scope = scope && scope.jquery ? scope : $(scope);
 			if (!$scope || !$scope.length) return;
@@ -185,7 +275,7 @@
 		function canvasClose(payload = {}) {
 			payload = parseEventPayload(payload);
 
-			const id = (payload && payload.id) ? String(payload.id) : null;
+			const id = payload && payload.id ? String(payload.id) : null;
 			if (id && id !== canvasState.id) {
 				return;
 			}
@@ -275,7 +365,7 @@
 		// Base Prompt
 		// ---------------------------------------------------------------------
 
-		$.get(config.serviceUrl, { baseprompt: 1 }, res => {
+		$.get(config.serviceUrl, appendReference({ baseprompt: 1 }), res => {
 			basePrompt.html(res);
 			patchLinksTargetBlank(basePrompt);
 		});
@@ -434,7 +524,7 @@
 		function fetchSuggestions(lastMsgId) {
 			if (!config.serviceUrl) return;
 
-			const data = { suggestions: 1 };
+			const data = appendReference({ suggestions: 1 });
 			if (lastMsgId) {
 				data.after = lastMsgId;
 			}
@@ -528,7 +618,7 @@
 						headers: {
 							'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
 						},
-						body: new URLSearchParams({ prompt: plain })
+						body: new URLSearchParams(appendReference({ prompt: plain }))
 					});
 
 					if (!response.ok) {
@@ -579,7 +669,7 @@
 					'tool.started', 'tool.finished',
 					'canvas.open', 'canvas.close', 'canvas.render'
 				],
-				payload: { prompt: plain }
+				payload: appendReference({ prompt: plain })
 			});
 
 			let finished = false;

@@ -195,11 +195,15 @@ function initChatbotWidget() {
 			useVoice: <?php echo $this->_['use_voice'] ? 'true' : 'false'; ?>,
 			useThreads: <?php echo !empty($this->_['use_threads']) ? 'true' : 'false'; ?>,
 
-			serviceUrl: '<?php echo $this->_['service']; ?>',
-			transportMode: '<?php echo $this->_['transport_mode']; ?>',
+			serviceUrl: <?php echo json_encode((string) $this->_['service'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			transportMode: <?php echo json_encode((string) $this->_['transport_mode'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+
+			referenceMode: <?php echo json_encode((string) $this->_['reference_mode'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			reference: <?php echo json_encode($this->_['reference'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			referenceProvider: <?php echo json_encode((string) ($this->_['reference_provider'] ?? ''), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 
 <?php if ($this->_['use_voice']) { ?>
-			defaultLang: '<?php echo $this->_['default_lang']; ?>',
+			defaultLang: <?php echo json_encode((string) $this->_['default_lang'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 			icons: {
 				copy: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/copy.svg'); ?>',
 				check: '<?php echo $this->_['resolve']('plugin/Chatbot/assets/icons/check.svg'); ?>',

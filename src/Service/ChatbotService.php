@@ -19,6 +19,7 @@ namespace Chatbot\Service;
 
 use Base3\Api\IOutput;
 use Base3\Api\IRequest;
+use MissionBay\Api\IAgentContext;
 use MissionBay\Api\IAgentContextFactory;
 use MissionBay\Api\IAgentFlowFactory;
 
@@ -44,7 +45,7 @@ class ChatbotService implements IOutput {
 			return $this->runStreamingFlow();
 		}
 
-		if ($this->request->request('suggestions') !== null) {
+		if ($this->request->request('suggestions') !== null || $this->request->get('suggestions') !== null) {
 			return $this->suggestPrompts();
 		}
 
@@ -53,6 +54,123 @@ class ChatbotService implements IOutput {
 
 	public function getHelp(): string {
 		return 'Help on ChatbotService.';
+	}
+
+	///////////////////////////////////////////////////////////////////////////////////////
+	// Reference context
+	///////////////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * Reads the client reference payload.
+	 */
+	protected function getReferenceInput(): array {
+		$raw = $this->request->request('reference');
+
+		if ($raw === null) {
+			$raw = $this->request->get('reference');
+		}
+
+		if ($raw === null || $raw === '') {
+			return [];
+		}
+
+		if (is_array($raw)) {
+			return $this->normalizeReferenceArray($raw);
+		}
+
+		$format = (string) ($this->request->request('reference_format') ?? '');
+
+		if ($format === '') {
+			$format = (string) ($this->request->get('reference_format') ?? '');
+		}
+
+		$decoded = $this->decodeReferenceString((string) $raw, $format);
+
+		if (!is_array($decoded)) {
+			return [];
+		}
+
+		return $this->normalizeReferenceArray($decoded);
+	}
+
+	/**
+	 * Decodes a serialized reference payload.
+	 */
+	protected function decodeReferenceString(string $raw, string $format): ?array {
+		$raw = trim($raw);
+
+		if ($raw === '') {
+			return null;
+		}
+
+		if ($format === 'base64json') {
+			return $this->decodeBase64JsonReference($raw);
+		}
+
+		$decoded = json_decode($raw, true);
+
+		if (is_array($decoded)) {
+			return $decoded;
+		}
+
+		return $this->decodeBase64JsonReference($raw);
+	}
+
+	/**
+	 * Decodes a Base64URL encoded JSON reference payload.
+	 */
+	protected function decodeBase64JsonReference(string $raw): ?array {
+		$base64 = strtr($raw, '-_', '+/');
+		$padding = strlen($base64) % 4;
+
+		if ($padding > 0) {
+			$base64 .= str_repeat('=', 4 - $padding);
+		}
+
+		$json = base64_decode($base64, true);
+
+		if (!is_string($json) || $json === '') {
+			return null;
+		}
+
+		$decoded = json_decode($json, true);
+
+		return is_array($decoded) ? $decoded : null;
+	}
+
+	/**
+	 * Stores the client reference payload in the agent context.
+	 */
+	protected function applyReferenceContext(IAgentContext $context): void {
+		$context->setVar('reference', $this->getReferenceInput());
+	}
+
+	/**
+	 * Limits reference payloads to simple serializable values.
+	 */
+	protected function normalizeReferenceArray(array $data, int $depth = 0): array {
+		if ($depth > 5) {
+			return [];
+		}
+
+		$result = [];
+
+		foreach ($data as $key => $value) {
+			if (!is_string($key) && !is_int($key)) {
+				continue;
+			}
+
+			if (is_scalar($value) || $value === null) {
+				$result[$key] = $value;
+				continue;
+			}
+
+			if (is_array($value)) {
+				$result[$key] = $this->normalizeReferenceArray($value, $depth + 1);
+			}
+		}
+
+		return $result;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -138,6 +256,7 @@ class ChatbotService implements IOutput {
 	protected function runStreamingFlow(): string {
 
 		$context = $this->contextFactory->createContext();
+		$this->applyReferenceContext($context);
 
 		$flowFile = $this->getAgentFlowFile();
 		$systemFile = $this->getSystemPromptFile();
@@ -208,6 +327,7 @@ class ChatbotService implements IOutput {
 	protected function suggestPrompts(): string {
 
 		$context = $this->contextFactory->createContext();
+		$this->applyReferenceContext($context);
 
 		$flowFile = $this->getSuggestionFlowFile();
 		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
