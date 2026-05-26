@@ -43,8 +43,45 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
 		$this->view->setTemplate('Content/ChatbotDisplay.php');
 
+		$config = $this->getClientConfig();
+		$config['service_url'] = $this->buildServiceUrl($config);
+
+		foreach ($config as $tag => $content) {
+			$this->view->assign($tag, $content);
+		}
+
+		$this->view->assign('resolve', fn($src) => $this->assetResolver->resolve($src));
+
+		return $this->view->loadTemplate();
+	}
+
+	public function getHelp(): string {
+		return 'Display a configurable Chatbot widget.';
+	}
+
+	public function setData($data) {
+		$this->data = (array) $data;
+	}
+
+	// ---------------------------------------------------------------------
+	// Configuration
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Returns the client-side display configuration.
+	 *
+	 * Server-side configuration values, especially system_prompt and later
+	 * agent/tool settings, must not be rendered into the browser. The browser
+	 * only needs to know which chatbot service to call and which SettingsStore
+	 * dataset identifies the current chatbot instance.
+	 */
+	protected function getClientConfig(): array {
 		$defaults = [
 			'service' => 'chatbotservice.php',
+
+			// SettingsStore instance identity.
+			'config_group' => '',
+			'config_name' => '',
 
 			// Features
 			'use_markdown' => true,
@@ -66,21 +103,100 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 		$config = array_merge($defaults, $this->data);
 
-		foreach ($config as $tag => $content) {
-			$this->view->assign($tag, $content);
+		return [
+			'service' => trim((string) ($config['service'] ?? $defaults['service'])),
+			'config_group' => trim((string) ($config['config_group'] ?? $defaults['config_group'])),
+			'config_name' => trim((string) ($config['config_name'] ?? $defaults['config_name'])),
+			'use_markdown' => $this->toBool($config['use_markdown'] ?? $defaults['use_markdown']),
+			'use_icons' => $this->toBool($config['use_icons'] ?? $defaults['use_icons']),
+			'use_voice' => $this->toBool($config['use_voice'] ?? $defaults['use_voice']),
+			'use_threads' => $this->toBool($config['use_threads'] ?? $defaults['use_threads']),
+			'transport_mode' => $this->normalizeEnum(
+				(string) ($config['transport_mode'] ?? $defaults['transport_mode']),
+				['auto', 'sse', 'websocket', 'rest'],
+				'auto'
+			),
+			'reference_mode' => $this->normalizeEnum(
+				(string) ($config['reference_mode'] ?? $defaults['reference_mode']),
+				['none', 'url', 'custom', 'provider'],
+				'url'
+			),
+			'reference' => is_array($config['reference'] ?? null) ? $config['reference'] : [],
+			'reference_provider' => trim((string) ($config['reference_provider'] ?? $defaults['reference_provider'])),
+			'default_lang' => trim((string) ($config['default_lang'] ?? $defaults['default_lang']))
+		];
+	}
+
+	/**
+	 * Builds the service URL used by the JavaScript chatbot client.
+	 *
+	 * The chatbot service receives config_group/config_name with every request.
+	 * This is intentionally done through the endpoint URL instead of exposing
+	 * server-only configuration values. It works for all current request types:
+	 * base prompt, normal prompt and suggestions.
+	 */
+	protected function buildServiceUrl(array $config): string {
+		$service = trim((string) ($config['service'] ?? ''));
+
+		if ($service === '') {
+			return '';
 		}
 
-		$this->view->assign('resolve', fn($src) => $this->assetResolver->resolve($src));
+		$params = [];
 
-		return $this->view->loadTemplate();
+		if (($config['config_group'] ?? '') !== '') {
+			$params['config_group'] = (string) $config['config_group'];
+		}
+
+		if (($config['config_name'] ?? '') !== '') {
+			$params['config_name'] = (string) $config['config_name'];
+		}
+
+		if ($params === []) {
+			return $service;
+		}
+
+		return $this->appendQueryParams($service, $params);
 	}
 
-	public function getHelp(): string {
-		return 'Display a configurable Chatbot widget.';
+	protected function appendQueryParams(string $url, array $params): string {
+		$fragment = '';
+
+		$fragmentPos = strpos($url, '#');
+		if ($fragmentPos !== false) {
+			$fragment = substr($url, $fragmentPos);
+			$url = substr($url, 0, $fragmentPos);
+		}
+
+		$query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+
+		if ($query === '') {
+			return $url . $fragment;
+		}
+
+		$separator = str_contains($url, '?')
+			? (str_ends_with($url, '?') || str_ends_with($url, '&') ? '' : '&')
+			: '?';
+
+		return $url . $separator . $query . $fragment;
 	}
 
-	public function setData($data) {
-		$this->data = (array) $data;
+	protected function normalizeEnum(string $value, array $allowed, string $default): string {
+		return in_array($value, $allowed, true) ? $value : $default;
+	}
+
+	protected function toBool(mixed $value): bool {
+		if (is_bool($value)) {
+			return $value;
+		}
+
+		if (is_int($value)) {
+			return $value === 1;
+		}
+
+		$value = strtolower(trim((string) $value));
+
+		return in_array($value, ['1', 'true', 'yes', 'on'], true);
 	}
 
 	// ---------------------------------------------------------------------
@@ -97,6 +213,18 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'type' => 'string',
 					'description' => 'Service URL (server endpoint)',
 					'default' => 'chatbotservice.php'
+				],
+
+				'config_group' => [
+					'type' => 'string',
+					'description' => 'SettingsStore group of the chatbot instance',
+					'default' => ''
+				],
+
+				'config_name' => [
+					'type' => 'string',
+					'description' => 'SettingsStore name of the chatbot instance',
+					'default' => ''
 				],
 
 				'use_markdown' => [

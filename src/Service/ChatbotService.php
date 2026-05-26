@@ -19,16 +19,19 @@ namespace Chatbot\Service;
 
 use Base3\Api\IOutput;
 use Base3\Api\IRequest;
+use Base3\Settings\Api\ISettingsStore;
 use MissionBay\Api\IAgentContext;
 use MissionBay\Api\IAgentContextFactory;
 use MissionBay\Api\IAgentFlowFactory;
+use Throwable;
 
 class ChatbotService implements IOutput {
 
 	public function __construct(
 		protected readonly IRequest $request,
 		protected readonly IAgentContextFactory $contextFactory,
-		protected readonly IAgentFlowFactory $flowFactory
+		protected readonly IAgentFlowFactory $flowFactory,
+		protected readonly ISettingsStore $settingsStore
 	) {}
 
 	public static function getName(): string {
@@ -54,6 +57,94 @@ class ChatbotService implements IOutput {
 
 	public function getHelp(): string {
 		return 'Help on ChatbotService.';
+	}
+
+	///////////////////////////////////////////////////////////////////////////////////////
+	// Chatbot instance configuration
+	///////////////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * Reads the chatbot SettingsStore identity from the request.
+	 *
+	 * The browser only sends the identity of the chatbot instance. The actual
+	 * configuration, especially server-side values like system_prompt and later
+	 * agent/tool settings, is loaded on the server through ISettingsStore.
+	 */
+	protected function getConfigIdentity(): array {
+		$group = trim((string) ($this->request->request('config_group') ?? ''));
+
+		if ($group === '') {
+			$group = trim((string) ($this->request->get('config_group') ?? ''));
+		}
+
+		$name = trim((string) ($this->request->request('config_name') ?? ''));
+
+		if ($name === '') {
+			$name = trim((string) ($this->request->get('config_name') ?? ''));
+		}
+
+		return [
+			'group' => $group,
+			'name' => $name
+		];
+	}
+
+	/**
+	 * Returns the SettingsStore dataset for the current chatbot instance.
+	 *
+	 * Empty group/name means that the service is called without instance-bound
+	 * configuration. This keeps older direct service usage working. Loading
+	 * errors are kept non-fatal here because the service still has file/default
+	 * fallbacks for prompts and flows.
+	 */
+	protected function getChatbotSettings(): array {
+		$identity = $this->getConfigIdentity();
+
+		if ($identity['group'] === '' || $identity['name'] === '') {
+			return [];
+		}
+
+		try {
+			$settings = $this->settingsStore->get($identity['group'], $identity['name'], []);
+		}
+		catch (Throwable) {
+			return [];
+		}
+
+		return is_array($settings) ? $settings : [];
+	}
+
+	/**
+	 * Stores instance metadata and loaded settings in the agent context.
+	 *
+	 * This gives later nodes access to the concrete chatbot instance without
+	 * exposing server-side settings to the browser. The complete settings array
+	 * is stored intentionally because upcoming configuration areas such as
+	 * agent tools will be service-side concerns as well.
+	 */
+	protected function applyChatbotConfigContext(IAgentContext $context, array $chatbotSettings): void {
+		$identity = $this->getConfigIdentity();
+
+		$context->setVar('chatbot_config_group', $identity['group']);
+		$context->setVar('chatbot_config_name', $identity['name']);
+		$context->setVar('chatbot_config', $chatbotSettings);
+	}
+
+	/**
+	 * Reads a string value from the loaded chatbot settings.
+	 */
+	protected function getChatbotSettingString(array $settings, string $key, string $default = ''): string {
+		if (!array_key_exists($key, $settings)) {
+			return $default;
+		}
+
+		$value = $settings[$key];
+
+		if (is_scalar($value) || $value === null) {
+			return trim((string) $value);
+		}
+
+		return $default;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -236,6 +327,34 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
+	 * Returns the effective system prompt for the current chatbot instance.
+	 *
+	 * Priority:
+	 * 1. SettingsStore value "system_prompt" for config_group/config_name
+	 * 2. File returned by getSystemPromptFile()
+	 * 3. Built-in fallback prompt
+	 */
+	protected function getSystemPrompt(array $chatbotSettings): string {
+		$configuredPrompt = $this->getChatbotSettingString($chatbotSettings, 'system_prompt');
+
+		if ($configuredPrompt !== '') {
+			return $configuredPrompt;
+		}
+
+		$systemFile = $this->getSystemPromptFile();
+
+		if ($systemFile !== '') {
+			$filePrompt = (string) @file_get_contents($systemFile);
+
+			if (trim($filePrompt) !== '') {
+				return $filePrompt;
+			}
+		}
+
+		return $this->getSimpleSystemPrompt();
+	}
+
+	/**
 	 * Returns a simple agent flow configuration.
 	 */
 	protected function getSimpleAgentFlow(): ?array {
@@ -255,11 +374,13 @@ class ChatbotService implements IOutput {
 	 */
 	protected function runStreamingFlow(): string {
 
+		$chatbotSettings = $this->getChatbotSettings();
+
 		$context = $this->contextFactory->createContext();
 		$this->applyReferenceContext($context);
+		$this->applyChatbotConfigContext($context, $chatbotSettings);
 
 		$flowFile = $this->getAgentFlowFile();
-		$systemFile = $this->getSystemPromptFile();
 
 		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
 		$config = is_string($json) ? json_decode($json, true) : null;
@@ -271,10 +392,7 @@ class ChatbotService implements IOutput {
 
 		$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
 
-		$systemPrompt = $systemFile !== ''
-			? ((string) @file_get_contents($systemFile) ?: $this->getSimpleSystemPrompt())
-			: $this->getSimpleSystemPrompt();
-
+		$systemPrompt = $this->getSystemPrompt($chatbotSettings);
 		$userPrompt = (string) $this->request->request('prompt');
 
 		$inputs = [
@@ -308,6 +426,33 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
+	 * Returns the effective suggestion system prompt.
+	 *
+	 * The first implementation keeps suggestion prompts file/default based.
+	 * A dedicated SettingsStore key can be added later without changing the
+	 * external chatbot instance identity model.
+	 */
+	protected function getSuggestionPrompt(array $chatbotSettings): string {
+		$configuredPrompt = $this->getChatbotSettingString($chatbotSettings, 'suggestion_system_prompt');
+
+		if ($configuredPrompt !== '') {
+			return $configuredPrompt;
+		}
+
+		$systemFile = $this->getSuggestionPromptFile();
+
+		if ($systemFile !== '') {
+			$filePrompt = (string) @file_get_contents($systemFile);
+
+			if (trim($filePrompt) !== '') {
+				return $filePrompt;
+			}
+		}
+
+		return $this->getSimpleSuggestionPrompt();
+	}
+
+	/**
 	 * Returns a simple suggestion agent flow configuration.
 	 */
 	protected function getSimpleSuggestionFlow(): ?array {
@@ -326,8 +471,11 @@ class ChatbotService implements IOutput {
 	 */
 	protected function suggestPrompts(): string {
 
+		$chatbotSettings = $this->getChatbotSettings();
+
 		$context = $this->contextFactory->createContext();
 		$this->applyReferenceContext($context);
+		$this->applyChatbotConfigContext($context, $chatbotSettings);
 
 		$flowFile = $this->getSuggestionFlowFile();
 		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
@@ -340,11 +488,7 @@ class ChatbotService implements IOutput {
 
 		$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
 
-		$systemFile = $this->getSuggestionPromptFile();
-		$systemPrompt = $systemFile !== ''
-			? ((string) @file_get_contents($systemFile) ?: $this->getSimpleSuggestionPrompt())
-			: $this->getSimpleSuggestionPrompt();
-
+		$systemPrompt = $this->getSuggestionPrompt($chatbotSettings);
 		$userPrompt = 'Generate suggestions.';
 
 		$inputs = [

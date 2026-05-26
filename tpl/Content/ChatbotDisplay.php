@@ -195,8 +195,11 @@ function initChatbotWidget() {
 			useVoice: <?php echo $this->_['use_voice'] ? 'true' : 'false'; ?>,
 			useThreads: <?php echo !empty($this->_['use_threads']) ? 'true' : 'false'; ?>,
 
-			serviceUrl: <?php echo json_encode((string) $this->_['service'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			serviceUrl: <?php echo json_encode((string) $this->_['service_url'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 			transportMode: <?php echo json_encode((string) $this->_['transport_mode'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+
+			configGroup: <?php echo json_encode((string) ($this->_['config_group'] ?? ''), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			configName: <?php echo json_encode((string) ($this->_['config_name'] ?? ''), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 
 			referenceMode: <?php echo json_encode((string) $this->_['reference_mode'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 			reference: <?php echo json_encode($this->_['reference'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
