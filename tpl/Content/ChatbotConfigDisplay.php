@@ -10,7 +10,7 @@
 	$group = (string) ($this->_['group'] ?? '');
 	$name = (string) ($this->_['name'] ?? '');
 	$renderForm = !empty($this->_['render_form']);
-	$saveMode = (string) ($this->_['save_mode'] ?? 'post');
+	$saveMode = (string) ($this->_['save_mode'] ?? 'ajax');
 	$saveUrl = (string) ($this->_['save_url'] ?? '');
 	$useAjax = $saveMode === 'ajax';
 ?>
@@ -190,13 +190,21 @@
 
 <div class="base3-chatbot-config-display">
 <?php if ($renderForm) { ?>
-	<form id="<?php echo $e($formId); ?>" method="post" action="<?php echo $e($this->_['form_action'] ?? ''); ?>">
+	<form
+		id="<?php echo $e($formId); ?>"
+		method="post"
+		action="<?php echo $e($this->_['form_action'] ?? ''); ?>"
+		data-base3-chatbot-config-root="1"
+		data-save-url="<?php echo $e($saveUrl); ?>"
+		data-save-mode="<?php echo $e($saveMode); ?>"
+	>
 <?php } else { ?>
 	<div
 		id="<?php echo $e($formId); ?>"
 		class="base3-chatbot-config-fields"
 		data-base3-chatbot-config-root="1"
 		data-save-url="<?php echo $e($saveUrl); ?>"
+		data-save-mode="<?php echo $e($saveMode); ?>"
 	>
 <?php } ?>
 
@@ -378,9 +386,9 @@
 			<div></div>
 			<div>
 				<button
-					type="<?php echo $useAjax ? 'button' : 'submit'; ?>"
+					type="<?php echo $renderForm ? 'submit' : 'button'; ?>"
 					class="btn btn-primary base3-chatbot-config-submit"
-					<?php echo $useAjax ? 'data-base3-chatbot-config-save="1"' : ''; ?>
+					data-base3-chatbot-config-save="1"
 				>
 					<?php echo $e($this->_['submit_label'] ?? 'Save'); ?>
 				</button>
@@ -399,9 +407,11 @@
 (function() {
 	var root = document.getElementById(<?php echo json_encode($formId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>);
 
-	if (!root) {
+	if (!root || root.getAttribute('data-base3-chatbot-config-ready') === '1') {
 		return;
 	}
+
+	root.setAttribute('data-base3-chatbot-config-ready', '1');
 
 	var button = root.querySelector('[data-base3-chatbot-config-save]');
 	var messages = root.querySelector('[data-base3-chatbot-config-messages]');
@@ -421,6 +431,10 @@
 	}
 
 	function collectFormData() {
+		if (root.tagName && root.tagName.toLowerCase() === 'form') {
+			return new FormData(root);
+		}
+
 		var formData = new FormData();
 		var fields = root.querySelectorAll('input, select, textarea');
 
@@ -435,10 +449,6 @@
 
 			formData.append(field.name, field.value);
 		});
-
-		if (!formData.has('chatbot_config_action')) {
-			formData.append('chatbot_config_action', 'save');
-		}
 
 		return formData;
 	}
@@ -497,7 +507,11 @@
 		});
 	}
 
-	button.addEventListener('click', function() {
+	function save(event) {
+		if (event) {
+			event.preventDefault();
+		}
+
 		button.disabled = true;
 
 		fetch(saveUrl, {
@@ -526,7 +540,13 @@
 			.finally(function() {
 				button.disabled = false;
 			});
-	});
+	}
+
+	if (root.tagName && root.tagName.toLowerCase() === 'form') {
+		root.addEventListener('submit', save);
+	} else {
+		button.addEventListener('click', save);
+	}
 })();
 </script>
 <?php } ?>

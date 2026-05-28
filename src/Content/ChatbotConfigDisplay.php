@@ -80,7 +80,12 @@ class ChatbotConfigDisplay implements IDisplay {
 
 		$context = $this->getContext(false);
 
-		if ($context['save_mode'] === 'post' && $this->isSaveRequest($context)) {
+		/*
+		 * Fallback for browsers without JavaScript or integrations explicitly
+		 * using classic POST. The default UI saves through AJAX and prevents this
+		 * full-page POST in the browser.
+		 */
+		if ($this->isSaveRequest($context)) {
 			$this->handleSave($context);
 		}
 
@@ -123,6 +128,10 @@ class ChatbotConfigDisplay implements IDisplay {
 	// ---------------------------------------------------------------------
 
 	protected function getJsonOutput(bool $final): string {
+		if ($final && !headers_sent()) {
+			header('Content-Type: application/json; charset=UTF-8');
+		}
+
 		$action = trim((string) $this->request->request('action', ''));
 
 		if ($action === '') {
@@ -134,12 +143,6 @@ class ChatbotConfigDisplay implements IDisplay {
 		}
 
 		$context = $this->getContext(true);
-		$postedGroup = trim((string) $this->request->request('chatbot_config_group', ''));
-		$postedName = trim((string) $this->request->request('chatbot_config_name', ''));
-
-		if ($postedGroup === '' || $postedName === '') {
-			return $this->jsonError('Missing configuration identity.');
-		}
 
 		if (!$this->isSaveRequest($context)) {
 			return $this->jsonError('Configuration identity does not match.');
@@ -154,10 +157,12 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	protected function jsonResponse(bool $success, array $data = []): string {
-		return json_encode(array_merge([
+		$json = json_encode(array_merge([
 			'status' => $success ? 'ok' : 'error',
 			'success' => $success
-		], $data), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{"status":"error","success":false}';
+		], $data), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+		return is_string($json) ? $json : '{"status":"error","success":false}';
 	}
 
 	protected function jsonError(string $message): string {
@@ -220,14 +225,14 @@ class ChatbotConfigDisplay implements IDisplay {
 			'standalone'
 		);
 
-		$saveModeDefault = $mode === 'embedded' ? 'ajax' : 'post';
 		$saveMode = $this->normalizeEnum(
-			(string) ($this->data['save_mode'] ?? $saveModeDefault),
-			['post', 'ajax'],
-			$saveModeDefault
+			(string) ($this->data['save_mode'] ?? 'ajax'),
+			['ajax', 'post'],
+			'ajax'
 		);
 
 		$renderForm = $mode !== 'embedded';
+
 		if (array_key_exists('render_form', $this->data)) {
 			$renderForm = $this->toBool($this->data['render_form']);
 		}
