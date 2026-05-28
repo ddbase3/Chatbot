@@ -119,8 +119,8 @@ final class ChatbotServiceTest extends TestCase {
 				return '';
 			}
 
-			protected function getSimpleSuggestionFlow(): string {
-				return 'DUMMY_FLOW';
+			protected function getSimpleSuggestionFlow(): ?array {
+				return ['DUMMY_FLOW'];
 			}
 
 			protected function getSuggestionPromptFile(): string {
