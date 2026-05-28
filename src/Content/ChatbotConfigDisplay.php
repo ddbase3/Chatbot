@@ -20,6 +20,7 @@ namespace Chatbot\Content;
 use Base3\Api\IDisplay;
 use Base3\Api\IMvcView;
 use Base3\Api\IRequest;
+use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use JsonException;
 use Throwable;
@@ -54,7 +55,8 @@ class ChatbotConfigDisplay implements IDisplay {
 	public function __construct(
 		private readonly IMvcView $view,
 		private readonly IRequest $request,
-		private readonly ISettingsStore $settingsStore
+		private readonly ISettingsStore $settingsStore,
+		private readonly ILinkTargetService $linkTargetService
 	) {}
 
 	public static function getName(): string {
@@ -66,13 +68,19 @@ class ChatbotConfigDisplay implements IDisplay {
 	// ---------------------------------------------------------------------
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
+		$out = strtolower(trim($out));
+
+		if ($out === 'json') {
+			return $this->getJsonOutput($final);
+		}
+
 		if ($out !== 'html') {
 			return '';
 		}
 
-		$context = $this->getContext();
+		$context = $this->getContext(false);
 
-		if ($this->isSaveRequest($context)) {
+		if ($context['save_mode'] === 'post' && $this->isSaveRequest($context)) {
 			$this->handleSave($context);
 		}
 
@@ -90,6 +98,10 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->view->assign('form_id', $context['form_id']);
 		$this->view->assign('form_action', $context['form_action']);
 		$this->view->assign('submit_label', $context['submit_label']);
+		$this->view->assign('mode', $context['mode']);
+		$this->view->assign('save_mode', $context['save_mode']);
+		$this->view->assign('save_url', $context['save_url']);
+		$this->view->assign('render_form', $context['render_form']);
 		$this->view->assign('values', $values);
 		$this->view->assign('messages', $this->messages);
 
@@ -102,6 +114,61 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	public function setData($data) {
 		$this->data = is_array($data) ? $data : [];
+		$this->messages = [];
+		$this->postedValues = null;
+	}
+
+	// ---------------------------------------------------------------------
+	// JSON endpoint
+	// ---------------------------------------------------------------------
+
+	protected function getJsonOutput(bool $final): string {
+		$action = trim((string) $this->request->request('action', ''));
+
+		if ($action === '') {
+			$action = trim((string) $this->request->request('chatbot_config_action', ''));
+		}
+
+		if ($action !== self::FORM_ACTION_SAVE) {
+			return $this->jsonError('Unknown action.');
+		}
+
+		$context = $this->getContext(true);
+		$postedGroup = trim((string) $this->request->request('chatbot_config_group', ''));
+		$postedName = trim((string) $this->request->request('chatbot_config_name', ''));
+
+		if ($postedGroup === '' || $postedName === '') {
+			return $this->jsonError('Missing configuration identity.');
+		}
+
+		if (!$this->isSaveRequest($context)) {
+			return $this->jsonError('Configuration identity does not match.');
+		}
+
+		$result = $this->saveSettingsFromRequest($context);
+
+		return $this->jsonResponse($result['success'], [
+			'messages' => $this->messages,
+			'values' => $this->postedValues ?? $this->settingsToViewValues($this->loadSettings($context))
+		]);
+	}
+
+	protected function jsonResponse(bool $success, array $data = []): string {
+		return json_encode(array_merge([
+			'status' => $success ? 'ok' : 'error',
+			'success' => $success
+		], $data), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{"status":"error","success":false}';
+	}
+
+	protected function jsonError(string $message): string {
+		$this->messages = [[
+			'type' => 'danger',
+			'text' => $message
+		]];
+
+		return $this->jsonResponse(false, [
+			'messages' => $this->messages
+		]);
 	}
 
 	// ---------------------------------------------------------------------
@@ -111,13 +178,21 @@ class ChatbotConfigDisplay implements IDisplay {
 	/**
 	 * Returns the fixed storage context for the rendered configuration form.
 	 *
-	 * The group/name pair is not trusted from POST data. POST data is only
-	 * checked against this server-side context so that multiple configuration
-	 * displays can safely exist on different pages or commands.
+	 * The group/name pair is not trusted from POST data during normal HTML
+	 * rendering. JSON endpoint calls may derive the context from the posted
+	 * hidden fields because no surrounding integration object calls setData().
 	 */
-	protected function getContext(): array {
-		$group = trim((string) ($this->data['group'] ?? 'chatbot'));
-		$name = trim((string) ($this->data['name'] ?? 'default'));
+	protected function getContext(bool $allowRequestContext): array {
+		$group = trim((string) ($this->data['group'] ?? ''));
+		$name = trim((string) ($this->data['name'] ?? ''));
+
+		if ($allowRequestContext && $group === '') {
+			$group = trim((string) $this->request->request('chatbot_config_group', ''));
+		}
+
+		if ($allowRequestContext && $name === '') {
+			$name = trim((string) $this->request->request('chatbot_config_name', ''));
+		}
 
 		if ($group === '') {
 			$group = 'chatbot';
@@ -139,15 +214,55 @@ class ChatbotConfigDisplay implements IDisplay {
 			$submitLabel = 'Save';
 		}
 
+		$mode = $this->normalizeEnum(
+			(string) ($this->data['mode'] ?? 'standalone'),
+			['standalone', 'embedded'],
+			'standalone'
+		);
+
+		$saveModeDefault = $mode === 'embedded' ? 'ajax' : 'post';
+		$saveMode = $this->normalizeEnum(
+			(string) ($this->data['save_mode'] ?? $saveModeDefault),
+			['post', 'ajax'],
+			$saveModeDefault
+		);
+
+		$renderForm = $mode !== 'embedded';
+		if (array_key_exists('render_form', $this->data)) {
+			$renderForm = $this->toBool($this->data['render_form']);
+		}
+
 		return [
 			'group' => $group,
 			'name' => $name,
 			'title' => $title,
 			'description' => $description,
 			'submit_label' => $submitLabel,
+			'mode' => $mode,
+			'save_mode' => $saveMode,
+			'render_form' => $renderForm,
 			'form_id' => 'base3_chatbot_config_' . md5($group . '/' . $name),
-			'form_action' => (string) ($this->data['form_action'] ?? ($_SERVER['REQUEST_URI'] ?? ''))
+			'form_action' => (string) ($this->data['form_action'] ?? ($_SERVER['REQUEST_URI'] ?? '')),
+			'save_url' => $this->getSaveUrl()
 		];
+	}
+
+	protected function getSaveUrl(): string {
+		$saveUrl = trim((string) ($this->data['save_url'] ?? ''));
+
+		if ($saveUrl !== '') {
+			return $saveUrl;
+		}
+
+		return $this->linkTargetService->getLink(
+			[
+				'name' => self::getName(),
+				'out' => 'json'
+			],
+			[
+				'action' => self::FORM_ACTION_SAVE
+			]
+		);
 	}
 
 	// ---------------------------------------------------------------------
@@ -166,6 +281,10 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	protected function handleSave(array $context): void {
+		$this->saveSettingsFromRequest($context);
+	}
+
+	protected function saveSettingsFromRequest(array $context): array {
 		$errors = [];
 		$settings = $this->getPostedSettings($errors);
 		$this->postedValues = $this->getPostedViewValues();
@@ -175,7 +294,9 @@ class ChatbotConfigDisplay implements IDisplay {
 				$this->addMessage('danger', $error);
 			}
 
-			return;
+			return [
+				'success' => false
+			];
 		}
 
 		try {
@@ -184,9 +305,17 @@ class ChatbotConfigDisplay implements IDisplay {
 
 			$this->postedValues = $this->settingsToViewValues($settings);
 			$this->addMessage('success', 'Settings saved.');
+
+			return [
+				'success' => true
+			];
 		}
 		catch (Throwable $e) {
 			$this->addMessage('danger', 'Settings could not be saved: ' . $e->getMessage());
+
+			return [
+				'success' => false
+			];
 		}
 	}
 
