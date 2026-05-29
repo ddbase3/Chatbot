@@ -44,7 +44,7 @@ class ChatbotService implements IOutput {
 			return $this->getBasePrompt();
 		}
 
-		if ($this->request->request('prompt') !== null) {
+		if ($this->getPromptInput() !== null) {
 			return $this->runStreamingFlow();
 		}
 
@@ -369,40 +369,65 @@ class ChatbotService implements IOutput {
 	}
 
 	/**
+	 * Reads the user prompt from POST or GET.
+	 *
+	 * The chat client may POST long messages first and then use GET for the SSE
+	 * stream. Therefore the runtime must accept both transports here.
+	 */
+	protected function getPromptInput(): ?string {
+		$prompt = $this->request->request('prompt');
+
+		if ($prompt === null) {
+			$prompt = $this->request->get('prompt');
+		}
+
+		if ($prompt === null) {
+			return null;
+		}
+
+		return (string) $prompt;
+	}
+
+	/**
 	 * Executes the AgentFlow for streaming.
 	 * The actual streaming (SSE) is executed inside the StreamingAiAssistantNode.
 	 */
 	protected function runStreamingFlow(): string {
 
-		$chatbotSettings = $this->getChatbotSettings();
+		try {
+			$chatbotSettings = $this->getChatbotSettings();
 
-		$context = $this->contextFactory->createContext();
-		$this->applyReferenceContext($context);
-		$this->applyChatbotConfigContext($context, $chatbotSettings);
+			$context = $this->contextFactory->createContext();
+			$this->applyReferenceContext($context);
+			$this->applyChatbotConfigContext($context, $chatbotSettings);
 
-		$flowFile = $this->getAgentFlowFile();
+			$flowFile = $this->getAgentFlowFile();
 
-		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
-		$config = is_string($json) ? json_decode($json, true) : null;
-		$config ??= $this->getSimpleAgentFlow();
+			$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
+			$config = is_string($json) ? json_decode($json, true) : null;
+			$config ??= $this->getSimpleAgentFlow();
 
-		if (!is_array($config) || $config === []) {
-			return $this->errorResponse('[Invalid Flow JSON]');
+			if (!is_array($config) || $config === []) {
+				return $this->errorResponse('[Invalid Flow JSON]');
+			}
+
+			$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
+
+			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
+			$userPrompt = (string) $this->getPromptInput();
+
+			$inputs = [
+				'system' => $systemPrompt,
+				'user' => $userPrompt
+			];
+
+			$flow->run($inputs);
+
+			exit;
 		}
-
-		$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
-
-		$systemPrompt = $this->getSystemPrompt($chatbotSettings);
-		$userPrompt = (string) $this->request->request('prompt');
-
-		$inputs = [
-			'system' => $systemPrompt,
-			'user' => $userPrompt
-		];
-
-		$flow->run($inputs);
-
-		exit;
+		catch (Throwable $e) {
+			return $this->errorResponse('[Chatbot runtime error] ' . $e->getMessage());
+		}
 
 		return '';
 	}
