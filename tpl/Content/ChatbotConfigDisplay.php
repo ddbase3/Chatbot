@@ -3,6 +3,23 @@
         $messages = is_array($this->_['messages'] ?? null) ? $this->_['messages'] : [];
         $llmOptions = is_array($this->_['llm_options'] ?? null) ? $this->_['llm_options'] : [];
 
+        $languageOptions = [
+                'auto' => 'auto',
+                'de-DE' => 'German (Germany) - de-DE',
+                'de-AT' => 'German (Austria) - de-AT',
+                'de-CH' => 'German (Switzerland) - de-CH',
+                'en-US' => 'English (United States) - en-US',
+                'en-GB' => 'English (United Kingdom) - en-GB',
+                'fr-FR' => 'French (France) - fr-FR',
+                'es-ES' => 'Spanish (Spain) - es-ES',
+                'it-IT' => 'Italian (Italy) - it-IT',
+                'nl-NL' => 'Dutch (Netherlands) - nl-NL',
+                'pl-PL' => 'Polish (Poland) - pl-PL',
+                'pt-PT' => 'Portuguese (Portugal) - pt-PT',
+                'pt-BR' => 'Portuguese (Brazil) - pt-BR',
+                'tr-TR' => 'Turkish (Turkey) - tr-TR'
+        ];
+
         $e = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $checked = static fn($value): string => !empty($value) ? ' checked="checked"' : '';
         $selected = static fn($current, $value): string => (string) $current === (string) $value ? ' selected="selected"' : '';
@@ -14,6 +31,11 @@
         $saveMode = (string) ($this->_['save_mode'] ?? 'ajax');
         $saveUrl = (string) ($this->_['save_url'] ?? '');
         $useAjax = $saveMode === 'ajax';
+        $currentLang = trim((string) ($values['default_lang'] ?? 'auto'));
+
+        if ($currentLang === '') {
+                $currentLang = 'auto';
+        }
 ?>
 
 <style>
@@ -438,17 +460,18 @@
                         </div>
 
                         <div class="base3-chatbot-config-row">
-                                <label for="<?php echo $e($formId); ?>_default_lang" class="base3-chatbot-config-label">Default language</label>
+                                <label for="<?php echo $e($formId); ?>_default_lang" class="base3-chatbot-config-label">Voice language</label>
                                 <div>
-                                        <input
-                                                type="text"
-                                                id="<?php echo $e($formId); ?>_default_lang"
-                                                name="default_lang"
-                                                class="form-control"
-                                                value="<?php echo $e($values['default_lang'] ?? 'auto'); ?>"
-                                        />
+                                        <select id="<?php echo $e($formId); ?>_default_lang" name="default_lang" class="form-control">
+<?php foreach ($languageOptions as $languageValue => $languageLabel) { ?>
+                                                <option value="<?php echo $e($languageValue); ?>"<?php echo $selected($currentLang, $languageValue); ?>><?php echo $e($languageLabel); ?></option>
+<?php } ?>
+<?php if (!array_key_exists($currentLang, $languageOptions)) { ?>
+                                                <option value="<?php echo $e($currentLang); ?>" selected="selected">Current custom value: <?php echo $e($currentLang); ?></option>
+<?php } ?>
+                                        </select>
                                         <p class="base3-chatbot-config-help">
-                                                Used by voice-related client features. Use "auto" unless the integration should force a language.
+                                                Language hint for browser text-to-speech output. Use <code>auto</code> unless the integration should force a specific speech language.
                                         </p>
                                 </div>
                         </div>
