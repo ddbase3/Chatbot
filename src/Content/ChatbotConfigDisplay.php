@@ -334,10 +334,8 @@ class ChatbotConfigDisplay implements IDisplay {
                         $errors
                 );
 
-                $basePrompts = $this->decodeConfigJsonInput(
-                        trim((string) $this->request->request('base_prompts')),
-                        'Base prompts',
-                        $errors
+                $basePrompts = $this->normalizeBasePromptsInput(
+                        $this->request->request('base_prompts', [])
                 );
 
                 $agentFlow = $this->decodeConfigJsonInput(
@@ -404,7 +402,7 @@ class ChatbotConfigDisplay implements IDisplay {
                         'reference_json' => (string) $this->request->request('reference'),
                         'reference_provider' => trim((string) $this->request->request('reference_provider')),
                         'system_prompt' => $this->normalizeTextBlock((string) $this->request->request('system_prompt')),
-                        'base_prompts_json' => (string) $this->request->request('base_prompts'),
+                        'base_prompts' => $this->normalizeBasePromptsInput($this->request->request('base_prompts', [])),
                         'agent_flow_json' => (string) $this->request->request('agent_flow')
                 ];
         }
@@ -706,7 +704,7 @@ class ChatbotConfigDisplay implements IDisplay {
                         'reference_provider' => trim((string) ($settings['reference_provider'] ?? $defaults['reference_provider'])),
                         'default_lang' => trim((string) ($settings['default_lang'] ?? $defaults['default_lang'])),
                         'system_prompt' => $this->normalizeTextBlock((string) ($settings['system_prompt'] ?? $defaults['system_prompt'])),
-                        'base_prompts' => is_array($settings['base_prompts'] ?? null) ? $settings['base_prompts'] : $defaults['base_prompts'],
+                        'base_prompts' => $this->normalizeBasePromptsInput($settings['base_prompts'] ?? $defaults['base_prompts']),
                         'agent_flow' => $agentFlow
                 ];
         }
@@ -727,9 +725,54 @@ class ChatbotConfigDisplay implements IDisplay {
                         'reference_provider' => $settings['reference_provider'],
                         'default_lang' => $settings['default_lang'],
                         'system_prompt' => $settings['system_prompt'],
-                        'base_prompts_json' => $this->formatConfigJson($settings['base_prompts'], '[]'),
+                        'base_prompts' => $settings['base_prompts'],
                         'agent_flow_json' => $this->formatConfigJson($settings['agent_flow'], '{}')
                 ];
+        }
+
+        protected function normalizeBasePromptsInput(mixed $value): array {
+                if (is_string($value)) {
+                        $value = trim($value);
+
+                        if ($value === '') {
+                                return [];
+                        }
+
+                        if (substr($value, 0, 1) === '[') {
+                                try {
+                                        $decoded = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+
+                                        if (is_array($decoded)) {
+                                                return $this->normalizeBasePromptsInput($decoded);
+                                        }
+                                }
+                                catch (JsonException) {}
+                        }
+
+                        return [$this->normalizeTextBlock($value)];
+                }
+
+                if (!is_array($value)) {
+                        return [];
+                }
+
+                $prompts = [];
+
+                foreach ($value as $prompt) {
+                        if (is_array($prompt) || is_object($prompt)) {
+                                continue;
+                        }
+
+                        $prompt = trim($this->normalizeTextBlock((string) $prompt));
+
+                        if ($prompt === '') {
+                                continue;
+                        }
+
+                        $prompts[] = $prompt;
+                }
+
+                return array_values($prompts);
         }
 
         protected function formatReferenceJson(array $reference): string {

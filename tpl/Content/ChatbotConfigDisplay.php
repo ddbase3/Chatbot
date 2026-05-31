@@ -2,6 +2,11 @@
         $values = is_array($this->_['values'] ?? null) ? $this->_['values'] : [];
         $messages = is_array($this->_['messages'] ?? null) ? $this->_['messages'] : [];
         $llmOptions = is_array($this->_['llm_options'] ?? null) ? $this->_['llm_options'] : [];
+        $basePrompts = is_array($values['base_prompts'] ?? null) ? $values['base_prompts'] : [];
+
+        if ($basePrompts === []) {
+                $basePrompts = [''];
+        }
 
         $languageOptions = [
                 'auto' => 'auto',
@@ -156,10 +161,6 @@
                 min-height: 140px;
         }
 
-        .base3-chatbot-config-base-prompts {
-                min-height: 260px;
-        }
-
         .base3-chatbot-config-agent-flow {
                 min-height: 420px;
         }
@@ -199,6 +200,34 @@
                 margin-right: 6px;
         }
 
+        .base3-chatbot-config-base-prompts {
+                max-width: 760px;
+        }
+
+        .base3-chatbot-config-base-prompt-row {
+                display: flex;
+                gap: 7px;
+                align-items: center;
+                margin: 0 0 7px;
+        }
+
+        .base3-chatbot-config-base-prompt-row input[type="text"] {
+                max-width: none;
+                flex: 1 1 auto;
+        }
+
+        .base3-chatbot-config-base-prompt-remove,
+        .base3-chatbot-config-base-prompt-add {
+                min-height: 34px;
+                padding: 6px 10px;
+                cursor: pointer;
+                white-space: nowrap;
+        }
+
+        .base3-chatbot-config-base-prompt-add {
+                margin-top: 1px;
+        }
+
         .base3-chatbot-config-actions {
                 margin-top: 4px;
         }
@@ -233,6 +262,14 @@
                 .base3-chatbot-config-display select,
                 .base3-chatbot-config-display textarea {
                         max-width: none;
+                }
+
+                .base3-chatbot-config-base-prompt-row {
+                        display: block;
+                }
+
+                .base3-chatbot-config-base-prompt-remove {
+                        margin-top: 5px;
                 }
         }
 </style>
@@ -381,25 +418,6 @@
                         </div>
 
                         <div class="base3-chatbot-config-row">
-                                <div class="base3-chatbot-config-label">Base prompts</div>
-                                <div>
-                                        <details class="base3-chatbot-config-collapsible">
-                                                <summary>Base prompts JSON</summary>
-                                                <div class="base3-chatbot-config-collapsible-content">
-                                                        <textarea
-                                                                id="<?php echo $e($formId); ?>_base_prompts"
-                                                                name="base_prompts"
-                                                                class="form-control base3-chatbot-config-base-prompts"
-                                                        ><?php echo $e($values['base_prompts_json'] ?? '[]'); ?></textarea>
-                                                        <p class="base3-chatbot-config-help">
-                                                                JSON array of initial chatbot base prompts. This is stored server-side and loaded by the configured chatbot service.
-                                                        </p>
-                                                </div>
-                                        </details>
-                                </div>
-                        </div>
-
-                        <div class="base3-chatbot-config-row">
                                 <div class="base3-chatbot-config-label">AgentFlow</div>
                                 <div>
                                         <details class="base3-chatbot-config-collapsible">
@@ -421,6 +439,46 @@
 
                 <div class="base3-chatbot-config-section">
                         <h3>Chatbot UI</h3>
+
+                        <div class="base3-chatbot-config-row">
+                                <div class="base3-chatbot-config-label">Base prompts</div>
+                                <div>
+                                        <div class="base3-chatbot-config-base-prompts" data-base3-chatbot-base-prompts>
+                                                <div data-base3-chatbot-base-prompts-items>
+<?php foreach ($basePrompts as $basePrompt) { ?>
+                                                        <div class="base3-chatbot-config-base-prompt-row">
+                                                                <input
+                                                                        type="text"
+                                                                        name="base_prompts[]"
+                                                                        class="form-control"
+                                                                        value="<?php echo $e($basePrompt); ?>"
+                                                                        placeholder="Initial greeting prompt"
+                                                                />
+                                                                <button
+                                                                        type="button"
+                                                                        class="btn btn-default base3-chatbot-config-base-prompt-remove"
+                                                                        data-base3-chatbot-base-prompt-remove="1"
+                                                                >
+                                                                        Remove
+                                                                </button>
+                                                        </div>
+<?php } ?>
+                                                </div>
+
+                                                <button
+                                                        type="button"
+                                                        class="btn btn-default base3-chatbot-config-base-prompt-add"
+                                                        data-base3-chatbot-base-prompt-add="1"
+                                                >
+                                                        Add base prompt
+                                                </button>
+
+                                                <p class="base3-chatbot-config-help">
+                                                        Initial greeting prompts shown before the user starts chatting. Empty fields are ignored when saving.
+                                                </p>
+                                        </div>
+                                </div>
+                        </div>
 
                         <div class="base3-chatbot-config-row">
                                 <div class="base3-chatbot-config-label">Features</div>
@@ -560,6 +618,9 @@
         var button = root.querySelector('[data-base3-chatbot-config-save]');
         var messages = root.querySelector('[data-base3-chatbot-config-messages]');
         var saveUrl = root.getAttribute('data-save-url') || <?php echo json_encode($saveUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        var basePromptsRoot = root.querySelector('[data-base3-chatbot-base-prompts]');
+        var basePromptsItems = root.querySelector('[data-base3-chatbot-base-prompts-items]');
+        var basePromptsAdd = root.querySelector('[data-base3-chatbot-base-prompt-add]');
 
         if (!button || !saveUrl) {
                 return;
@@ -572,6 +633,55 @@
                         .replace(/>/g, '&gt;')
                         .replace(/"/g, '&quot;')
                         .replace(/'/g, '&#039;');
+        }
+
+        function createBasePromptRow(value) {
+                var row = document.createElement('div');
+                var input = document.createElement('input');
+                var remove = document.createElement('button');
+
+                row.className = 'base3-chatbot-config-base-prompt-row';
+
+                input.type = 'text';
+                input.name = 'base_prompts[]';
+                input.className = 'form-control';
+                input.value = value || '';
+                input.placeholder = 'Initial greeting prompt';
+
+                remove.type = 'button';
+                remove.className = 'btn btn-default base3-chatbot-config-base-prompt-remove';
+                remove.setAttribute('data-base3-chatbot-base-prompt-remove', '1');
+                remove.appendChild(document.createTextNode('Remove'));
+                remove.addEventListener('click', function() {
+                        if (row.parentNode) {
+                                row.parentNode.removeChild(row);
+                        }
+
+                        if (basePromptsItems && !basePromptsItems.querySelector('[name="base_prompts[]"]')) {
+                                basePromptsItems.appendChild(createBasePromptRow(''));
+                        }
+                });
+
+                row.appendChild(input);
+                row.appendChild(remove);
+
+                return row;
+        }
+
+        function renderBasePrompts(items) {
+                if (!basePromptsItems) {
+                        return;
+                }
+
+                if (!Array.isArray(items) || items.length === 0) {
+                        items = [''];
+                }
+
+                basePromptsItems.innerHTML = '';
+
+                items.forEach(function(item) {
+                        basePromptsItems.appendChild(createBasePromptRow(item));
+                });
         }
 
         function collectFormData() {
@@ -629,7 +739,6 @@
                         reference_json: 'reference',
                         reference_provider: 'reference_provider',
                         system_prompt: 'system_prompt',
-                        base_prompts_json: 'base_prompts',
                         agent_flow_json: 'agent_flow'
                 };
 
@@ -644,6 +753,10 @@
                                 field.value = values[key];
                         }
                 });
+
+                if (Object.prototype.hasOwnProperty.call(values, 'base_prompts')) {
+                        renderBasePrompts(values.base_prompts);
+                }
 
                 ['use_markdown', 'use_icons', 'use_voice', 'use_threads'].forEach(function(key) {
                         var field = root.querySelector('[name="' + key + '"]');
@@ -687,6 +800,26 @@
                         .finally(function() {
                                 button.disabled = false;
                         });
+        }
+
+        if (basePromptsRoot && basePromptsAdd && basePromptsItems) {
+                basePromptsAdd.addEventListener('click', function() {
+                        basePromptsItems.appendChild(createBasePromptRow(''));
+                });
+
+                basePromptsRoot.querySelectorAll('[data-base3-chatbot-base-prompt-remove]').forEach(function(remove) {
+                        remove.addEventListener('click', function() {
+                                var row = remove.closest('.base3-chatbot-config-base-prompt-row');
+
+                                if (row && row.parentNode) {
+                                        row.parentNode.removeChild(row);
+                                }
+
+                                if (!basePromptsItems.querySelector('[name="base_prompts[]"]')) {
+                                        basePromptsItems.appendChild(createBasePromptRow(''));
+                                }
+                        });
+                });
         }
 
         if (root.tagName && root.tagName.toLowerCase() === 'form') {
