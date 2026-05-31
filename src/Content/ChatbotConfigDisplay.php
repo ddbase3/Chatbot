@@ -31,20 +31,23 @@ use Throwable;
  * Provides a reusable configuration display for one concrete chatbot instance.
  *
  * Important:
- * The surrounding integration layer, e.g. ILIAS UIHook, RepositoryObject or
+ * The surrounding integration layer, e.g. UIHook, RepositoryObject or
  * PageComponent, only needs to persist a stable instance id. The actual
  * chatbot configuration is stored here through ISettingsStore using:
  *
  * - group: the integration scope, e.g. uihk-chatbot, repo-chatbot, copg-chatbot
  * - name:  the concrete instance id, e.g. default, obj_123, pc_...
  *
- * This keeps the configuration independent from ILIAS plugin config storage
+ * This keeps the configuration independent from integration plugin config storage
  * and allows each copied object or page component to receive its own settings
  * dataset later.
  */
 class ChatbotConfigDisplay implements IDisplay {
 
         protected const FORM_ACTION_SAVE = 'save';
+        protected const LLM_SETTINGS_GROUP = 'service-llm';
+        protected const CHAT_LLM_RESOURCE_ID = 'chatllm';
+        protected const CHAT_LLM_RESOURCE_TYPE = 'configuredchatmodelagentresource';
 
         protected array $data = [];
 
@@ -108,6 +111,7 @@ class ChatbotConfigDisplay implements IDisplay {
                 $this->view->assign('save_url', $context['save_url']);
                 $this->view->assign('render_form', $context['render_form']);
                 $this->view->assign('values', $values);
+                $this->view->assign('llm_options', $this->listLlmOptions());
                 $this->view->assign('messages', $this->messages);
 
                 return $this->view->loadTemplate();
@@ -342,8 +346,19 @@ class ChatbotConfigDisplay implements IDisplay {
                         $errors
                 );
 
+                $llm = $this->normalizeTechnicalKey((string) $this->request->request('llm'));
+
+                if ($llm !== '' && !$this->llmExists($llm)) {
+                        $errors[] = 'Selected LLM does not exist in settings group "' . self::LLM_SETTINGS_GROUP . '": ' . $llm;
+                }
+
+                if ($errors === [] && $llm !== '') {
+                        $agentFlow = $this->applyLlmToAgentFlow($agentFlow, $llm);
+                }
+
                 return $this->normalizeSettings([
                         'service' => trim((string) $this->request->request('service')),
+                        'llm' => $llm,
                         'default_lang' => trim((string) $this->request->request('default_lang')),
                         'use_markdown' => $this->request->request('use_markdown') !== null,
                         'use_icons' => $this->request->request('use_icons') !== null,
@@ -370,6 +385,7 @@ class ChatbotConfigDisplay implements IDisplay {
         protected function getPostedViewValues(): array {
                 return [
                         'service' => trim((string) $this->request->request('service')),
+                        'llm' => $this->normalizeTechnicalKey((string) $this->request->request('llm')),
                         'default_lang' => trim((string) $this->request->request('default_lang')),
                         'use_markdown' => $this->request->request('use_markdown') !== null,
                         'use_icons' => $this->request->request('use_icons') !== null,
@@ -426,6 +442,193 @@ class ChatbotConfigDisplay implements IDisplay {
         }
 
         // ---------------------------------------------------------------------
+        // LLM options
+        // ---------------------------------------------------------------------
+
+        /**
+         * @return array<int,array<string,mixed>>
+         */
+        protected function listLlmOptions(): array {
+                $rows = [];
+
+                try {
+                        $group = $this->settingsStore->getGroup(self::LLM_SETTINGS_GROUP);
+                }
+                catch (Throwable $e) {
+                        $this->addMessage('danger', 'LLMs could not be loaded: ' . $e->getMessage());
+                        return [];
+                }
+
+                if (!is_array($group)) {
+                        return [];
+                }
+
+                foreach ($group as $id => $settings) {
+                        if (!is_string($id) || $id === '' || !is_array($settings)) {
+                                continue;
+                        }
+
+                        $rows[] = $this->normalizeLlmOption($id, $settings);
+                }
+
+                usort($rows, static function(array $a, array $b): int {
+                        $aSort = trim((string) ($a['label'] ?? ''));
+                        $bSort = trim((string) ($b['label'] ?? ''));
+
+                        if ($aSort === '') {
+                                $aSort = (string) ($a['id'] ?? '');
+                        }
+
+                        if ($bSort === '') {
+                                $bSort = (string) ($b['id'] ?? '');
+                        }
+
+                        $cmp = strcasecmp($aSort, $bSort);
+
+                        if ($cmp !== 0) {
+                                return $cmp;
+                        }
+
+                        return strcasecmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
+                });
+
+                return $rows;
+        }
+
+        /**
+         * @return array<string,mixed>
+         */
+        protected function normalizeLlmOption(string $id, array $settings): array {
+                $label = trim((string) ($settings['name'] ?? ($settings['label'] ?? '')));
+
+                if ($label === '') {
+                        $label = $id;
+                }
+
+                return [
+                        'id' => $id,
+                        'label' => $label,
+                        'model' => trim((string) ($settings['model'] ?? '')),
+                        'driver' => trim((string) ($settings['driver'] ?? '')),
+                        'connection' => trim((string) ($settings['connection'] ?? ($settings['provider'] ?? ''))),
+                        'enabled' => $this->toBool($settings['enabled'] ?? true)
+                ];
+        }
+
+        protected function llmExists(string $id): bool {
+                if ($id === '') {
+                        return false;
+                }
+
+                try {
+                        $settings = $this->settingsStore->get(self::LLM_SETTINGS_GROUP, $id, []);
+                }
+                catch (Throwable) {
+                        return false;
+                }
+
+                return is_array($settings) && $settings !== [];
+        }
+
+        // ---------------------------------------------------------------------
+        // AgentFlow LLM binding
+        // ---------------------------------------------------------------------
+
+        protected function applyLlmToAgentFlow(array $agentFlow, string $llm): array {
+                if ($llm === '') {
+                        return $agentFlow;
+                }
+
+                if (!isset($agentFlow['resources']) || !is_array($agentFlow['resources'])) {
+                        $agentFlow['resources'] = [];
+                }
+
+                $resources = $agentFlow['resources'];
+                $resourceIndex = $this->findChatLlmResourceIndex($resources);
+
+                $resource = [
+                        'id' => self::CHAT_LLM_RESOURCE_ID,
+                        'type' => self::CHAT_LLM_RESOURCE_TYPE,
+                        'config' => [
+                                'service' => [
+                                        'mode' => 'fixed',
+                                        'value' => $llm
+                                ]
+                        ]
+                ];
+
+                if ($resourceIndex !== null && isset($resources[$resourceIndex]) && is_array($resources[$resourceIndex])) {
+                        $resource = array_merge($resources[$resourceIndex], $resource);
+                        $resource['config'] = is_array($resources[$resourceIndex]['config'] ?? null)
+                                ? $resources[$resourceIndex]['config']
+                                : [];
+                        $resource['config']['service'] = [
+                                'mode' => 'fixed',
+                                'value' => $llm
+                        ];
+                        $resource['type'] = self::CHAT_LLM_RESOURCE_TYPE;
+                }
+
+                if ($resourceIndex === null) {
+                        $resources[] = $resource;
+                }
+                else {
+                        $resources[$resourceIndex] = $resource;
+                }
+
+                $agentFlow['resources'] = array_values($resources);
+
+                return $agentFlow;
+        }
+
+        protected function findChatLlmResourceIndex(array $resources): ?int {
+                $fallback = null;
+
+                foreach ($resources as $index => $resource) {
+                        if (!is_array($resource)) {
+                                continue;
+                        }
+
+                        if ((string) ($resource['id'] ?? '') === self::CHAT_LLM_RESOURCE_ID) {
+                                return (int) $index;
+                        }
+
+                        if ($fallback === null && (string) ($resource['type'] ?? '') === self::CHAT_LLM_RESOURCE_TYPE) {
+                                $fallback = (int) $index;
+                        }
+                }
+
+                return $fallback;
+        }
+
+        protected function extractLlmFromAgentFlow(array $agentFlow): string {
+                $resources = $agentFlow['resources'] ?? null;
+
+                if (!is_array($resources)) {
+                        return '';
+                }
+
+                $resourceIndex = $this->findChatLlmResourceIndex($resources);
+
+                if ($resourceIndex === null || !isset($resources[$resourceIndex]) || !is_array($resources[$resourceIndex])) {
+                        return '';
+                }
+
+                $resource = $resources[$resourceIndex];
+                $service = $resource['config']['service'] ?? null;
+
+                if (!is_array($service)) {
+                        return '';
+                }
+
+                if ((string) ($service['mode'] ?? '') !== 'fixed') {
+                        return '';
+                }
+
+                return $this->normalizeTechnicalKey((string) ($service['value'] ?? ''));
+        }
+
+        // ---------------------------------------------------------------------
         // Settings
         // ---------------------------------------------------------------------
 
@@ -444,6 +647,9 @@ class ChatbotConfigDisplay implements IDisplay {
         protected function getDefaultSettings(): array {
                 return [
                         'service' => 'chatbotservice.php',
+
+                        // Guided server-side selections.
+                        'llm' => '',
 
                         // Client-side UI feature flags.
                         'use_markdown' => true,
@@ -472,8 +678,16 @@ class ChatbotConfigDisplay implements IDisplay {
         protected function normalizeSettings(array $settings): array {
                 $defaults = $this->getDefaultSettings();
 
+                $agentFlow = is_array($settings['agent_flow'] ?? null) ? $settings['agent_flow'] : $defaults['agent_flow'];
+                $llm = $this->normalizeTechnicalKey((string) ($settings['llm'] ?? ''));
+
+                if ($llm === '') {
+                        $llm = $this->extractLlmFromAgentFlow($agentFlow);
+                }
+
                 return [
                         'service' => trim((string) ($settings['service'] ?? $defaults['service'])),
+                        'llm' => $llm,
                         'use_markdown' => $this->toBool($settings['use_markdown'] ?? $defaults['use_markdown']),
                         'use_icons' => $this->toBool($settings['use_icons'] ?? $defaults['use_icons']),
                         'use_voice' => $this->toBool($settings['use_voice'] ?? $defaults['use_voice']),
@@ -493,7 +707,7 @@ class ChatbotConfigDisplay implements IDisplay {
                         'default_lang' => trim((string) ($settings['default_lang'] ?? $defaults['default_lang'])),
                         'system_prompt' => $this->normalizeTextBlock((string) ($settings['system_prompt'] ?? $defaults['system_prompt'])),
                         'base_prompts' => is_array($settings['base_prompts'] ?? null) ? $settings['base_prompts'] : $defaults['base_prompts'],
-                        'agent_flow' => is_array($settings['agent_flow'] ?? null) ? $settings['agent_flow'] : $defaults['agent_flow']
+                        'agent_flow' => $agentFlow
                 ];
         }
 
@@ -502,6 +716,7 @@ class ChatbotConfigDisplay implements IDisplay {
 
                 return [
                         'service' => $settings['service'],
+                        'llm' => $settings['llm'],
                         'use_markdown' => $settings['use_markdown'],
                         'use_icons' => $settings['use_icons'],
                         'use_voice' => $settings['use_voice'],
@@ -543,6 +758,12 @@ class ChatbotConfigDisplay implements IDisplay {
 
         protected function normalizeTextBlock(string $value): string {
                 return str_replace(["\r\n", "\r"], "\n", $value);
+        }
+
+        protected function normalizeTechnicalKey(string $value): string {
+                $value = strtolower(trim($value));
+
+                return preg_replace('/[^a-z0-9._-]+/', '', $value) ?? '';
         }
 
         protected function toBool(mixed $value): bool {

@@ -1,6 +1,7 @@
 <?php
         $values = is_array($this->_['values'] ?? null) ? $this->_['values'] : [];
         $messages = is_array($this->_['messages'] ?? null) ? $this->_['messages'] : [];
+        $llmOptions = is_array($this->_['llm_options'] ?? null) ? $this->_['llm_options'] : [];
 
         $e = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $checked = static fn($value): string => !empty($value) ? ' checked="checked"' : '';
@@ -284,107 +285,57 @@
                         </div>
 
                         <div class="base3-chatbot-config-row">
-                                <label for="<?php echo $e($formId); ?>_default_lang" class="base3-chatbot-config-label">Default language</label>
+                                <label for="<?php echo $e($formId); ?>_llm" class="base3-chatbot-config-label">LLM</label>
                                 <div>
-                                        <input
-                                                type="text"
-                                                id="<?php echo $e($formId); ?>_default_lang"
-                                                name="default_lang"
-                                                class="form-control"
-                                                value="<?php echo $e($values['default_lang'] ?? 'auto'); ?>"
-                                        />
+                                        <select id="<?php echo $e($formId); ?>_llm" name="llm" class="form-control">
+                                                <option value="">Use AgentFlow JSON value</option>
+<?php foreach ($llmOptions as $llm) {
+        $llmId = (string) ($llm['id'] ?? '');
+        if ($llmId === '') {
+                continue;
+        }
+
+        $parts = [];
+        $label = trim((string) ($llm['label'] ?? ''));
+
+        if ($label === '') {
+                $label = $llmId;
+        }
+
+        $parts[] = $label;
+
+        if (!empty($llm['model'])) {
+                $parts[] = (string) $llm['model'];
+        }
+
+        if (!empty($llm['driver'])) {
+                $parts[] = (string) $llm['driver'];
+        }
+
+        $text = implode(' / ', $parts);
+
+        if (empty($llm['enabled'])) {
+                $text .= ' [disabled]';
+        }
+?>
+                                                <option value="<?php echo $e($llmId); ?>"<?php echo $selected($values['llm'] ?? '', $llmId); ?>><?php echo $e($text); ?></option>
+<?php } ?>
+                                        </select>
                                         <p class="base3-chatbot-config-help">
-                                                Used by voice-related client features. Use "auto" unless the integration should force a language.
+                                                If an LLM is selected here, the AgentFlow resource <code>chatllm</code> is updated to use this configured LLM. Leave empty to keep the raw AgentFlow value unchanged.
                                         </p>
                                 </div>
                         </div>
                 </div>
 
                 <div class="base3-chatbot-config-section">
-                        <h3>Chatbot UI</h3>
+                        <h3>Tools</h3>
 
                         <div class="base3-chatbot-config-row">
-                                <div class="base3-chatbot-config-label">Features</div>
-                                <div class="base3-chatbot-config-checkboxes">
-                                        <label>
-                                                <input type="checkbox" name="use_markdown" value="1"<?php echo $checked($values['use_markdown'] ?? false); ?> />
-                                                Enable markdown rendering
-                                        </label>
-
-                                        <label>
-                                                <input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
-                                                Show dialog action icons
-                                        </label>
-
-                                        <label>
-                                                <input type="checkbox" name="use_voice" value="1"<?php echo $checked($values['use_voice'] ?? false); ?> />
-                                                Enable voice controls
-                                        </label>
-
-                                        <label>
-                                                <input type="checkbox" name="use_threads" value="1"<?php echo $checked($values['use_threads'] ?? false); ?> />
-                                                Enable chat threads
-                                        </label>
-                                </div>
-                        </div>
-
-                        <div class="base3-chatbot-config-row">
-                                <label for="<?php echo $e($formId); ?>_transport_mode" class="base3-chatbot-config-label">Transport mode</label>
+                                <div class="base3-chatbot-config-label">Status</div>
                                 <div>
-                                        <select id="<?php echo $e($formId); ?>_transport_mode" name="transport_mode" class="form-control">
-                                                <option value="auto"<?php echo $selected($values['transport_mode'] ?? 'auto', 'auto'); ?>>auto</option>
-                                                <option value="sse"<?php echo $selected($values['transport_mode'] ?? 'auto', 'sse'); ?>>sse</option>
-                                                <option value="websocket"<?php echo $selected($values['transport_mode'] ?? 'auto', 'websocket'); ?>>websocket</option>
-                                                <option value="rest"<?php echo $selected($values['transport_mode'] ?? 'auto', 'rest'); ?>>rest</option>
-                                        </select>
-                                </div>
-                        </div>
-                </div>
-
-                <div class="base3-chatbot-config-section">
-                        <h3>Reference context</h3>
-
-                        <div class="base3-chatbot-config-row">
-                                <label for="<?php echo $e($formId); ?>_reference_mode" class="base3-chatbot-config-label">Reference mode</label>
-                                <div>
-                                        <select id="<?php echo $e($formId); ?>_reference_mode" name="reference_mode" class="form-control">
-                                                <option value="none"<?php echo $selected($values['reference_mode'] ?? 'url', 'none'); ?>>none</option>
-                                                <option value="url"<?php echo $selected($values['reference_mode'] ?? 'url', 'url'); ?>>url</option>
-                                                <option value="custom"<?php echo $selected($values['reference_mode'] ?? 'url', 'custom'); ?>>custom</option>
-                                                <option value="provider"<?php echo $selected($values['reference_mode'] ?? 'url', 'provider'); ?>>provider</option>
-                                        </select>
                                         <p class="base3-chatbot-config-help">
-                                                Controls which contextual reference is sent with requests. The service can store this in the agent context.
-                                        </p>
-                                </div>
-                        </div>
-
-                        <div class="base3-chatbot-config-row">
-                                <label for="<?php echo $e($formId); ?>_reference" class="base3-chatbot-config-label">Static reference JSON</label>
-                                <div>
-                                        <textarea
-                                                id="<?php echo $e($formId); ?>_reference"
-                                                name="reference"
-                                                class="form-control base3-chatbot-config-json"
-                                        ><?php echo $e($values['reference_json'] ?? '{}'); ?></textarea>
-                                        <p class="base3-chatbot-config-help">
-                                                Only used for custom reference mode. Must be valid JSON.
-                                        </p>
-                                </div>
-                        </div>
-
-                        <div class="base3-chatbot-config-row">
-                                <label for="<?php echo $e($formId); ?>_reference_provider" class="base3-chatbot-config-label">Reference provider</label>
-                                <div>
-                                        <input
-                                                type="text"
-                                                id="<?php echo $e($formId); ?>_reference_provider"
-                                                name="reference_provider"
-                                                class="form-control"
-                                                value="<?php echo $e($values['reference_provider'] ?? ''); ?>"
-                                        />
-                                        <p class="base3-chatbot-config-help">
-                                                Global JavaScript function name used by provider reference mode.
+                                                Tool configuration is under construction. This section is already reserved for upcoming tool selection and tool-specific settings.
                                         </p>
                                 </div>
                         </div>
@@ -438,10 +389,116 @@
                                                                 class="form-control base3-chatbot-config-agent-flow"
                                                         ><?php echo $e($values['agent_flow_json'] ?? '{}'); ?></textarea>
                                                         <p class="base3-chatbot-config-help">
-                                                                Temporary raw JSON configuration for the service-side AgentFlow. This field will be replaced by a guided UI later.
+                                                                Temporary raw JSON configuration for the service-side AgentFlow. Selecting an LLM above updates only the <code>chatllm</code> resource during save.
                                                         </p>
                                                 </div>
                                         </details>
+                                </div>
+                        </div>
+                </div>
+
+                <div class="base3-chatbot-config-section">
+                        <h3>Chatbot UI</h3>
+
+                        <div class="base3-chatbot-config-row">
+                                <div class="base3-chatbot-config-label">Features</div>
+                                <div class="base3-chatbot-config-checkboxes">
+                                        <label>
+                                                <input type="checkbox" name="use_markdown" value="1"<?php echo $checked($values['use_markdown'] ?? false); ?> />
+                                                Enable markdown rendering
+                                        </label>
+
+                                        <label>
+                                                <input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
+                                                Show dialog action icons
+                                        </label>
+
+                                        <label>
+                                                <input type="checkbox" name="use_voice" value="1"<?php echo $checked($values['use_voice'] ?? false); ?> />
+                                                Enable voice controls
+                                        </label>
+
+                                        <label>
+                                                <input type="checkbox" name="use_threads" value="1"<?php echo $checked($values['use_threads'] ?? false); ?> />
+                                                Enable chat threads
+                                        </label>
+                                </div>
+                        </div>
+
+                        <div class="base3-chatbot-config-row">
+                                <label for="<?php echo $e($formId); ?>_transport_mode" class="base3-chatbot-config-label">Transport mode</label>
+                                <div>
+                                        <select id="<?php echo $e($formId); ?>_transport_mode" name="transport_mode" class="form-control">
+                                                <option value="auto"<?php echo $selected($values['transport_mode'] ?? 'auto', 'auto'); ?>>auto</option>
+                                                <option value="sse"<?php echo $selected($values['transport_mode'] ?? 'auto', 'sse'); ?>>sse</option>
+                                                <option value="websocket"<?php echo $selected($values['transport_mode'] ?? 'auto', 'websocket'); ?>>websocket</option>
+                                                <option value="rest"<?php echo $selected($values['transport_mode'] ?? 'auto', 'rest'); ?>>rest</option>
+                                        </select>
+                                </div>
+                        </div>
+
+                        <div class="base3-chatbot-config-row">
+                                <label for="<?php echo $e($formId); ?>_default_lang" class="base3-chatbot-config-label">Default language</label>
+                                <div>
+                                        <input
+                                                type="text"
+                                                id="<?php echo $e($formId); ?>_default_lang"
+                                                name="default_lang"
+                                                class="form-control"
+                                                value="<?php echo $e($values['default_lang'] ?? 'auto'); ?>"
+                                        />
+                                        <p class="base3-chatbot-config-help">
+                                                Used by voice-related client features. Use "auto" unless the integration should force a language.
+                                        </p>
+                                </div>
+                        </div>
+                </div>
+
+                <div class="base3-chatbot-config-section">
+                        <h3>Reference context</h3>
+
+                        <div class="base3-chatbot-config-row">
+                                <label for="<?php echo $e($formId); ?>_reference_mode" class="base3-chatbot-config-label">Reference mode</label>
+                                <div>
+                                        <select id="<?php echo $e($formId); ?>_reference_mode" name="reference_mode" class="form-control">
+                                                <option value="none"<?php echo $selected($values['reference_mode'] ?? 'url', 'none'); ?>>none</option>
+                                                <option value="url"<?php echo $selected($values['reference_mode'] ?? 'url', 'url'); ?>>url</option>
+                                                <option value="custom"<?php echo $selected($values['reference_mode'] ?? 'url', 'custom'); ?>>custom</option>
+                                                <option value="provider"<?php echo $selected($values['reference_mode'] ?? 'url', 'provider'); ?>>provider</option>
+                                        </select>
+                                        <p class="base3-chatbot-config-help">
+                                                Controls which contextual reference is sent with requests. The service can store this in the agent context.
+                                        </p>
+                                </div>
+                        </div>
+
+                        <div class="base3-chatbot-config-row">
+                                <label for="<?php echo $e($formId); ?>_reference" class="base3-chatbot-config-label">Static reference JSON</label>
+                                <div>
+                                        <textarea
+                                                id="<?php echo $e($formId); ?>_reference"
+                                                name="reference"
+                                                class="form-control base3-chatbot-config-json"
+                                        ><?php echo $e($values['reference_json'] ?? '{}'); ?></textarea>
+                                        <p class="base3-chatbot-config-help">
+                                                Only used for custom reference mode. Must be valid JSON.
+                                        </p>
+                                </div>
+                        </div>
+
+                        <div class="base3-chatbot-config-row">
+                                <label for="<?php echo $e($formId); ?>_reference_provider" class="base3-chatbot-config-label">Reference provider</label>
+                                <div>
+                                        <input
+                                                type="text"
+                                                id="<?php echo $e($formId); ?>_reference_provider"
+                                                name="reference_provider"
+                                                class="form-control"
+                                                value="<?php echo $e($values['reference_provider'] ?? ''); ?>"
+                                        />
+                                        <p class="base3-chatbot-config-help">
+                                                Global JavaScript function name used by provider reference mode.
+                                        </p>
                                 </div>
                         </div>
                 </div>
@@ -542,6 +599,7 @@
 
                 var map = {
                         service: 'service',
+                        llm: 'llm',
                         default_lang: 'default_lang',
                         transport_mode: 'transport_mode',
                         reference_mode: 'reference_mode',
