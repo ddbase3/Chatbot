@@ -41,6 +41,31 @@
 		return $value['value'] ?? $default;
 	};
 	$componentHasAttach = static fn(array $component, string $type): bool => in_array($type, is_array($component['attach_as'] ?? null) ? $component['attach_as'] : [], true);
+	$presetCapabilities = [];
+	foreach ($agentComponentPresets as $presetOption) {
+		$presetOptionId = (string) ($presetOption['id'] ?? '');
+
+		if ($presetOptionId === '') {
+			continue;
+		}
+
+		$presetOptionCapabilities = is_array($presetOption['capabilities'] ?? null) ? $presetOption['capabilities'] : [];
+		$presetCapabilities[$presetOptionId] = array_values(array_filter(array_map('strval', $presetOptionCapabilities)));
+	}
+	$capabilityText = static function(array $capabilities): string {
+		$capabilities = array_values(array_filter(array_map('strval', $capabilities)));
+
+		return $capabilities === [] ? '-' : implode(', ', $capabilities);
+	};
+	$componentCapabilityText = static function(array $component) use ($presetCapabilities, $capabilityText): string {
+		$presetId = (string) ($component['preset'] ?? '');
+
+		if ($presetId !== '' && isset($presetCapabilities[$presetId])) {
+			return $capabilityText($presetCapabilities[$presetId]);
+		}
+
+		return $capabilityText(is_array($component['attach_as'] ?? null) ? $component['attach_as'] : []);
+	};
 
 	$formId = (string) ($this->_['form_id'] ?? 'base3_chatbot_config');
 	$group = (string) ($this->_['group'] ?? '');
@@ -275,7 +300,7 @@
 
 	.base3-chatbot-config-agent-component-row {
 		display: grid;
-		grid-template-columns: minmax(170px, 1.5fr) 74px 74px 80px minmax(90px, 0.8fr) minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(180px, 1.8fr) auto;
+		grid-template-columns: minmax(170px, 1.5fr) 74px minmax(100px, 0.8fr) minmax(90px, 0.8fr) minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(180px, 1.8fr) auto;
 		gap: 7px;
 		align-items: start;
 		margin: 0 0 8px;
@@ -296,6 +321,18 @@
 	.base3-chatbot-config-agent-component-row input[type="text"],
 	.base3-chatbot-config-agent-component-row select {
 		max-width: none;
+	}
+
+	.base3-chatbot-config-agent-component-capabilities {
+		min-height: 34px;
+		padding: 7px 0 0;
+		color: #333;
+		font-size: 12px;
+		line-height: 1.35;
+	}
+
+	.base3-chatbot-config-agent-component-muted {
+		opacity: 0.55;
 	}
 
 	.base3-chatbot-config-agent-component-check {
@@ -575,33 +612,23 @@
 										Active
 									</label>
 								</div>
-								<div class="base3-chatbot-config-agent-component-check">
-									<input type="hidden" name="agent_components[<?php echo $e($componentIndex); ?>][attach_memory]" value="0" />
-									<label>
-										<input type="checkbox" name="agent_components[<?php echo $e($componentIndex); ?>][attach_memory]" value="1"<?php echo $checked($componentHasAttach($component, 'memory')); ?> />
-										Memory
-									</label>
-								</div>
-								<div class="base3-chatbot-config-agent-component-check">
-									<input type="hidden" name="agent_components[<?php echo $e($componentIndex); ?>][attach_tool]" value="0" />
-									<label>
-										<input type="checkbox" name="agent_components[<?php echo $e($componentIndex); ?>][attach_tool]" value="1"<?php echo $checked($componentHasAttach($component, 'tool')); ?> />
-										Tool
-									</label>
-								</div>
 								<div>
+									<label>Use as</label>
+									<div class="base3-chatbot-config-agent-component-capabilities" data-base3-chatbot-agent-component-capabilities="1"><?php echo $e($componentCapabilityText($component)); ?></div>
+								</div>
+								<div data-base3-chatbot-agent-component-memory-fields="1">
 									<label>Order</label>
 									<input type="text" name="agent_components[<?php echo $e($componentIndex); ?>][order]" class="form-control" value="<?php echo $e($order); ?>" placeholder="10" />
 								</div>
-								<div>
+								<div data-base3-chatbot-agent-component-tool-fields="1">
 									<label>Namespace</label>
 									<input type="text" name="agent_components[<?php echo $e($componentIndex); ?>][namespace]" class="form-control" value="<?php echo $e($namespace); ?>" placeholder="web" />
 								</div>
-								<div>
+								<div data-base3-chatbot-agent-component-tool-fields="1">
 									<label>Label</label>
 									<input type="text" name="agent_components[<?php echo $e($componentIndex); ?>][label]" class="form-control" value="<?php echo $e($label); ?>" placeholder="Visible tool label" />
 								</div>
-								<div>
+								<div data-base3-chatbot-agent-component-tool-fields="1">
 									<label>Description</label>
 									<input type="text" name="agent_components[<?php echo $e($componentIndex); ?>][description]" class="form-control" value="<?php echo $e($description); ?>" placeholder="Visible tool description" />
 								</div>
@@ -622,7 +649,7 @@
 						</button>
 
 						<p class="base3-chatbot-config-help">
-							Components are stored as <code>agent_components</code>. The runtime builds configured tool and memory wrappers from these selections.
+							Components are stored as <code>agent_components</code>. Memory/tool exposure is derived from the selected preset resource implementation; the runtime builds the configured wrappers during flow construction.
 						</p>
 <?php if ($agentComponentPresets === []) { ?>
 						<p class="base3-chatbot-config-help">
@@ -959,6 +986,62 @@
 		return Array.isArray(component.attach_as) && component.attach_as.indexOf(type) !== -1;
 	}
 
+	function getAgentComponentPresetById(id) {
+		id = String(id || '');
+
+		for (var i = 0; i < agentComponentPresets.length; i++) {
+			if (String(agentComponentPresets[i].id || '') === id) {
+				return agentComponentPresets[i];
+			}
+		}
+
+		return null;
+	}
+
+	function getAgentComponentCapabilities(id, fallbackComponent) {
+		var preset = getAgentComponentPresetById(id);
+
+		if (preset && Array.isArray(preset.capabilities)) {
+			return preset.capabilities.map(String).filter(Boolean);
+		}
+
+		if (fallbackComponent && Array.isArray(fallbackComponent.attach_as)) {
+			return fallbackComponent.attach_as.map(String).filter(Boolean);
+		}
+
+		return [];
+	}
+
+	function formatAgentComponentCapabilities(capabilities) {
+		capabilities = Array.isArray(capabilities) ? capabilities.map(String).filter(Boolean) : [];
+
+		return capabilities.length ? capabilities.join(', ') : '-';
+	}
+
+	function updateAgentComponentRowState(row) {
+		if (!row) {
+			return;
+		}
+
+		var select = row.querySelector('select[name$="[preset]"]');
+		var capabilitiesNode = row.querySelector('[data-base3-chatbot-agent-component-capabilities]');
+		var capabilities = getAgentComponentCapabilities(select ? select.value : '', null);
+		var hasMemory = capabilities.indexOf('memory') !== -1;
+		var hasTool = capabilities.indexOf('tool') !== -1;
+
+		if (capabilitiesNode) {
+			capabilitiesNode.textContent = formatAgentComponentCapabilities(capabilities);
+		}
+
+		row.querySelectorAll('[data-base3-chatbot-agent-component-memory-fields]').forEach(function(cell) {
+			cell.classList.toggle('base3-chatbot-config-agent-component-muted', !hasMemory);
+		});
+
+		row.querySelectorAll('[data-base3-chatbot-agent-component-tool-fields]').forEach(function(cell) {
+			cell.classList.toggle('base3-chatbot-config-agent-component-muted', !hasTool);
+		});
+	}
+
 	function createAgentComponentRow(component) {
 		component = component && typeof component === 'object' ? component : {};
 
@@ -1044,6 +1127,7 @@
 			}
 
 			option.value = id;
+			option.setAttribute('data-capabilities', Array.isArray(preset.capabilities) ? preset.capabilities.join(',') : '');
 			option.appendChild(document.createTextNode(text + ' (' + id + ')'));
 
 			if (String(component.preset || '') === id) {
@@ -1053,25 +1137,39 @@
 			select.appendChild(option);
 		});
 
+		select.addEventListener('change', function() {
+			updateAgentComponentRowState(row);
+		});
+
 		presetCell.appendChild(select);
 		row.appendChild(presetCell);
 		row.appendChild(makeCheckbox('enabled', '1', 'Active', enabled));
-		row.appendChild(makeCheckbox('attach_memory', '1', 'Memory', componentHasAttach(component, 'memory')));
-		row.appendChild(makeCheckbox('attach_tool', '1', 'Tool', componentHasAttach(component, 'tool')));
+
+		var capabilitiesCell = makeCell('Use as');
+		var capabilitiesValue = document.createElement('div');
+		capabilitiesValue.className = 'base3-chatbot-config-agent-component-capabilities';
+		capabilitiesValue.setAttribute('data-base3-chatbot-agent-component-capabilities', '1');
+		capabilitiesValue.appendChild(document.createTextNode(formatAgentComponentCapabilities(getAgentComponentCapabilities(component.preset || '', component))));
+		capabilitiesCell.appendChild(capabilitiesValue);
+		row.appendChild(capabilitiesCell);
 
 		var orderCell = makeCell('Order');
+		orderCell.setAttribute('data-base3-chatbot-agent-component-memory-fields', '1');
 		orderCell.appendChild(makeInput('order', order, '10'));
 		row.appendChild(orderCell);
 
 		var namespaceCell = makeCell('Namespace');
+		namespaceCell.setAttribute('data-base3-chatbot-agent-component-tool-fields', '1');
 		namespaceCell.appendChild(makeInput('namespace', namespace, 'web'));
 		row.appendChild(namespaceCell);
 
 		var labelCell = makeCell('Label');
+		labelCell.setAttribute('data-base3-chatbot-agent-component-tool-fields', '1');
 		labelCell.appendChild(makeInput('label', label, 'Visible tool label'));
 		row.appendChild(labelCell);
 
 		var descriptionCell = makeCell('Description');
+		descriptionCell.setAttribute('data-base3-chatbot-agent-component-tool-fields', '1');
 		descriptionCell.appendChild(makeInput('description', description, 'Visible tool description'));
 		row.appendChild(descriptionCell);
 
@@ -1088,6 +1186,7 @@
 		});
 		actionCell.appendChild(remove);
 		row.appendChild(actionCell);
+		updateAgentComponentRowState(row);
 
 		return row;
 	}
@@ -1261,6 +1360,18 @@
 	if (agentComponentsRoot && agentComponentsAdd && agentComponentsItems) {
 		agentComponentsAdd.addEventListener('click', function() {
 			agentComponentsItems.appendChild(createAgentComponentRow({ enabled: true, attach_as: [] }));
+		});
+
+		agentComponentsRoot.querySelectorAll('[data-base3-chatbot-agent-component-row]').forEach(function(row) {
+			var select = row.querySelector('select[name$="[preset]"]');
+
+			if (select) {
+				select.addEventListener('change', function() {
+					updateAgentComponentRowState(row);
+				});
+			}
+
+			updateAgentComponentRowState(row);
 		});
 
 		agentComponentsRoot.querySelectorAll('[data-base3-chatbot-agent-component-remove]').forEach(function(remove) {

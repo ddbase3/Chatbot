@@ -24,6 +24,9 @@ use Base3\Api\IRequest;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
+use MissionBay\Api\IAgentMemory;
+use MissionBay\Api\IAgentResource;
+use MissionBay\Api\IAgentTool;
 use JsonException;
 use Throwable;
 
@@ -57,6 +60,11 @@ class ChatbotConfigDisplay implements IDisplay {
 	protected array $messages = [];
 
 	protected ?array $postedValues = null;
+
+	/**
+	 * @var array<string,array<int,string>>|null
+	 */
+	protected ?array $resourceCapabilitiesByType = null;
 
 	public function __construct(
 		private readonly IMvcView $view,
@@ -525,11 +533,13 @@ class ChatbotConfigDisplay implements IDisplay {
 			$label = $id;
 		}
 
-		$capabilities = $settings['capabilities'] ?? [];
+		$storedCapabilities = $settings['capabilities'] ?? [];
 
-		if (!is_array($capabilities)) {
-			$capabilities = [];
+		if (!is_array($storedCapabilities)) {
+			$storedCapabilities = [];
 		}
+
+		$capabilities = $this->derivePresetCapabilities($settings, $storedCapabilities);
 
 		$meta = $settings['meta'] ?? [];
 
@@ -543,6 +553,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'type' => trim((string) ($settings['type'] ?? '')),
 			'enabled' => $this->toBool($settings['enabled'] ?? true),
 			'capabilities' => array_values(array_filter(array_map('strval', $capabilities))),
+			'capability_text' => implode(', ', array_values(array_filter(array_map('strval', $capabilities)))),
 			'description' => trim((string) ($meta['description'] ?? ($settings['description'] ?? ''))),
 			'category' => trim((string) ($meta['category'] ?? '')),
 			'risk' => trim((string) ($meta['risk'] ?? '')),
@@ -575,10 +586,11 @@ class ChatbotConfigDisplay implements IDisplay {
 			}
 
 			$enabled = $this->toBool($row['enabled'] ?? true);
-			$attachAs = $this->normalizeAgentComponentAttachAs($row);
+			$presetSettings = $this->loadAgentComponentPresetSettings($preset);
+			$attachAs = $this->normalizeAgentComponentAttachAs($row, $presetSettings);
 
 			if ($attachAs === []) {
-				$errors[] = 'Agent component preset "' . $preset . '" must be attached as memory and/or tool.';
+				$errors[] = 'Agent component preset "' . $preset . '" does not expose a memory or tool capability.';
 				continue;
 			}
 
@@ -608,7 +620,11 @@ class ChatbotConfigDisplay implements IDisplay {
 		return $components;
 	}
 
-	protected function normalizeAgentComponentAttachAs(array $row): array {
+	protected function normalizeAgentComponentAttachAs(array $row, ?array $presetSettings = null): array {
+		if ($presetSettings !== null) {
+			return $this->derivePresetCapabilities($presetSettings, []);
+		}
+
 		$attachAs = [];
 
 		if (is_array($row['attach_as'] ?? null)) {
@@ -630,6 +646,116 @@ class ChatbotConfigDisplay implements IDisplay {
 		}
 
 		return array_values(array_unique($attachAs));
+	}
+
+	protected function loadAgentComponentPresetSettings(string $preset): ?array {
+		if ($preset === '') {
+			return null;
+		}
+
+		try {
+			$settings = $this->settingsStore->get(self::AGENT_COMPONENT_PRESET_GROUP, $preset, []);
+		}
+		catch (Throwable) {
+			return null;
+		}
+
+		return is_array($settings) && $settings !== [] ? $settings : null;
+	}
+
+	/**
+	 * @param array<string,mixed> $preset
+	 * @param array<int|string,mixed> $fallback
+	 * @return array<int,string>
+	 */
+	protected function derivePresetCapabilities(array $preset, array $fallback = []): array {
+		$type = $this->normalizeTechnicalKey((string) ($preset['type'] ?? ''));
+		$map = $this->getResourceCapabilitiesByType();
+		$capabilities = $map[$type] ?? [];
+
+		if ($capabilities === []) {
+			$capabilities = $fallback;
+		}
+
+		return $this->normalizeAttachCapabilityList($capabilities);
+	}
+
+	/**
+	 * @return array<string,array<int,string>>
+	 */
+	protected function getResourceCapabilitiesByType(): array {
+		if ($this->resourceCapabilitiesByType !== null) {
+			return $this->resourceCapabilitiesByType;
+		}
+
+		$map = [];
+
+		try {
+			if(method_exists($this->classMap, 'getInstancesByInterface')) {
+				$resources = $this->classMap->getInstancesByInterface(IAgentResource::class);
+			}
+			else {
+				$resources = $this->classMap->getInstances(['interface' => IAgentResource::class]);
+			}
+		}
+		catch (Throwable) {
+			$this->resourceCapabilitiesByType = [];
+
+			return [];
+		}
+
+		foreach ($resources as $resource) {
+			if (!$resource instanceof IAgentResource) {
+				continue;
+			}
+
+			$type = $this->normalizeTechnicalKey((string) $resource::getName());
+
+			if ($type === '') {
+				continue;
+			}
+
+			$capabilities = [];
+
+			if ($resource instanceof IAgentMemory) {
+				$capabilities[] = 'memory';
+			}
+
+			if ($resource instanceof IAgentTool) {
+				$capabilities[] = 'tool';
+			}
+
+			$map[$type] = $this->normalizeAttachCapabilityList($capabilities);
+		}
+
+		$this->resourceCapabilitiesByType = $map;
+
+		return $map;
+	}
+
+	/**
+	 * @return array<int,string>
+	 */
+	protected function normalizeAttachCapabilityList(mixed $value): array {
+		if (is_string($value)) {
+			$value = explode(',', $value);
+		}
+
+		if (!is_array($value)) {
+			return [];
+		}
+
+		$result = [];
+
+		foreach ($value as $item) {
+			$item = strtolower(trim((string) $item));
+
+			if (in_array($item, ['memory', 'tool'], true)) {
+				$result[] = $item;
+			}
+		}
+
+		return array_values(array_unique($result));
 	}
 
 	protected function buildAgentComponentMemoryConfig(array $row, string $order): array {
