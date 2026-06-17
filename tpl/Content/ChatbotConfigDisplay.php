@@ -295,12 +295,12 @@
 
 
         .base3-chatbot-config-agent-components {
-                max-width: 900px;
+                max-width: none;
         }
 
         .base3-chatbot-config-agent-component-row {
                 display: grid;
-                grid-template-columns: minmax(170px, 1.5fr) 74px minmax(100px, 0.8fr) minmax(90px, 0.8fr) minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(180px, 1.8fr) auto;
+                grid-template-columns: minmax(150px, 1.5fr) 74px minmax(80px, 0.8fr) minmax(70px, 0.8fr) minmax(95px, 1fr) minmax(110px, 1.2fr) minmax(150px, 1.8fr) auto;
                 gap: 7px;
                 align-items: start;
                 margin: 0 0 8px;
@@ -707,11 +707,8 @@
                 <div class="base3-chatbot-config-section">
                         <h3>Tools &amp; Memory</h3>
 
-                        <div class="base3-chatbot-config-row">
-                                <div class="base3-chatbot-config-label">Components</div>
-                                <div>
-                                        <div class="base3-chatbot-config-agent-components" data-base3-chatbot-agent-components>
-                                                <div data-base3-chatbot-agent-component-items>
+                        <div class="base3-chatbot-config-agent-components" data-base3-chatbot-agent-components>
+                                <div data-base3-chatbot-agent-component-items>
 <?php foreach ($agentComponents as $componentIndex => $component) {
         if (!is_array($component)) {
                 continue;
@@ -778,27 +775,29 @@
                                                                 </div>
                                                         </div>
 <?php } ?>
-                                                </div>
-
-                                                <button
-                                                        type="button"
-                                                        class="btn btn-default base3-chatbot-config-agent-component-add"
-                                                        data-base3-chatbot-agent-component-add="1"
-                                                >
-                                                        Add component
-                                                </button>
-
-                                                <p class="base3-chatbot-config-help">
-                                                        Components are stored as <code>agent_components</code>. Memory/tool exposure is derived from the selected preset resource implementation; the runtime builds the configured wrappers during flow construction.
-                                                </p>
-<?php if ($agentComponentPresets === []) { ?>
-                                                <p class="base3-chatbot-config-help">
-                                                        No presets found in SettingsStore group <code>agent-component-preset</code>.
-                                                </p>
-<?php } ?>
-                                        </div>
                                 </div>
+
+                                <button
+                                        type="button"
+                                        class="btn btn-default base3-chatbot-config-agent-component-add"
+                                        data-base3-chatbot-agent-component-add="1"
+                                >
+                                        Add component
+                                </button>
+
+                                <p class="base3-chatbot-config-help">
+                                        Components are stored as <code>agent_components</code>. Memory/tool exposure is derived from the selected preset resource implementation; the runtime builds the configured wrappers during flow construction.
+                                </p>
+<?php if ($agentComponentPresets === []) { ?>
+                                <p class="base3-chatbot-config-help">
+                                        No presets found in SettingsStore group <code>agent-component-preset</code>.
+                                </p>
+<?php } ?>
                         </div>
+                </div>
+
+                <div class="base3-chatbot-config-section">
+                        <h3>Prompt &amp; Flow</h3>
 
                         <div class="base3-chatbot-config-row">
                                 <label for="<?php echo $e($formId); ?>_system_prompt" class="base3-chatbot-config-label">System prompt</label>
@@ -834,7 +833,6 @@
                         </div>
                 </div>
                 <div class="base3-chatbot-config-row base3-chatbot-config-actions">
-                        <div></div>
                         <div>
                                 <div class="base3-chatbot-config-messages" data-base3-chatbot-config-messages>
 <?php foreach ($messages as $message) {
