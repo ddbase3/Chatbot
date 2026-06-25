@@ -1,918 +1,924 @@
 (function() {
 
-	function initChatbot(rootSel = '#chatbot', config = {}) {
-		const root = document.querySelector(rootSel);
-		if (!root || root.dataset.inited === '1') return;
-		root.dataset.inited = '1';
-
-		const $root = $(root);
-		const chatControl = $root.find('.chat');
-		const msgControl = $root.find('textarea[name=prompt]');
-		const btnSend = $root.find('#chatSend');
-		const basePrompt = $root.find('.baseprompt');
-		const threadsHost = $root.find('[name=chatthreads]');
-
-		// Canvas elements
-		const canvasElem = $root.find('.chatbot-canvas');
-		const canvasTitleElem = $root.find('.chatbot-canvas .canvas-title');
-		const canvasContentElem = $root.find('.chatbot-canvas .canvas-content');
-		const canvasCloseBtn = $root.find('.chatbot-canvas .canvas-close');
-
-		// Suggestions container (bottom-right, styling via CSS)
-		const suggestionsContainer = $('<div class="chat-suggestions" aria-live="polite"></div>');
-		$root.find('.chatbot-main').append(suggestionsContainer);
-
-		// ---------------------------------------------------------------------
-		// Utility
-		// ---------------------------------------------------------------------
-
-		function scrollToBottom() {
-			chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
-		}
-
-		function scrollToResponse() {
-			const last = chatControl.children().last();
-			const offset = last.offset().top - chatControl.offset().top + chatControl.scrollTop();
-			chatControl.stop().animate({ scrollTop: offset - 10 }, 300);
-		}
-
-		function cleanForVoice(str) {
-			let txt = str.replace(/<[^>]*>/g, ' ');
-			txt = txt
-				.replace(/(\*\*|__)(.*?)\1/g, '$2')
-				.replace(/(\*|_)(.*?)\1/g, '$2')
-				.replace(/`([^`]*)`/g, '$1')
-				.replace(/```[\s\S]*?```/g, '')
-				.replace(/#+\s?(.*)/g, '$1')
-				.replace(/\[(.*?)\]\(.*?\)/g, '$1')
-				.replace(/!\[(.*?)\]\(.*?\)/g, '$1')
-				.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
-				.replace(/\s+/g, ' ')
-				.trim();
-			return txt;
-		}
-
-		function escapeHtml(str) {
-			return $('<div>').text(str || '').html();
-		}
-
-		function parseEventPayload(data) {
-			if (typeof data !== 'string') {
-				return data;
-			}
-
-			try {
-				return JSON.parse(data);
-			} catch {
-				return data;
-			}
-		}
-
-		function getGlobalValue(path) {
-			if (!path || typeof path !== 'string') return null;
-
-			const parts = path.split('.');
-			let value = window;
-
-			for (const part of parts) {
-				if (!part || value == null || (typeof value !== 'object' && typeof value !== 'function')) {
-					return null;
-				}
-
-				value = value[part];
-			}
-
-			return value;
-		}
-
-		function normalizeReference(reference) {
-			if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
-				return null;
-			}
-
-			return {
-				...reference,
-				sentAt: new Date().toISOString()
-			};
-		}
-
-		function getDefaultReference() {
-			return normalizeReference({
-				type: 'page',
-				url: window.location.href,
-				title: document.title || '',
-				referrer: document.referrer || ''
-			});
-		}
-
-		function getReferencePayload() {
-			const mode = String(config.referenceMode || 'url').toLowerCase();
-
-			if (mode === 'none') {
-				return null;
-			}
-
-			if (mode === 'custom') {
-				return normalizeReference(config.reference || null);
-			}
-
-			if (mode === 'provider') {
-				const providerName = String(config.referenceProvider || '').trim();
-				const provider = getGlobalValue(providerName);
-
-				if (typeof provider !== 'function') {
-					return null;
-				}
-
-				return normalizeReference(provider({
-					root,
-					config
-				}));
-			}
-
-			return getDefaultReference();
-		}
-
-		function encodeBase64Url(str) {
-			const bytes = new TextEncoder().encode(str);
-			let binary = '';
-
-			for (const byte of bytes) {
-				binary += String.fromCharCode(byte);
-			}
-
-			return btoa(binary)
-				.replace(/\+/g, '-')
-				.replace(/\//g, '_')
-				.replace(/=+$/g, '');
-		}
-
-		function appendReference(data) {
-			const reference = getReferencePayload();
-
-			if (reference) {
-				data.reference = encodeBase64Url(JSON.stringify(reference));
-				data.reference_format = 'base64json';
-			}
-
-			return data;
-		}
-		
-		function patchLinksTargetBlank(scope) {
-			const $scope = scope && scope.jquery ? scope : $(scope);
-			if (!$scope || !$scope.length) return;
-
-			$scope.find('a[href]').each(function() {
-				const $a = $(this);
-				const href = String($a.attr('href') || '').trim();
-
-				if (!href || href.startsWith('#') || href.toLowerCase().startsWith('javascript:')) {
-					return;
-				}
-
-				$a.attr('target', '_blank');
-
-				const relRaw = String($a.attr('rel') || '');
-				const rel = relRaw.split(/\s+/).filter(Boolean);
-
-				if (!rel.includes('noopener')) rel.push('noopener');
-				if (!rel.includes('noreferrer')) rel.push('noreferrer');
-
-				$a.attr('rel', rel.join(' '));
-			});
-		}
-
-		function renderMarkdownOrText(targetElem, text) {
-			if (config.useMarkdown && window.marked) {
-				targetElem.html(marked.parse(text));
-				patchLinksTargetBlank(targetElem);
-				return;
-			}
-
-			targetElem.text(text);
-		}
-
-		function toolArgsPreview(toolName, args, maxLen = 110) {
-			let s = '';
-
-			if (args) {
-				const pick =
-					args.query || args.q || args.text || args.prompt ||
-					args.question || args.input || args.search || args.term;
-
-				if (typeof pick === 'string' && pick.trim()) {
-					s = pick.trim();
-				} else if (Array.isArray(args.messages)) {
-					const lastUser = [...args.messages].reverse().find(m => m && m.role === 'user' && typeof m.content === 'string');
-					if (lastUser) s = lastUser.content.trim();
-				} else if (Array.isArray(args.documents) && args.documents.length) {
-					s = `${args.documents.length} document(s)`;
-				}
-			}
-
-			if (!s) {
-				try {
-					const flat = Object.entries(args || {})
-						.map(([k, v]) => {
-							if (v == null) return '';
-							if (typeof v === 'string') return v.trim() ? `${k}: ${v.trim()}` : '';
-							if (typeof v === 'number' || typeof v === 'boolean') return `${k}: ${v}`;
-							if (Array.isArray(v)) return `${k}: [${v.length}]`;
-							return `${k}: …`;
-						})
-						.filter(Boolean)
-						.join(' · ');
-					s = flat || '';
-				} catch {
-					s = '';
-				}
-			}
-
-			s = s.replace(/\s+/g, ' ').trim();
-			if (!s) return '';
-
-			if (s.length > maxLen) s = s.slice(0, maxLen - 1) + '…';
-			return s;
-		}
-
-		function isNearBottom(threshold = 40) {
-			const el = chatControl[0];
-			return (el.scrollHeight - (el.scrollTop + el.clientHeight)) < threshold;
-		}
-
-		// ---------------------------------------------------------------------
-		// Canvas Controller (minimal)
-		// ---------------------------------------------------------------------
-
-		const canvasState = {
-			id: 'main',
-			isOpen: false
-		};
-
-		function canvasSetOpen(open) {
-			canvasState.isOpen = !!open;
-			if (canvasState.isOpen) {
-				root.classList.add('canvas-open');
-				canvasElem.attr('aria-hidden', 'false');
-			} else {
-				root.classList.remove('canvas-open');
-				canvasElem.attr('aria-hidden', 'true');
-			}
-		}
-
-		function canvasOpen(payload = {}) {
-			payload = parseEventPayload(payload);
-
-			const id = (payload && payload.id) ? String(payload.id) : 'main';
-			canvasState.id = id;
-
-			const title = payload && payload.title ? String(payload.title) : 'Canvas';
-			canvasTitleElem.text(title);
-
-			canvasSetOpen(true);
-		}
-
-		function canvasClose(payload = {}) {
-			payload = parseEventPayload(payload);
-
-			const id = payload && payload.id ? String(payload.id) : null;
-			if (id && id !== canvasState.id) {
-				return;
-			}
-			canvasSetOpen(false);
-		}
-
-		function renderCanvasBlocks(blocks, mode = 'replace') {
-			if (!Array.isArray(blocks)) blocks = [];
-
-			if (mode === 'replace') {
-				canvasContentElem.empty();
-			}
-
-			for (const block of blocks) {
-				if (!block || typeof block !== 'object') continue;
-
-				const type = (block.type || '').toLowerCase();
-
-				// HTML block
-				if (type === 'html') {
-					const html = String(block.html || '');
-					const wrap = $('<div class="canvas-block canvas-block-html"></div>');
-					wrap.html(html);
-					patchLinksTargetBlank(wrap);
-					canvasContentElem.append(wrap);
-					continue;
-				}
-
-				// Markdown block
-				if (type === 'markdown') {
-					const md = String(block.markdown || '');
-					const wrap = $('<div class="canvas-block canvas-block-markdown"></div>');
-					renderMarkdownOrText(wrap, md);
-					canvasContentElem.append(wrap);
-					continue;
-				}
-
-				// Tool block (canvas-internal widgets) - placeholder for later
-				if (type === 'tool') {
-					const toolName = String(block.tool || 'tool');
-					const wrap = $(`
-						<div class="canvas-block canvas-block-tool">
-							<div class="canvas-tool-title">Canvas Tool: ${escapeHtml(toolName)}</div>
-							<pre class="canvas-tool-params"></pre>
-						</div>
-					`);
-					try {
-						wrap.find('.canvas-tool-params').text(JSON.stringify(block.params || {}, null, 2));
-					} catch {
-						wrap.find('.canvas-tool-params').text('{}');
-					}
-					canvasContentElem.append(wrap);
-					continue;
-				}
-
-				// Unknown block
-				const wrap = $('<div class="canvas-block canvas-block-unknown"></div>');
-				wrap.text('Unknown canvas block.');
-				canvasContentElem.append(wrap);
-			}
-		}
-
-		function canvasRender(payload = {}) {
-			payload = parseEventPayload(payload);
-
-			const id = payload && payload.id ? String(payload.id) : 'main';
-			canvasState.id = id;
-
-			if (payload && payload.title) {
-				canvasTitleElem.text(String(payload.title));
-			}
-
-			const mode = payload && payload.mode ? String(payload.mode) : 'replace';
-			const blocks = payload && Array.isArray(payload.blocks) ? payload.blocks : [];
-
-			canvasSetOpen(true);
-			renderCanvasBlocks(blocks, mode);
-		}
-
-		// Local close button
-		canvasCloseBtn.off('click.chatbotCanvas').on('click.chatbotCanvas', e => {
-			e.preventDefault();
-			canvasClose({ id: canvasState.id });
-		});
-
-		// ---------------------------------------------------------------------
-		// Base Prompt
-		// ---------------------------------------------------------------------
-
-		$.get(config.serviceUrl, appendReference({ baseprompt: 1 }), res => {
-			basePrompt.html(res);
-			patchLinksTargetBlank(basePrompt);
-		});
-
-		// ---------------------------------------------------------------------
-		// Icon Bar – Copy + Like + Dislike (with toggle)
-		// ---------------------------------------------------------------------
-
-		function renderIconBar(toolsElem, fullText, msgId) {
-			if (!config.useIcons || !toolsElem) return;
-
-			const icons = config.icons || {};
-
-			let likeBtn = $(
-				`<a title="helpful" href="#" class="like-btn"><img src="${icons.thumbsup}"></a>`
-			);
-			let dislikeBtn = $(
-				`<a title="not helpful" href="#" class="dislike-btn"><img src="${icons.thumbsdown}"></a>`
-			);
-			let copyBtn = $(
-				`<a title="copy" href="#" class="copy-btn"><img src="${icons.copy}"></a>`
-			);
-
-			toolsElem.append(copyBtn, likeBtn, dislikeBtn);
-
-			// Copy
-			copyBtn.on('click', function(e) {
-				e.preventDefault();
-				navigator.clipboard.writeText(fullText).then(() => {
-					const img = $(this).find('img');
-					img.attr('src', icons.check);
-					setTimeout(() => img.attr('src', icons.copy), 1000);
-				});
-			});
-
-			// Like / Dislike
-			const parentMsg = toolsElem.closest('.message.assistent');
-
-			if (!parentMsg.attr('data-feedback')) {
-				parentMsg.attr('data-feedback', 'none');
-			}
-
-			function updateVisual() {
-				const state = parentMsg.attr('data-feedback');
-
-				if (state === 'like') {
-					likeBtn.find('img').attr('src', icons.thumbsupfill);
-					dislikeBtn.hide();
-				} else if (state === 'dislike') {
-					dislikeBtn.find('img').attr('src', icons.thumbsdownfill);
-					likeBtn.hide();
-				} else {
-					likeBtn.find('img').attr('src', icons.thumbsup);
-					dislikeBtn.find('img').attr('src', icons.thumbsdown);
-					likeBtn.show();
-					dislikeBtn.show();
-				}
-			}
-
-			function sendFeedback(type) {
-				if (!msgId) return;
-
-				$.post(
-					config.serviceUrl,
-					{ feedback: type, messageid: msgId },
-					function(res) { /* optional */ },
-					'json'
-				);
-			}
-
-			likeBtn.on('click', function(e) {
-				e.preventDefault();
-				const s = parentMsg.attr('data-feedback');
-
-				if (s === 'like') {
-					parentMsg.attr('data-feedback', 'none');
-					sendFeedback('like');
-				} else {
-					parentMsg.attr('data-feedback', 'like');
-					sendFeedback('like');
-				}
-
-				updateVisual();
-			});
-
-			dislikeBtn.on('click', function(e) {
-				e.preventDefault();
-				const s = parentMsg.attr('data-feedback');
-
-				if (s === 'dislike') {
-					parentMsg.attr('data-feedback', 'none');
-					sendFeedback('dislike');
-				} else {
-					parentMsg.attr('data-feedback', 'dislike');
-					sendFeedback('dislike');
-				}
-
-				updateVisual();
-			});
-
-			updateVisual();
-		}
-
-		// ---------------------------------------------------------------------
-		// Prompt Suggestions
-		// ---------------------------------------------------------------------
-
-		function renderSuggestions(list) {
-			suggestionsContainer.removeClass('loading');
-			suggestionsContainer.empty();
-
-			if (!Array.isArray(list) || !list.length) {
-				suggestionsContainer.removeClass('has-suggestions');
-				return;
-			}
-
-			suggestionsContainer.addClass('has-suggestions');
-
-			const max = 3;
-			for (let i = 0; i < list.length && i < max; i++) {
-				let text = list[i];
-				if (typeof text !== 'string') continue;
-				text = text.trim();
-				if (!text) continue;
-
-				const btn = $('<button type="button" class="chat-suggestion"></button>');
-				btn.text(text);
-
-				btn.on('click', function(e) {
-					e.preventDefault();
-					const current = msgControl.val() || '';
-					if (!current.trim()) {
-						msgControl.val(text);
-					} else {
-						msgControl.val(current.replace(/\s*$/, ' ') + text);
-					}
-					msgControl.focus();
-					msgControl.trigger('input');
-				});
-
-				btn.on('dblclick', function(e) {
-					e.preventDefault();
-					const current = msgControl.val() || '';
-					if (!current.trim()) {
-						msgControl.val(text);
-					}
-					msgControl.focus();
-					msgControl.trigger('input');
-					sendMessage();
-				});
-
-				suggestionsContainer.append(btn);
-			}
-		}
-
-		function fetchSuggestions(lastMsgId) {
-			if (!config.serviceUrl) return;
-
-			const data = appendReference({ suggestions: 1 });
-			if (lastMsgId) {
-				data.after = lastMsgId;
-			}
-
-			suggestionsContainer.addClass('loading');
-			suggestionsContainer.empty();
-
-			$.getJSON(config.serviceUrl, data)
-				.done(res => {
-					renderSuggestions(res);
-				})
-				.fail(() => {
-					suggestionsContainer.removeClass('loading');
-					suggestionsContainer.removeClass('has-suggestions');
-					suggestionsContainer.empty();
-				});
-		}
-
-		// ---------------------------------------------------------------------
-		// Main Chat Send
-		// ---------------------------------------------------------------------
-
-		async function sendMessage() {
-			const raw = msgControl.val() || '';
-			const plain = raw.trim();
-			if (!plain) return;
-
-			// Clear current suggestions while new answer is generated
-			suggestionsContainer.removeClass('has-suggestions loading');
-			suggestionsContainer.empty();
-
-			chatControl.removeClass('chatempty');
-			basePrompt.remove();
-			root.classList.add('chatstarted');
-
-			// User message
-			const userHtml = raw.replace(/\n/g, '<br>');
-			msgControl.val('');
-			chatControl.append('<div class="message user">' + userHtml + '</div>');
-			scrollToBottom();
-
-			// Assistant message container
-			const respElem = $('<div class="message assistent"></div>').appendTo(chatControl);
-			const contentElem = $('<div class="assistant-content"></div>').appendTo(respElem);
-
-			// Initial "thinking" indicator
-			const thinkingElem = $(`
-				<div class="assistant-thinking" aria-live="polite">
-					<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-				</div>
-			`).appendTo(contentElem);
-
-			function hideThinking() {
-				thinkingElem.remove();
-			}
-
-			let toolsElem = null;
-			if (config.useIcons) {
-				toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
-			}
-
-			let fullText = '';
-			let renderTimeout = null;
-			let currentMessageId = null;
-
-			// Reset per-message tool counter
-			respElem.attr('data-toolcount', '0');
-
-			function scheduleRender() {
-				if (renderTimeout) return;
-
-				renderTimeout = setTimeout(() => {
-					renderMarkdownOrText(contentElem, fullText);
-					renderTimeout = null;
-					scrollToBottom();
-				}, 60);
-			}
-
-			// -----------------------------------------------------------------
-			// REST MODE
-			// -----------------------------------------------------------------
-
-			if (config.transportMode === 'rest') {
-				const loader = $('<div class="loading"><div class="spinner"></div></div>');
-				chatControl.append(loader);
-				scrollToBottom();
-
-				try {
-					const response = await fetch(config.serviceUrl, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-						},
-						body: new URLSearchParams(appendReference({ prompt: plain }))
-					});
-
-					if (!response.ok) {
-						throw new Error('HTTP ' + response.status);
-					}
-
-					const json = await response.json();
-
-					currentMessageId = json.id || ('msg_' + Date.now());
-					respElem.attr('data-msgid', currentMessageId);
-
-					fullText = json.text || '';
-					hideThinking();
-					renderMarkdownOrText(contentElem, fullText);
-				} catch (err) {
-					console.error('REST request failed:', err);
-					hideThinking();
-					contentElem.append('<div class="error">Fehler bei der Serveranfrage.</div>');
-				} finally {
-					loader.remove();
-					scrollToBottom();
-
-					renderIconBar(toolsElem, fullText, currentMessageId);
-
-					if (config.useVoice && root._voiceCtrl) {
-						const txt = cleanForVoice(contentElem.text());
-						root._voiceCtrl.handleAssistantReply(txt);
-					}
-
-					// After assistant answered: fetch prompt suggestions
-					fetchSuggestions(currentMessageId);
-				}
-
-				return;
-			}
-
-			// -----------------------------------------------------------------
-			// STREAMING MODE
-			// -----------------------------------------------------------------
-
-			const streamUrl = config.serviceUrl;
-
-			const client = new EventTransportClient({
-				endpoint: streamUrl,
-				transport: config.transportMode || 'auto',
-				events: [
-					'msgid', 'token', 'done', 'error',
-					'tool.started', 'tool.finished',
-					'canvas.open', 'canvas.close', 'canvas.render'
-				],
-				payload: appendReference({ prompt: plain })
-			});
-
-			let finished = false;
-
-			await client.connect((event, data) => {
-
-				// -----------------------------
-				// CANVAS EVENTS
-				// -----------------------------
-				if (event === 'canvas.open') {
-					canvasOpen(data);
-					return;
-				}
-
-				if (event === 'canvas.close') {
-					canvasClose(data);
-					return;
-				}
-
-				if (event === 'canvas.render') {
-					canvasRender(data);
-					return;
-				}
-
-				// -----------------------------
-				// MSGID
-				// -----------------------------
-				if (event === 'msgid') {
-					data = parseEventPayload(data);
-
-					if (data && typeof data === 'object') {
-						currentMessageId = data.id || data.msgid || ('msg_' + Date.now());
-					} else {
-						currentMessageId = 'msg_' + Date.now();
-					}
-
-					respElem.attr('data-msgid', currentMessageId);
-					return;
-				}
-
-				// -----------------------------
-				// TOOL STARTED (Phase 1)
-				// -----------------------------
-				if (event === 'tool.started') {
-					hideThinking();
-
-					data = parseEventPayload(data);
-					const payload = (data && typeof data === 'object') ? data : {};
-
-					const toolName = payload.label || payload.tool || 'tool';
-					const args = payload.args || {};
-
-					const prevCount = parseInt(respElem.attr('data-toolcount') || '0', 10);
-					const callIndex = prevCount + 1;
-					respElem.attr('data-toolcount', String(callIndex));
-
-					const prettyArgs = JSON.stringify(args, null, 2)
-						.replace(/\\n/g, '\n')
-						.replace(/ {4}/g, '  ');
-
-					const preview = toolArgsPreview(toolName, args);
-
-					const elem = $(`
-						<div class="message tool-event" data-tool="${escapeHtml(toolName)}" data-callindex="${callIndex}">
-							<span class="tool-badge">
-								<span class="tool-ic" aria-hidden="true">🔧</span>
-								<span class="tool-name">${escapeHtml(toolName)}</span>
-								${preview ? `<span class="tool-preview">“${escapeHtml(preview)}”</span>` : ``}
-								<span class="tool-activity" aria-hidden="true"></span>
-								<span class="tool-meta" aria-hidden="true">#${callIndex}</span>
-							</span>
-							<details class="tool-params">
-								<summary>params</summary>
-								<pre></pre>
-							</details>
-						</div>
-					`);
-
-					elem.find('pre').text(prettyArgs);
-
-					elem.find('details.tool-params').on('toggle', () => {
-						if (!isNearBottom()) return;
-						requestAnimationFrame(() => scrollToBottom());
-					});
-
-					chatControl.append(elem);
-					scrollToBottom();
-					return;
-				}
-
-				// -----------------------------
-				// TOOL FINISHED (currently disabled)
-				// -----------------------------
-				if (false && event === 'tool.finished') {
-					data = parseEventPayload(data);
-					const payload = (data && typeof data === 'object') ? data : {};
-					const toolName = payload.tool || 'tool';
-					chatControl.find('.tool-event[data-tool="' + toolName + '"]').remove();
-					return;
-				}
-
-				// -----------------------------
-				// TOKEN (Phase 2)
-				// -----------------------------
-				if (event === 'token') {
-					hideThinking();
-
-					// Remove all tool events when token stream starts
-					chatControl.find('.tool-event').remove();
-
-					let tokenText = '';
-
-					if (typeof data === 'string') {
-						tokenText = data;
-					} else if (data && typeof data === 'object') {
-						tokenText = String(data.text ?? data.token ?? data.content ?? '');
-					}
-
-					if (tokenText !== '') {
-						fullText += tokenText;
-						scheduleRender();
-					}
-
-					return;
-				}
-
-				// -----------------------------
-				// DONE
-				// -----------------------------
-				if (event === 'done') {
-					if (finished) return;
-					finished = true;
-
-					hideThinking();
-
-					if (!currentMessageId) {
-						currentMessageId = 'msg_' + Date.now();
-						respElem.attr('data-msgid', currentMessageId);
-					}
-
-					renderMarkdownOrText(contentElem, fullText);
-
-					renderIconBar(toolsElem, fullText, currentMessageId);
-					scrollToResponse();
-
-					if (config.useVoice && root._voiceCtrl) {
-						const txt = cleanForVoice(contentElem.text());
-						root._voiceCtrl.handleAssistantReply(txt);
-					}
-
-					client.close();
-
-					// After assistant answered: fetch prompt suggestions
-					fetchSuggestions(currentMessageId);
-					return;
-				}
-
-				// -----------------------------
-				// ERROR
-				// -----------------------------
-				if (event === 'error') {
-					hideThinking();
-					console.error('Streaming error event:', data);
-					client.close();
-				}
-			});
-		}
-
-		// ---------------------------------------------------------------------
-		// Input Events
-		// ---------------------------------------------------------------------
-
-		btnSend.off('click.chatbot').on('click.chatbot', e => {
-			e.preventDefault();
-			sendMessage();
-		});
-
-		msgControl.off('keydown.chatbot').on('keydown.chatbot', e => {
-			if (e.key === 'Enter' && !e.shiftKey) {
-				e.preventDefault();
-				sendMessage();
-			}
-		});
-
-		// Auto-resize
-		msgControl.off('input.chatbot').on('input.chatbot', function() {
-			this.style.height = 'auto';
-			const newHeight = Math.min(this.scrollHeight, 150);
-			this.style.height = Math.max(newHeight, 50) + 'px';
-		}).trigger('input');
-
-		// ---------------------------------------------------------------------
-		// Threads Control
-		// ---------------------------------------------------------------------
-
-		if (config.useThreads && typeof ChatThreadsControl !== 'undefined' && threadsHost.length) {
-			const threadsCtrl = new ChatThreadsControl({
-				events: {
-					onListRequested: () => {},
-					onNewThreadRequested: () => {}
-				}
-			});
-
-			threadsCtrl.attachTo(threadsHost[0]);
-			root._threadsCtrl = threadsCtrl;
-		}
-
-		// ---------------------------------------------------------------------
-		// Voice Control
-		// ---------------------------------------------------------------------
-
-		if (config.useVoice) {
-			const voiceCtrl = new ChatVoiceControl({
-				stt: 'browser',
-				tts: 'browser',
-				lang: config.defaultLang || 'auto',
-				availableLangs: [
-					{ code: 'auto', label: 'Auto' },
-					{ code: 'de-DE', label: 'Deutsch' },
-					{ code: 'en-US', label: 'English' },
-					{ code: 'fr-FR', label: 'Français' },
-					{ code: 'es-ES', label: 'Español' },
-					{ code: 'it-IT', label: 'Italiano' },
-					{ code: 'pt-PT', label: 'Português' },
-					{ code: 'bg-BG', label: 'Български' },
-					{ code: 'ro-RO', label: 'Română' },
-					{ code: 'uk-UA', label: 'Українська' },
-					{ code: 'ru-RU', label: 'Русский' }
-				],
-				events: {
-					onUserFinishedSpeaking: text => {
-						const cur = msgControl.val();
-						msgControl.val(cur ? cur + ' ' + text : text);
-					},
-					onSendRequested: () => sendMessage()
-				}
-			});
-
-			voiceCtrl.attachTo($root.find('[name=chatvoice]')[0]);
-			root._voiceCtrl = voiceCtrl;
-		}
-	}
-
-	window.initChatbot = initChatbot;
+        function initChatbot(rootSel = '#chatbot', config = {}) {
+                const root = document.querySelector(rootSel);
+                if (!root || root.dataset.inited === '1') return;
+                root.dataset.inited = '1';
+
+                const $root = $(root);
+                const chatControl = $root.find('.chat');
+                const msgControl = $root.find('textarea[name=prompt]');
+                const btnSend = $root.find('#chatSend');
+                const basePrompt = $root.find('.baseprompt');
+                const threadsHost = $root.find('[name=chatthreads]');
+
+                // Canvas elements
+                const canvasElem = $root.find('.chatbot-canvas');
+                const canvasTitleElem = $root.find('.chatbot-canvas .canvas-title');
+                const canvasContentElem = $root.find('.chatbot-canvas .canvas-content');
+                const canvasCloseBtn = $root.find('.chatbot-canvas .canvas-close');
+
+                // Suggestions container (bottom-right, styling via CSS)
+                const suggestionsContainer = $('<div class="chat-suggestions" aria-live="polite"></div>');
+                $root.find('.chatbot-main').append(suggestionsContainer);
+
+                // ---------------------------------------------------------------------
+                // Utility
+                // ---------------------------------------------------------------------
+
+                function scrollToBottom() {
+                        chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
+                }
+
+                function scrollToResponse() {
+                        const last = chatControl.children().last();
+                        const offset = last.offset().top - chatControl.offset().top + chatControl.scrollTop();
+                        chatControl.stop().animate({ scrollTop: offset - 10 }, 300);
+                }
+
+                function cleanForVoice(str) {
+                        let txt = str.replace(/<[^>]*>/g, ' ');
+                        txt = txt
+                                .replace(/(\*\*|__)(.*?)\1/g, '$2')
+                                .replace(/(\*|_)(.*?)\1/g, '$2')
+                                .replace(/`([^`]*)`/g, '$1')
+                                .replace(/```[\s\S]*?```/g, '')
+                                .replace(/#+\s?(.*)/g, '$1')
+                                .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+                                .replace(/!\[(.*?)\]\(.*?\)/g, '$1')
+                                .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+                                .replace(/\s+/g, ' ')
+                                .trim();
+                        return txt;
+                }
+
+                function escapeHtml(str) {
+                        return $('<div>').text(str || '').html();
+                }
+
+                function parseEventPayload(data) {
+                        if (typeof data !== 'string') {
+                                return data;
+                        }
+
+                        try {
+                                return JSON.parse(data);
+                        } catch {
+                                return data;
+                        }
+                }
+
+                function getGlobalValue(path) {
+                        if (!path || typeof path !== 'string') return null;
+
+                        const parts = path.split('.');
+                        let value = window;
+
+                        for (const part of parts) {
+                                if (!part || value == null || (typeof value !== 'object' && typeof value !== 'function')) {
+                                        return null;
+                                }
+
+                                value = value[part];
+                        }
+
+                        return value;
+                }
+
+                function normalizeReference(reference) {
+                        if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+                                return null;
+                        }
+
+                        return {
+                                ...reference,
+                                sentAt: new Date().toISOString()
+                        };
+                }
+
+                function getDefaultReference() {
+                        return normalizeReference({
+                                type: 'page',
+                                url: window.location.href,
+                                title: document.title || '',
+                                referrer: document.referrer || ''
+                        });
+                }
+
+                function getReferencePayload() {
+                        const mode = String(config.referenceMode || 'url').toLowerCase();
+
+                        if (mode === 'none') {
+                                return null;
+                        }
+
+                        if (mode === 'custom') {
+                                return normalizeReference(config.reference || null);
+                        }
+
+                        if (mode === 'provider') {
+                                const providerName = String(config.referenceProvider || '').trim();
+                                const provider = getGlobalValue(providerName);
+
+                                if (typeof provider !== 'function') {
+                                        return null;
+                                }
+
+                                return normalizeReference(provider({
+                                        root,
+                                        config
+                                }));
+                        }
+
+                        return getDefaultReference();
+                }
+
+                function encodeBase64Url(str) {
+                        const bytes = new TextEncoder().encode(str);
+                        let binary = '';
+
+                        for (const byte of bytes) {
+                                binary += String.fromCharCode(byte);
+                        }
+
+                        return btoa(binary)
+                                .replace(/\+/g, '-')
+                                .replace(/\//g, '_')
+                                .replace(/=+$/g, '');
+                }
+
+                function appendReference(data) {
+                        const reference = getReferencePayload();
+
+                        if (reference) {
+                                data.reference = encodeBase64Url(JSON.stringify(reference));
+                                data.reference_format = 'base64json';
+                        }
+
+                        return data;
+                }
+
+                function patchLinksTargetBlank(scope) {
+                        const $scope = scope && scope.jquery ? scope : $(scope);
+                        if (!$scope || !$scope.length) return;
+
+                        $scope.find('a[href]').each(function() {
+                                const $a = $(this);
+                                const href = String($a.attr('href') || '').trim();
+
+                                if (!href || href.startsWith('#') || href.toLowerCase().startsWith('javascript:')) {
+                                        return;
+                                }
+
+                                $a.attr('target', '_blank');
+
+                                const relRaw = String($a.attr('rel') || '');
+                                const rel = relRaw.split(/\s+/).filter(Boolean);
+
+                                if (!rel.includes('noopener')) rel.push('noopener');
+                                if (!rel.includes('noreferrer')) rel.push('noreferrer');
+
+                                $a.attr('rel', rel.join(' '));
+                        });
+                }
+
+                function renderMarkdownOrText(targetElem, text) {
+                        if (config.useMarkdown && window.marked) {
+                                targetElem.html(marked.parse(text));
+                                patchLinksTargetBlank(targetElem);
+                                return;
+                        }
+
+                        targetElem.text(text);
+                }
+
+                function toolArgsPreview(toolName, args, maxLen = 110) {
+                        let s = '';
+
+                        if (args) {
+                                const pick =
+                                        args.query || args.q || args.text || args.prompt ||
+                                        args.question || args.input || args.search || args.term;
+
+                                if (typeof pick === 'string' && pick.trim()) {
+                                        s = pick.trim();
+                                } else if (Array.isArray(args.messages)) {
+                                        const lastUser = [...args.messages].reverse().find(m => m && m.role === 'user' && typeof m.content === 'string');
+                                        if (lastUser) s = lastUser.content.trim();
+                                } else if (Array.isArray(args.documents) && args.documents.length) {
+                                        s = `${args.documents.length} document(s)`;
+                                }
+                        }
+
+                        if (!s) {
+                                try {
+                                        const flat = Object.entries(args || {})
+                                                .map(([k, v]) => {
+                                                        if (v == null) return '';
+                                                        if (typeof v === 'string') return v.trim() ? `${k}: ${v.trim()}` : '';
+                                                        if (typeof v === 'number' || typeof v === 'boolean') return `${k}: ${v}`;
+                                                        if (Array.isArray(v)) return `${k}: [${v.length}]`;
+                                                        return `${k}: …`;
+                                                })
+                                                .filter(Boolean)
+                                                .join(' · ');
+                                        s = flat || '';
+                                } catch {
+                                        s = '';
+                                }
+                        }
+
+                        s = s.replace(/\s+/g, ' ').trim();
+                        if (!s) return '';
+
+                        if (s.length > maxLen) s = s.slice(0, maxLen - 1) + '…';
+                        return s;
+                }
+
+                function isNearBottom(threshold = 40) {
+                        const el = chatControl[0];
+                        return (el.scrollHeight - (el.scrollTop + el.clientHeight)) < threshold;
+                }
+
+                // ---------------------------------------------------------------------
+                // Canvas Controller (minimal)
+                // ---------------------------------------------------------------------
+
+                const canvasState = {
+                        id: 'main',
+                        isOpen: false
+                };
+
+                function canvasSetOpen(open) {
+                        canvasState.isOpen = !!open;
+                        if (canvasState.isOpen) {
+                                root.classList.add('canvas-open');
+                                canvasElem.attr('aria-hidden', 'false');
+                        } else {
+                                root.classList.remove('canvas-open');
+                                canvasElem.attr('aria-hidden', 'true');
+                        }
+                }
+
+                function canvasOpen(payload = {}) {
+                        payload = parseEventPayload(payload);
+
+                        const id = (payload && payload.id) ? String(payload.id) : 'main';
+                        canvasState.id = id;
+
+                        const title = payload && payload.title ? String(payload.title) : 'Canvas';
+                        canvasTitleElem.text(title);
+
+                        canvasSetOpen(true);
+                }
+
+                function canvasClose(payload = {}) {
+                        payload = parseEventPayload(payload);
+
+                        const id = payload && payload.id ? String(payload.id) : null;
+                        if (id && id !== canvasState.id) {
+                                return;
+                        }
+                        canvasSetOpen(false);
+                }
+
+                function renderCanvasBlocks(blocks, mode = 'replace') {
+                        if (!Array.isArray(blocks)) blocks = [];
+
+                        if (mode === 'replace') {
+                                canvasContentElem.empty();
+                        }
+
+                        for (const block of blocks) {
+                                if (!block || typeof block !== 'object') continue;
+
+                                const type = (block.type || '').toLowerCase();
+
+                                // HTML block
+                                if (type === 'html') {
+                                        const html = String(block.html || '');
+                                        const wrap = $('<div class="canvas-block canvas-block-html"></div>');
+                                        wrap.html(html);
+                                        patchLinksTargetBlank(wrap);
+                                        canvasContentElem.append(wrap);
+                                        continue;
+                                }
+
+                                // Markdown block
+                                if (type === 'markdown') {
+                                        const md = String(block.markdown || '');
+                                        const wrap = $('<div class="canvas-block canvas-block-markdown"></div>');
+                                        renderMarkdownOrText(wrap, md);
+                                        canvasContentElem.append(wrap);
+                                        continue;
+                                }
+
+                                // Tool block (canvas-internal widgets) - placeholder for later
+                                if (type === 'tool') {
+                                        const toolName = String(block.tool || 'tool');
+                                        const wrap = $(`
+                                                <div class="canvas-block canvas-block-tool">
+                                                        <div class="canvas-tool-title">Canvas Tool: ${escapeHtml(toolName)}</div>
+                                                        <pre class="canvas-tool-params"></pre>
+                                                </div>
+                                        `);
+                                        try {
+                                                wrap.find('.canvas-tool-params').text(JSON.stringify(block.params || {}, null, 2));
+                                        } catch {
+                                                wrap.find('.canvas-tool-params').text('{}');
+                                        }
+                                        canvasContentElem.append(wrap);
+                                        continue;
+                                }
+
+                                // Unknown block
+                                const wrap = $('<div class="canvas-block canvas-block-unknown"></div>');
+                                wrap.text('Unknown canvas block.');
+                                canvasContentElem.append(wrap);
+                        }
+                }
+
+                function canvasRender(payload = {}) {
+                        payload = parseEventPayload(payload);
+
+                        const id = payload && payload.id ? String(payload.id) : 'main';
+                        canvasState.id = id;
+
+                        if (payload && payload.title) {
+                                canvasTitleElem.text(String(payload.title));
+                        }
+
+                        const mode = payload && payload.mode ? String(payload.mode) : 'replace';
+                        const blocks = payload && Array.isArray(payload.blocks) ? payload.blocks : [];
+
+                        canvasSetOpen(true);
+                        renderCanvasBlocks(blocks, mode);
+                }
+
+                // Local close button
+                canvasCloseBtn.off('click.chatbotCanvas').on('click.chatbotCanvas', e => {
+                        e.preventDefault();
+                        canvasClose({ id: canvasState.id });
+                });
+
+                // ---------------------------------------------------------------------
+                // Base Prompt
+                // ---------------------------------------------------------------------
+
+                $.get(config.serviceUrl, appendReference({ baseprompt: 1 }), res => {
+                        basePrompt.html(res);
+                        patchLinksTargetBlank(basePrompt);
+                });
+
+                // ---------------------------------------------------------------------
+                // Icon Bar – Copy + Like + Dislike (with toggle)
+                // ---------------------------------------------------------------------
+
+                function renderIconBar(toolsElem, fullText, msgId) {
+                        if (!config.useIcons || !toolsElem) return;
+
+                        const icons = config.icons || {};
+
+                        let likeBtn = $(
+                                `<a title="helpful" href="#" class="like-btn"><img src="${icons.thumbsup}"></a>`
+                        );
+                        let dislikeBtn = $(
+                                `<a title="not helpful" href="#" class="dislike-btn"><img src="${icons.thumbsdown}"></a>`
+                        );
+                        let copyBtn = $(
+                                `<a title="copy" href="#" class="copy-btn"><img src="${icons.copy}"></a>`
+                        );
+
+                        toolsElem.append(copyBtn, likeBtn, dislikeBtn);
+
+                        // Copy
+                        copyBtn.on('click', function(e) {
+                                e.preventDefault();
+                                navigator.clipboard.writeText(fullText).then(() => {
+                                        const img = $(this).find('img');
+                                        img.attr('src', icons.check);
+                                        setTimeout(() => img.attr('src', icons.copy), 1000);
+                                });
+                        });
+
+                        // Like / Dislike
+                        const parentMsg = toolsElem.closest('.message.assistent');
+
+                        if (!parentMsg.attr('data-feedback')) {
+                                parentMsg.attr('data-feedback', 'none');
+                        }
+
+                        function updateVisual() {
+                                const state = parentMsg.attr('data-feedback');
+
+                                if (state === 'like') {
+                                        likeBtn.find('img').attr('src', icons.thumbsupfill);
+                                        dislikeBtn.hide();
+                                } else if (state === 'dislike') {
+                                        dislikeBtn.find('img').attr('src', icons.thumbsdownfill);
+                                        likeBtn.hide();
+                                } else {
+                                        likeBtn.find('img').attr('src', icons.thumbsup);
+                                        dislikeBtn.find('img').attr('src', icons.thumbsdown);
+                                        likeBtn.show();
+                                        dislikeBtn.show();
+                                }
+                        }
+
+                        function sendFeedback(type) {
+                                if (!msgId) return;
+
+                                $.post(
+                                        config.serviceUrl,
+                                        { feedback: type, messageid: msgId },
+                                        function(res) { /* optional */ },
+                                        'json'
+                                );
+                        }
+
+                        likeBtn.on('click', function(e) {
+                                e.preventDefault();
+                                const s = parentMsg.attr('data-feedback');
+
+                                if (s === 'like') {
+                                        parentMsg.attr('data-feedback', 'none');
+                                        sendFeedback('like');
+                                } else {
+                                        parentMsg.attr('data-feedback', 'like');
+                                        sendFeedback('like');
+                                }
+
+                                updateVisual();
+                        });
+
+                        dislikeBtn.on('click', function(e) {
+                                e.preventDefault();
+                                const s = parentMsg.attr('data-feedback');
+
+                                if (s === 'dislike') {
+                                        parentMsg.attr('data-feedback', 'none');
+                                        sendFeedback('dislike');
+                                } else {
+                                        parentMsg.attr('data-feedback', 'dislike');
+                                        sendFeedback('dislike');
+                                }
+
+                                updateVisual();
+                        });
+
+                        updateVisual();
+                }
+
+                // ---------------------------------------------------------------------
+                // Prompt Suggestions
+                // ---------------------------------------------------------------------
+
+                function renderSuggestions(list) {
+                        suggestionsContainer.removeClass('loading');
+                        suggestionsContainer.empty();
+
+                        if (!Array.isArray(list) || !list.length) {
+                                suggestionsContainer.removeClass('has-suggestions');
+                                return;
+                        }
+
+                        suggestionsContainer.addClass('has-suggestions');
+
+                        const max = 3;
+                        for (let i = 0; i < list.length && i < max; i++) {
+                                let text = list[i];
+                                if (typeof text !== 'string') continue;
+                                text = text.trim();
+                                if (!text) continue;
+
+                                const btn = $('<button type="button" class="chat-suggestion"></button>');
+                                btn.text(text);
+
+                                btn.on('click', function(e) {
+                                        e.preventDefault();
+                                        const current = msgControl.val() || '';
+                                        if (!current.trim()) {
+                                                msgControl.val(text);
+                                        } else {
+                                                msgControl.val(current.replace(/\s*$/, ' ') + text);
+                                        }
+                                        msgControl.focus();
+                                        msgControl.trigger('input');
+                                });
+
+                                btn.on('dblclick', function(e) {
+                                        e.preventDefault();
+                                        const current = msgControl.val() || '';
+                                        if (!current.trim()) {
+                                                msgControl.val(text);
+                                        }
+                                        msgControl.focus();
+                                        msgControl.trigger('input');
+                                        sendMessage();
+                                });
+
+                                suggestionsContainer.append(btn);
+                        }
+                }
+
+                function fetchSuggestions(lastMsgId) {
+                        if (!config.serviceUrl) return;
+
+                        const data = appendReference({ suggestions: 1 });
+                        if (lastMsgId) {
+                                data.after = lastMsgId;
+                        }
+
+                        suggestionsContainer.addClass('loading');
+                        suggestionsContainer.empty();
+
+                        $.getJSON(config.serviceUrl, data)
+                                .done(res => {
+                                        renderSuggestions(res);
+                                })
+                                .fail(() => {
+                                        suggestionsContainer.removeClass('loading');
+                                        suggestionsContainer.removeClass('has-suggestions');
+                                        suggestionsContainer.empty();
+                                });
+                }
+
+                // ---------------------------------------------------------------------
+                // Main Chat Send
+                // ---------------------------------------------------------------------
+
+                async function sendMessage() {
+                        const raw = msgControl.val() || '';
+                        const plain = raw.trim();
+                        if (!plain) return;
+
+                        // Clear current suggestions while new answer is generated
+                        suggestionsContainer.removeClass('has-suggestions loading');
+                        suggestionsContainer.empty();
+
+                        chatControl.removeClass('chatempty');
+                        basePrompt.remove();
+                        root.classList.add('chatstarted');
+
+                        // User message
+                        const userHtml = raw.replace(/\n/g, '<br>');
+                        msgControl.val('');
+                        chatControl.append('<div class="message user">' + userHtml + '</div>');
+                        scrollToBottom();
+
+                        // Assistant message container
+                        const respElem = $('<div class="message assistent"></div>').appendTo(chatControl);
+                        const contentElem = $('<div class="assistant-content"></div>').appendTo(respElem);
+
+                        // Initial "thinking" indicator
+                        const thinkingElem = $(`
+                                <div class="assistant-thinking" aria-live="polite">
+                                        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                                </div>
+                        `).appendTo(contentElem);
+
+                        function hideThinking() {
+                                thinkingElem.remove();
+                        }
+
+                        let toolsElem = null;
+                        if (config.useIcons) {
+                                toolsElem = $('<div class="chat-tools"></div>').appendTo(respElem);
+                        }
+
+                        let fullText = '';
+                        let renderTimeout = null;
+                        let currentMessageId = null;
+
+                        // Reset per-message tool counter
+                        respElem.attr('data-toolcount', '0');
+
+                        function scheduleRender() {
+                                if (renderTimeout) return;
+
+                                renderTimeout = setTimeout(() => {
+                                        renderMarkdownOrText(contentElem, fullText);
+                                        renderTimeout = null;
+                                        scrollToBottom();
+                                }, 60);
+                        }
+
+                        // -----------------------------------------------------------------
+                        // REST MODE
+                        // -----------------------------------------------------------------
+
+                        if (config.transportMode === 'rest') {
+                                const loader = $('<div class="loading"><div class="spinner"></div></div>');
+                                chatControl.append(loader);
+                                scrollToBottom();
+
+                                try {
+                                        const response = await fetch(config.serviceUrl, {
+                                                method: 'POST',
+                                                headers: {
+                                                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                                                },
+                                                body: new URLSearchParams(appendReference({
+                                                        prompt: plain,
+                                                        transport_mode: 'rest'
+                                                }))
+                                        });
+
+                                        if (!response.ok) {
+                                                throw new Error('HTTP ' + response.status);
+                                        }
+
+                                        const json = await response.json();
+
+                                        currentMessageId = json.id || ('msg_' + Date.now());
+                                        respElem.attr('data-msgid', currentMessageId);
+
+                                        fullText = json.text || '';
+                                        hideThinking();
+                                        renderMarkdownOrText(contentElem, fullText);
+                                } catch (err) {
+                                        console.error('REST request failed:', err);
+                                        hideThinking();
+                                        contentElem.append('<div class="error">Fehler bei der Serveranfrage.</div>');
+                                } finally {
+                                        loader.remove();
+                                        scrollToBottom();
+
+                                        renderIconBar(toolsElem, fullText, currentMessageId);
+
+                                        if (config.useVoice && root._voiceCtrl) {
+                                                const txt = cleanForVoice(contentElem.text());
+                                                root._voiceCtrl.handleAssistantReply(txt);
+                                        }
+
+                                        // After assistant answered: fetch prompt suggestions
+                                        fetchSuggestions(currentMessageId);
+                                }
+
+                                return;
+                        }
+
+                        // -----------------------------------------------------------------
+                        // STREAMING MODE
+                        // -----------------------------------------------------------------
+
+                        const streamUrl = config.serviceUrl;
+
+                        const client = new EventTransportClient({
+                                endpoint: streamUrl,
+                                transport: config.transportMode || 'auto',
+                                events: [
+                                        'msgid', 'token', 'done', 'error',
+                                        'tool.started', 'tool.finished',
+                                        'canvas.open', 'canvas.close', 'canvas.render'
+                                ],
+                                payload: appendReference({
+                                        prompt: plain,
+                                        transport_mode: config.transportMode || 'auto'
+                                })
+                        });
+
+                        let finished = false;
+
+                        await client.connect((event, data) => {
+
+                                // -----------------------------
+                                // CANVAS EVENTS
+                                // -----------------------------
+                                if (event === 'canvas.open') {
+                                        canvasOpen(data);
+                                        return;
+                                }
+
+                                if (event === 'canvas.close') {
+                                        canvasClose(data);
+                                        return;
+                                }
+
+                                if (event === 'canvas.render') {
+                                        canvasRender(data);
+                                        return;
+                                }
+
+                                // -----------------------------
+                                // MSGID
+                                // -----------------------------
+                                if (event === 'msgid') {
+                                        data = parseEventPayload(data);
+
+                                        if (data && typeof data === 'object') {
+                                                currentMessageId = data.id || data.msgid || ('msg_' + Date.now());
+                                        } else {
+                                                currentMessageId = 'msg_' + Date.now();
+                                        }
+
+                                        respElem.attr('data-msgid', currentMessageId);
+                                        return;
+                                }
+
+                                // -----------------------------
+                                // TOOL STARTED (Phase 1)
+                                // -----------------------------
+                                if (event === 'tool.started') {
+                                        hideThinking();
+
+                                        data = parseEventPayload(data);
+                                        const payload = (data && typeof data === 'object') ? data : {};
+
+                                        const toolName = payload.label || payload.tool || 'tool';
+                                        const args = payload.args || {};
+
+                                        const prevCount = parseInt(respElem.attr('data-toolcount') || '0', 10);
+                                        const callIndex = prevCount + 1;
+                                        respElem.attr('data-toolcount', String(callIndex));
+
+                                        const prettyArgs = JSON.stringify(args, null, 2)
+                                                .replace(/\\n/g, '\n')
+                                                .replace(/ {4}/g, '  ');
+
+                                        const preview = toolArgsPreview(toolName, args);
+
+                                        const elem = $(`
+                                                <div class="message tool-event" data-tool="${escapeHtml(toolName)}" data-callindex="${callIndex}">
+                                                        <span class="tool-badge">
+                                                                <span class="tool-ic" aria-hidden="true">🔧</span>
+                                                                <span class="tool-name">${escapeHtml(toolName)}</span>
+                                                                ${preview ? `<span class="tool-preview">“${escapeHtml(preview)}”</span>` : ``}
+                                                                <span class="tool-activity" aria-hidden="true"></span>
+                                                                <span class="tool-meta" aria-hidden="true">#${callIndex}</span>
+                                                        </span>
+                                                        <details class="tool-params">
+                                                                <summary>params</summary>
+                                                                <pre></pre>
+                                                        </details>
+                                                </div>
+                                        `);
+
+                                        elem.find('pre').text(prettyArgs);
+
+                                        elem.find('details.tool-params').on('toggle', () => {
+                                                if (!isNearBottom()) return;
+                                                requestAnimationFrame(() => scrollToBottom());
+                                        });
+
+                                        chatControl.append(elem);
+                                        scrollToBottom();
+                                        return;
+                                }
+
+                                // -----------------------------
+                                // TOOL FINISHED (currently disabled)
+                                // -----------------------------
+                                if (false && event === 'tool.finished') {
+                                        data = parseEventPayload(data);
+                                        const payload = (data && typeof data === 'object') ? data : {};
+                                        const toolName = payload.tool || 'tool';
+                                        chatControl.find('.tool-event[data-tool="' + toolName + '"]').remove();
+                                        return;
+                                }
+
+                                // -----------------------------
+                                // TOKEN (Phase 2)
+                                // -----------------------------
+                                if (event === 'token') {
+                                        hideThinking();
+
+                                        // Remove all tool events when token stream starts
+                                        chatControl.find('.tool-event').remove();
+
+                                        let tokenText = '';
+
+                                        if (typeof data === 'string') {
+                                                tokenText = data;
+                                        } else if (data && typeof data === 'object') {
+                                                tokenText = String(data.text ?? data.token ?? data.content ?? '');
+                                        }
+
+                                        if (tokenText !== '') {
+                                                fullText += tokenText;
+                                                scheduleRender();
+                                        }
+
+                                        return;
+                                }
+
+                                // -----------------------------
+                                // DONE
+                                // -----------------------------
+                                if (event === 'done') {
+                                        if (finished) return;
+                                        finished = true;
+
+                                        hideThinking();
+
+                                        if (!currentMessageId) {
+                                                currentMessageId = 'msg_' + Date.now();
+                                                respElem.attr('data-msgid', currentMessageId);
+                                        }
+
+                                        renderMarkdownOrText(contentElem, fullText);
+
+                                        renderIconBar(toolsElem, fullText, currentMessageId);
+                                        scrollToResponse();
+
+                                        if (config.useVoice && root._voiceCtrl) {
+                                                const txt = cleanForVoice(contentElem.text());
+                                                root._voiceCtrl.handleAssistantReply(txt);
+                                        }
+
+                                        client.close();
+
+                                        // After assistant answered: fetch prompt suggestions
+                                        fetchSuggestions(currentMessageId);
+                                        return;
+                                }
+
+                                // -----------------------------
+                                // ERROR
+                                // -----------------------------
+                                if (event === 'error') {
+                                        hideThinking();
+                                        console.error('Streaming error event:', data);
+                                        client.close();
+                                }
+                        });
+                }
+
+                // ---------------------------------------------------------------------
+                // Input Events
+                // ---------------------------------------------------------------------
+
+                btnSend.off('click.chatbot').on('click.chatbot', e => {
+                        e.preventDefault();
+                        sendMessage();
+                });
+
+                msgControl.off('keydown.chatbot').on('keydown.chatbot', e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                sendMessage();
+                        }
+                });
+
+                // Auto-resize
+                msgControl.off('input.chatbot').on('input.chatbot', function() {
+                        this.style.height = 'auto';
+                        const newHeight = Math.min(this.scrollHeight, 150);
+                        this.style.height = Math.max(newHeight, 50) + 'px';
+                }).trigger('input');
+
+                // ---------------------------------------------------------------------
+                // Threads Control
+                // ---------------------------------------------------------------------
+
+                if (config.useThreads && typeof ChatThreadsControl !== 'undefined' && threadsHost.length) {
+                        const threadsCtrl = new ChatThreadsControl({
+                                events: {
+                                        onListRequested: () => {},
+                                        onNewThreadRequested: () => {}
+                                }
+                        });
+
+                        threadsCtrl.attachTo(threadsHost[0]);
+                        root._threadsCtrl = threadsCtrl;
+                }
+
+                // ---------------------------------------------------------------------
+                // Voice Control
+                // ---------------------------------------------------------------------
+
+                if (config.useVoice) {
+                        const voiceCtrl = new ChatVoiceControl({
+                                stt: 'browser',
+                                tts: 'browser',
+                                lang: config.defaultLang || 'auto',
+                                availableLangs: [
+                                        { code: 'auto', label: 'Auto' },
+                                        { code: 'de-DE', label: 'Deutsch' },
+                                        { code: 'en-US', label: 'English' },
+                                        { code: 'fr-FR', label: 'Français' },
+                                        { code: 'es-ES', label: 'Español' },
+                                        { code: 'it-IT', label: 'Italiano' },
+                                        { code: 'pt-PT', label: 'Português' },
+                                        { code: 'bg-BG', label: 'Български' },
+                                        { code: 'ro-RO', label: 'Română' },
+                                        { code: 'uk-UA', label: 'Українська' },
+                                        { code: 'ru-RU', label: 'Русский' }
+                                ],
+                                events: {
+                                        onUserFinishedSpeaking: text => {
+                                                const cur = msgControl.val();
+                                                msgControl.val(cur ? cur + ' ' + text : text);
+                                        },
+                                        onSendRequested: () => sendMessage()
+                                }
+                        });
+
+                        voiceCtrl.attachTo($root.find('[name=chatvoice]')[0]);
+                        root._voiceCtrl = voiceCtrl;
+                }
+        }
+
+        window.initChatbot = initChatbot;
 
 })();

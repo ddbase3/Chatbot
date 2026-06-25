@@ -22,6 +22,7 @@ use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
 use MissionBay\Api\IAgentContext;
 use MissionBay\Api\IAgentContextFactory;
+use MissionBay\Api\IAgentFlow;
 use MissionBay\Api\IAgentFlowFactory;
 use Throwable;
 
@@ -50,12 +51,18 @@ abstract class AbstractChatbotService implements IChatbotService {
 			return $this->getBasePrompt();
 		}
 
-		if ($this->getPromptInput() !== null) {
-			return $this->runStreamingFlow();
-		}
-
 		if ($this->request->request('suggestions') !== null || $this->request->get('suggestions') !== null) {
 			return $this->suggestPrompts();
+		}
+
+		if ($this->getPromptInput() !== null) {
+			$chatbotSettings = $this->getChatbotSettings();
+
+			if ($this->isRestTransport($chatbotSettings)) {
+				return $this->runRestFlow($chatbotSettings, $final);
+			}
+
+			return $this->runStreamingFlow();
 		}
 
 		return '';
@@ -396,7 +403,10 @@ abstract class AbstractChatbotService implements IChatbotService {
 
 	/**
 	 * Executes the AgentFlow for streaming.
-	 * The actual streaming (SSE) is executed inside the StreamingAiAssistantNode.
+	 * The actual streaming is executed inside the StreamingAiAssistantNode.
+	 *
+	 * This method intentionally keeps the historical streaming input contract:
+	 * the flow receives the user prompt through the external input named "user".
 	 */
 	protected function runStreamingFlow(): string {
 
@@ -407,17 +417,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 			$this->applyReferenceContext($context);
 			$this->applyChatbotConfigContext($context, $chatbotSettings);
 
-			$flowFile = $this->getAgentFlowFile();
-
-			$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
-			$config = is_string($json) ? json_decode($json, true) : null;
-			$config ??= $this->getSimpleAgentFlow();
-
-			if (!is_array($config) || $config === []) {
-				return $this->errorResponse('[Invalid Flow JSON]');
-			}
-
-			$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
+			$flow = $this->createConfiguredFlow($context);
 
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
 			$userPrompt = (string) $this->getPromptInput();
@@ -436,6 +436,206 @@ abstract class AbstractChatbotService implements IChatbotService {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Executes the AgentFlow for REST and returns a JSON response.
+	 *
+	 * REST uses the direct AiAssistantNode contract and therefore passes the
+	 * user prompt through the external input named "prompt".
+	 */
+	protected function runRestFlow(array $chatbotSettings, bool $final): string {
+
+		try {
+			if ($final && !headers_sent()) {
+				header('Content-Type: application/json; charset=UTF-8');
+			}
+
+			$context = $this->contextFactory->createContext();
+			$this->applyReferenceContext($context);
+			$this->applyChatbotConfigContext($context, $chatbotSettings);
+
+			$flow = $this->createConfiguredFlow($context);
+
+			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
+			$userPrompt = (string) $this->getPromptInput();
+
+			$output = $flow->run([
+				'system' => $systemPrompt,
+				'prompt' => $userPrompt,
+				'mode' => 'chat'
+			]);
+
+			$assistantNodeId = $this->getAssistantNodeId($chatbotSettings);
+			$message = $this->extractAssistantMessage($output, $assistantNodeId);
+
+			if ($message === null) {
+				$error = $this->extractFlowError($output, $assistantNodeId);
+
+				if ($error !== '') {
+					return $this->errorResponse('[Chatbot runtime error] ' . $error);
+				}
+
+				return $this->errorResponse('[Chatbot runtime error] Flow did not return an assistant message. ' . $this->describeFlowOutput($output));
+			}
+
+			return $this->messageResponse($message);
+		}
+		catch (Throwable $e) {
+			return $this->errorResponse('[Chatbot runtime error] ' . $e->getMessage());
+		}
+	}
+
+	protected function createConfiguredFlow(IAgentContext $context): IAgentFlow {
+		$flowFile = $this->getAgentFlowFile();
+
+		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
+		$config = is_string($json) ? json_decode($json, true) : null;
+		$config ??= $this->getSimpleAgentFlow();
+
+		if (!is_array($config) || $config === []) {
+			throw new \RuntimeException('Invalid Flow JSON');
+		}
+
+		return $this->flowFactory->createFromArray('strictflow', $config, $context);
+	}
+
+	protected function isRestTransport(array $chatbotSettings): bool {
+		$requestMode = $this->getTransportModeInput();
+
+		if ($requestMode !== '') {
+			return $requestMode === 'rest';
+		}
+
+		return $this->getChatbotSettingString($chatbotSettings, 'transport_mode', '') === 'rest';
+	}
+
+	protected function getTransportModeInput(): string {
+		$mode = $this->request->request('transport_mode');
+
+		if ($mode === null) {
+			$mode = $this->request->get('transport_mode');
+		}
+
+		if (!is_scalar($mode) && $mode !== null) {
+			return '';
+		}
+
+		return strtolower(trim((string) $mode));
+	}
+
+	protected function getAssistantNodeId(array $chatbotSettings): string {
+		$nodeId = $this->getChatbotSettingString($chatbotSettings, 'agent_components_assistant_node', 'assistant');
+
+		return $nodeId !== '' ? $nodeId : 'assistant';
+	}
+
+	/**
+	 * @param array<string,mixed> $output
+	 * @return ?array<string,mixed>
+	 */
+	protected function extractAssistantMessage(array $output, string $assistantNodeId): ?array {
+		if (isset($output[$assistantNodeId]['message']) && is_array($output[$assistantNodeId]['message'])) {
+			return $output[$assistantNodeId]['message'];
+		}
+
+		if (isset($output['assistant']['message']) && is_array($output['assistant']['message'])) {
+			return $output['assistant']['message'];
+		}
+
+		foreach ($output as $nodeOutput) {
+			if (is_array($nodeOutput) && isset($nodeOutput['message']) && is_array($nodeOutput['message'])) {
+				return $nodeOutput['message'];
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array<string,mixed> $output
+	 */
+	protected function extractFlowError(array $output, string $assistantNodeId): string {
+		if (isset($output[$assistantNodeId]['error']) && is_scalar($output[$assistantNodeId]['error'])) {
+			return trim((string) $output[$assistantNodeId]['error']);
+		}
+
+		if (isset($output['assistant']['error']) && is_scalar($output['assistant']['error'])) {
+			return trim((string) $output['assistant']['error']);
+		}
+
+		foreach ($output as $nodeOutput) {
+			if (is_array($nodeOutput) && isset($nodeOutput['error']) && is_scalar($nodeOutput['error'])) {
+				return trim((string) $nodeOutput['error']);
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param array<string,mixed> $output
+	 */
+	protected function describeFlowOutput(array $output): string {
+		$nodeIds = array_keys($output);
+		$nodeIds = array_map('strval', $nodeIds);
+		$nodeIds = array_values(array_filter($nodeIds, static fn(string $id): bool => $id !== ''));
+
+		if ($nodeIds === []) {
+			return 'No terminal node output was returned.';
+		}
+
+		return 'Terminal nodes: ' . implode(', ', $nodeIds) . '.';
+	}
+
+	/**
+	 * @param array<string,mixed> $message
+	 */
+	protected function messageResponse(array $message): string {
+		$json = json_encode([
+			'id' => $this->normalizeMessageId($message['id'] ?? null),
+			'type' => 'message',
+			'text' => $this->normalizeMessageContent($message['content'] ?? ''),
+			'meta' => [
+				'timestamp' => gmdate('c')
+			]
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+		return is_string($json) ? $json : $this->errorResponse('[Chatbot runtime error] Could not encode assistant message.');
+	}
+
+	protected function normalizeMessageId(mixed $id): string {
+		if (is_scalar($id)) {
+			$id = trim((string) $id);
+
+			if ($id !== '') {
+				return $id;
+			}
+		}
+
+		return uniqid('msg_', true);
+	}
+
+	protected function normalizeMessageContent(mixed $content): string {
+		if ($content === null) {
+			return '';
+		}
+
+		if (is_string($content)) {
+			return $content;
+		}
+
+		if (is_bool($content)) {
+			return $content ? 'true' : 'false';
+		}
+
+		if (is_int($content) || is_float($content)) {
+			return (string) $content;
+		}
+
+		$json = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+		return is_string($json) && $json !== 'null' ? $json : '';
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -567,6 +767,6 @@ abstract class AbstractChatbotService implements IChatbotService {
 			'meta' => [
 				'timestamp' => gmdate('c')
 			]
-		], JSON_UNESCAPED_UNICODE);
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 	}
 }
