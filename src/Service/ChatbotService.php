@@ -19,8 +19,8 @@ namespace Chatbot\Service;
 
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
-use MissionBay\Api\IAgentComponentFlowBuilder;
 use MissionBay\Api\IAgentContextFactory;
+use MissionBay\Api\IAgentExecutionService;
 use MissionBay\Api\IAgentFlowFactory;
 
 /**
@@ -34,19 +34,14 @@ use MissionBay\Api\IAgentFlowFactory;
  */
 class ChatbotService extends AbstractChatbotService {
 
-	/**
-	 * @var array<int,string>
-	 */
-	private array $agentComponentWarnings = [];
-
 	public function __construct(
 		IRequest $request,
 		IAgentContextFactory $contextFactory,
 		IAgentFlowFactory $flowFactory,
 		ISettingsStore $settingsStore,
-		private readonly IAgentComponentFlowBuilder $componentFlowBuilder
+		IAgentExecutionService $agentExecutionService
 	) {
-		parent::__construct($request, $contextFactory, $flowFactory, $settingsStore);
+		parent::__construct($request, $contextFactory, $flowFactory, $settingsStore, $agentExecutionService);
 	}
 
 	public static function getName(): string {
@@ -118,72 +113,22 @@ class ChatbotService extends AbstractChatbotService {
 	 * Returns the configured agent flow from the SettingsStore.
 	 *
 	 * The value may be an already decoded array or a JSON string from the temporary
-	 * textarea configuration UI. If agent_components are present, the stored base
-	 * flow is expanded into an effective runtime flow with configured wrappers.
+	 * textarea configuration UI. Effective component expansion now happens in
+	 * MissionBay\Service\AgentExecutionService.
 	 */
 	protected function getSimpleAgentFlow(): ?array {
 		$settings = $this->getChatbotSettings();
-		$flow = $this->getArraySetting($settings, 'agent_flow');
 
-		if ($flow === null || $flow === []) {
-			return $flow;
-		}
-
-		$components = $this->getArraySetting($settings, 'agent_components');
-
-		if ($components === null || $components === []) {
-			$this->agentComponentWarnings = [];
-			return $flow;
-		}
-
-		$assistantNodeId = $this->getChatbotSettingString($settings, 'agent_components_assistant_node', 'assistant');
-
-		if ($assistantNodeId === '') {
-			$assistantNodeId = 'assistant';
-		}
-
-		$effectiveFlow = $this->componentFlowBuilder->build(
-			$flow,
-			$this->normalizeAgentComponents($components),
-			$assistantNodeId
-		);
-
-		$this->agentComponentWarnings = $this->componentFlowBuilder->getWarnings();
-
-		return $effectiveFlow;
+		return $this->getArraySetting($settings, 'agent_flow');
 	}
 
 	/**
-	 * Returns non-fatal warnings from the last component flow build.
+	 * Returns non-fatal warnings from the last MissionBay agent flow build.
 	 *
 	 * @return array<int,string>
 	 */
 	protected function getAgentComponentWarnings(): array {
-		return $this->agentComponentWarnings;
-	}
-
-	/**
-	 * Normalizes agent_components into a list of component arrays.
-	 *
-	 * @param array<int|string,mixed> $components
-	 * @return array<int,array<string,mixed>>
-	 */
-	protected function normalizeAgentComponents(array $components): array {
-		$result = [];
-
-		foreach ($components as $id => $component) {
-			if (!is_array($component)) {
-				continue;
-			}
-
-			if (!isset($component['preset']) && is_string($id)) {
-				$component['preset'] = $id;
-			}
-
-			$result[] = $component;
-		}
-
-		return $result;
+		return $this->agentExecutionService->getWarnings();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////

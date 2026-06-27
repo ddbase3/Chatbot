@@ -22,6 +22,7 @@ use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
 use MissionBay\Api\IAgentContext;
 use MissionBay\Api\IAgentContextFactory;
+use MissionBay\Api\IAgentExecutionService;
 use MissionBay\Api\IAgentFlow;
 use MissionBay\Api\IAgentFlowFactory;
 use Throwable;
@@ -32,7 +33,8 @@ abstract class AbstractChatbotService implements IChatbotService {
 		protected readonly IRequest $request,
 		protected readonly IAgentContextFactory $contextFactory,
 		protected readonly IAgentFlowFactory $flowFactory,
-		protected readonly ISettingsStore $settingsStore
+		protected readonly ISettingsStore $settingsStore,
+		protected readonly IAgentExecutionService $agentExecutionService
 	) {}
 
 	abstract public static function getName(): string;
@@ -141,6 +143,22 @@ abstract class AbstractChatbotService implements IChatbotService {
 		$context->setVar('chatbot_config_group', $identity['group']);
 		$context->setVar('chatbot_config_name', $identity['name']);
 		$context->setVar('chatbot_config', $chatbotSettings);
+	}
+
+	/**
+	 * Builds context variables for MissionBay agent execution.
+	 *
+	 * @return array<string,mixed>
+	 */
+	protected function getAgentContextVars(array $chatbotSettings): array {
+		$identity = $this->getConfigIdentity();
+
+		return [
+			'reference' => $this->getReferenceInput(),
+			'chatbot_config_group' => $identity['group'],
+			'chatbot_config_name' => $identity['name'],
+			'chatbot_config' => $chatbotSettings
+		];
 	}
 
 	/**
@@ -412,22 +430,18 @@ abstract class AbstractChatbotService implements IChatbotService {
 
 		try {
 			$chatbotSettings = $this->getChatbotSettings();
-
-			$context = $this->contextFactory->createContext();
-			$this->applyReferenceContext($context);
-			$this->applyChatbotConfigContext($context, $chatbotSettings);
-
-			$flow = $this->createConfiguredFlow($context);
-
+			$agentSettings = $this->getAgentSettingsForExecution($chatbotSettings);
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
 			$userPrompt = (string) $this->getPromptInput();
 
-			$inputs = [
-				'system' => $systemPrompt,
-				'user' => $userPrompt
-			];
-
-			$flow->run($inputs);
+			$this->agentExecutionService->stream(
+				$agentSettings,
+				[
+					'system' => $systemPrompt,
+					'user' => $userPrompt
+				],
+				$this->getAgentContextVars($chatbotSettings)
+			);
 
 			exit;
 		}
@@ -451,21 +465,21 @@ abstract class AbstractChatbotService implements IChatbotService {
 				header('Content-Type: application/json; charset=UTF-8');
 			}
 
-			$context = $this->contextFactory->createContext();
-			$this->applyReferenceContext($context);
-			$this->applyChatbotConfigContext($context, $chatbotSettings);
-
-			$flow = $this->createConfiguredFlow($context);
-
+			$agentSettings = $this->getAgentSettingsForExecution($chatbotSettings);
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
 			$userPrompt = (string) $this->getPromptInput();
 
-			$output = $flow->run([
-				'system' => $systemPrompt,
-				'prompt' => $userPrompt,
-				'mode' => 'chat'
-			]);
+			$result = $this->agentExecutionService->run(
+				$agentSettings,
+				[
+					'system' => $systemPrompt,
+					'prompt' => $userPrompt,
+					'mode' => 'chat'
+				],
+				$this->getAgentContextVars($chatbotSettings)
+			);
 
+			$output = $result->getOutput();
 			$assistantNodeId = $this->getAssistantNodeId($chatbotSettings);
 			$message = $this->extractAssistantMessage($output, $assistantNodeId);
 
@@ -484,6 +498,35 @@ abstract class AbstractChatbotService implements IChatbotService {
 		catch (Throwable $e) {
 			return $this->errorResponse('[Chatbot runtime error] ' . $e->getMessage());
 		}
+	}
+
+	/**
+	 * Returns the settings that should be passed to MissionBay agent execution.
+	 *
+	 * @param array<string,mixed> $chatbotSettings
+	 * @return array<string,mixed>
+	 */
+	protected function getAgentSettingsForExecution(array $chatbotSettings): array {
+		$settings = $chatbotSettings;
+		$flowFile = $this->getAgentFlowFile();
+
+		if ($flowFile !== '') {
+			$json = @file_get_contents($flowFile);
+			$config = is_string($json) ? json_decode($json, true) : null;
+
+			if (is_array($config) && $config !== []) {
+				$settings['agent_flow'] = $config;
+			}
+		}
+		elseif (!array_key_exists('agent_flow', $settings)) {
+			$config = $this->getSimpleAgentFlow();
+
+			if (is_array($config)) {
+				$settings['agent_flow'] = $config;
+			}
+		}
+
+		return $settings;
 	}
 
 	protected function createConfiguredFlow(IAgentContext $context): IAgentFlow {
