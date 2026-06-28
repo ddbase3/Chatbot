@@ -19,7 +19,7 @@ namespace Chatbot\Service;
 
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
-use AssistentFoundation\Api\IAgentExecutionService;
+use AssistantFoundation\Api\IAgentExecutionService;
 use MissionBay\Api\IAgentContextFactory;
 use MissionBay\Api\IAgentFlowFactory;
 
