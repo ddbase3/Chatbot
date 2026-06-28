@@ -413,6 +413,14 @@ abstract class AbstractChatbotService implements IChatbotService {
 		}
 
 		if ($prompt === null) {
+			$prompt = $this->request->request('user');
+		}
+
+		if ($prompt === null) {
+			$prompt = $this->request->get('user');
+		}
+
+		if ($prompt === null) {
 			return null;
 		}
 
@@ -423,8 +431,8 @@ abstract class AbstractChatbotService implements IChatbotService {
 	 * Executes the AgentFlow for streaming.
 	 * The actual streaming is executed inside the StreamingAiAssistantNode.
 	 *
-	 * This method intentionally keeps the historical streaming input contract:
-	 * the flow receives the user prompt through the external input named "user".
+	 * Streaming now uses the canonical external prompt input name.
+	 * The MissionBay runtime keeps legacy "user" flow connections compatible.
 	 */
 	protected function runStreamingFlow(): string {
 
@@ -438,7 +446,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 				$agentSettings,
 				[
 					'system' => $systemPrompt,
-					'user' => $userPrompt
+					'prompt' => $userPrompt
 				],
 				$this->getAgentContextVars($chatbotSettings)
 			);
@@ -455,8 +463,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 	/**
 	 * Executes the AgentFlow for REST and returns a JSON response.
 	 *
-	 * REST uses the direct AiAssistantNode contract and therefore passes the
-	 * user prompt through the external input named "prompt".
+	 * REST uses the canonical external prompt input name.
 	 */
 	protected function runRestFlow(array $chatbotSettings, bool $final): string {
 
