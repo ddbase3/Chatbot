@@ -21,7 +21,7 @@ use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentExecutionService;
 use Chatbot\Api\IChatbotService;
-use MissionBay\Api\IAgentContext;
+use AssistantFoundation\Api\IAgentContext;
 use MissionBay\Api\IAgentContextFactory;
 use MissionBay\Api\IAgentFlow;
 use MissionBay\Api\IAgentFlowFactory;
