@@ -669,7 +669,8 @@
                                 transport: config.transportMode || 'auto',
                                 events: [
                                         'msgid', 'token', 'done', 'error',
-                                        'tool.started', 'tool.finished',
+                                        'tool.started', 'tool.finished', 'tool.error',
+                                        'stage.started', 'stage.finished', 'stage.error',
                                         'canvas.open', 'canvas.close', 'canvas.render'
                                 ],
                                 payload: appendReference({
@@ -679,8 +680,442 @@
                         });
 
                         let finished = false;
+                        let activityOutputPhase = false;
+                        const stageActivityRows = new Map();
+                        const toolActivityRows = new Map();
+
+                        const ensureActivityShell = () => {
+                                let shell = respElem.children('.agent-activity-shell').first();
+
+                                if (shell.length) return shell;
+
+                                shell = $(`
+                                        <div class="agent-activity-shell">
+                                                <button type="button" class="agent-activity-toggle" aria-expanded="true" hidden>
+                                                        <span class="agent-activity-toggle-label">Arbeitsschritte ausblenden</span>
+                                                        <span class="agent-activity-toggle-count"></span>
+                                                </button>
+                                                <div class="agent-activity-log" aria-label="Agent activity" aria-live="polite"></div>
+                                        </div>
+                                `);
+                                shell.find('.agent-activity-toggle').on('click', () => {
+                                        const isCollapsed = shell.hasClass('is-collapsed');
+                                        setActivityCollapsed(!isCollapsed);
+                                });
+                                shell.insertBefore(contentElem);
+                                return shell;
+                        };
+
+                        const ensureActivityLog = () => ensureActivityShell().children('.agent-activity-log').first();
+
+                        const updateActivityToggle = () => {
+                                const shell = ensureActivityShell();
+                                const count = ensureActivityLog().children('.agent-activity-entry').length;
+                                const button = shell.children('.agent-activity-toggle');
+                                const collapsed = shell.hasClass('is-collapsed');
+
+                                button.prop('hidden', !activityOutputPhase || count === 0);
+                                button.find('.agent-activity-toggle-label').text(
+                                        collapsed ? 'Arbeitsschritte anzeigen' : 'Arbeitsschritte ausblenden'
+                                );
+                                button.find('.agent-activity-toggle-count').text(count > 0 ? '(' + count + ')' : '');
+                                button.attr('aria-expanded', collapsed ? 'false' : 'true');
+                        };
+
+                        const setActivityCollapsed = collapsed => {
+                                const shell = ensureActivityShell();
+                                shell.toggleClass('is-collapsed', Boolean(collapsed));
+                                updateActivityToggle();
+
+                                if (!collapsed) {
+                                        requestAnimationFrame(() => {
+                                                const node = ensureActivityLog()[0];
+                                                if (node) node.scrollTop = node.scrollHeight;
+                                                scrollToBottom();
+                                        });
+                                }
+                        };
+
+                        const beginOutputPhase = () => {
+                                if (activityOutputPhase) return;
+
+                                activityOutputPhase = true;
+                                const count = ensureActivityLog().children('.agent-activity-entry').length;
+                                if (count > 0) {
+                                        setActivityCollapsed(true);
+                                } else {
+                                        updateActivityToggle();
+                                }
+                        };
+
+                        const scrollActivityToBottom = () => {
+                                const shell = ensureActivityShell();
+                                const elem = ensureActivityLog();
+                                const node = elem[0];
+
+                                updateActivityToggle();
+                                if (!node || shell.hasClass('is-collapsed')) return;
+
+                                requestAnimationFrame(() => {
+                                        node.scrollTop = node.scrollHeight;
+                                        scrollToBottom();
+                                });
+                        };
+
+                        const stageActivityKey = payload => {
+                                const iteration = Number(payload.iteration || 0);
+                                const id = String(payload.id || payload.name || 'stage');
+                                return iteration + ':' + id;
+                        };
+
+                        const ensureStageActivity = payload => {
+                                const key = stageActivityKey(payload);
+                                let elem = stageActivityRows.get(key);
+
+                                if (elem && elem.length) return elem;
+
+                                elem = $(`
+                                        <div class="agent-activity-entry agent-stage-activity" data-status="running">
+                                                <span class="agent-activity-icon" aria-hidden="true">⚙</span>
+                                                <span class="agent-activity-label"></span>
+                                                <span class="agent-activity-description"></span>
+                                                <span class="agent-activity-meta"></span>
+                                                <span class="agent-activity-state" aria-hidden="true"></span>
+                                        </div>
+                                `);
+                                stageActivityRows.set(key, elem);
+                                ensureActivityLog().append(elem);
+                                return elem;
+                        };
+
+                        const formatActivityNumber = value => {
+                                const number = Number(value);
+                                if (!Number.isFinite(number)) return '?';
+                                return Math.round(number).toLocaleString('de-DE');
+                        };
+
+                        const budgetActivityMeta = payload => {
+                                const resultMetadata = (payload.result_metadata && typeof payload.result_metadata === 'object')
+                                        ? payload.result_metadata
+                                        : {};
+                                const assessment = (resultMetadata.budget && typeof resultMetadata.budget === 'object')
+                                        ? resultMetadata.budget
+                                        : null;
+
+                                if (!assessment) return [];
+
+                                const budget = (assessment.budget && typeof assessment.budget === 'object') ? assessment.budget : {};
+                                const usage = (assessment.usage && typeof assessment.usage === 'object') ? assessment.usage : {};
+                                const stageMeta = (assessment.metadata && typeof assessment.metadata === 'object') ? assessment.metadata : {};
+                                const parts = [];
+                                const configuredLimits = [
+                                        budget.max_input_tokens, budget.max_output_tokens, budget.max_total_tokens,
+                                        budget.max_ai_operations, budget.max_tool_calls, budget.max_elapsed_ms
+                                ].some(value => value !== null && value !== undefined);
+                                const metricLimits = (budget.metric_limits && typeof budget.metric_limits === 'object')
+                                        ? Object.keys(budget.metric_limits).length
+                                        : 0;
+
+                                if (!configuredLimits && metricLimits === 0) {
+                                        parts.push('budget unlimited');
+                                        return parts;
+                                }
+
+                                if (budget.max_total_tokens !== null && budget.max_total_tokens !== undefined) {
+                                        parts.push('tokens ' + formatActivityNumber(usage.total_tokens) + '/' + formatActivityNumber(budget.max_total_tokens));
+                                }
+
+                                if (budget.max_ai_operations !== null && budget.max_ai_operations !== undefined) {
+                                        parts.push('AI ops ' + formatActivityNumber(assessment.ai_operation_count) + '/' + formatActivityNumber(budget.max_ai_operations));
+                                }
+
+                                if (budget.max_tool_calls !== null && budget.max_tool_calls !== undefined) {
+                                        const projected = stageMeta.projected_tool_call_count ?? assessment.tool_call_count;
+                                        parts.push('tools ' + formatActivityNumber(projected) + '/' + formatActivityNumber(budget.max_tool_calls));
+                                }
+
+                                if (budget.max_elapsed_ms !== null && budget.max_elapsed_ms !== undefined) {
+                                        parts.push('time ' + (Number(assessment.elapsed_ms || 0) / 1000).toFixed(1) + 's/' + (Number(budget.max_elapsed_ms) / 1000).toFixed(1) + 's');
+                                }
+
+                                const exceeded = (assessment.exceeded_limits && typeof assessment.exceeded_limits === 'object')
+                                        ? Object.keys(assessment.exceeded_limits)
+                                        : [];
+                                const unknown = (assessment.unknown_limits && typeof assessment.unknown_limits === 'object')
+                                        ? Object.keys(assessment.unknown_limits)
+                                        : [];
+
+                                if (exceeded.length) parts.push('exceeded: ' + exceeded.join(', '));
+                                if (unknown.length) parts.push('unknown: ' + unknown.join(', '));
+
+                                return parts;
+                        };
+
+                        const continuationActivityMeta = payload => {
+                                const resultMetadata = (payload.result_metadata && typeof payload.result_metadata === 'object')
+                                        ? payload.result_metadata
+                                        : {};
+                                const continuation = (resultMetadata.continuation && typeof resultMetadata.continuation === 'object')
+                                        ? resultMetadata.continuation
+                                        : null;
+
+                                if (!continuation) return [];
+
+                                const parts = [];
+                                if (continuation.decision) parts.push(String(continuation.decision));
+
+                                if (continuation.confidence !== null && continuation.confidence !== undefined && continuation.confidence !== '') {
+                                        const confidence = Number(continuation.confidence);
+                                        if (Number.isFinite(confidence)) {
+                                                parts.push('confidence ' + Math.round(confidence * 100) + '%');
+                                        }
+                                }
+
+                                return parts;
+                        };
+
+                        const semanticVerificationActivityMeta = payload => {
+                                const resultMetadata = (payload.result_metadata && typeof payload.result_metadata === 'object')
+                                        ? payload.result_metadata
+                                        : {};
+                                const verification = (resultMetadata.semantic_verification && typeof resultMetadata.semantic_verification === 'object')
+                                        ? resultMetadata.semantic_verification
+                                        : null;
+
+                                if (!verification) return [];
+
+                                const parts = [];
+                                if (verification.verdict) parts.push(String(verification.verdict));
+
+                                const metadata = (verification.metadata && typeof verification.metadata === 'object')
+                                        ? verification.metadata
+                                        : {};
+                                if (metadata.recommendation) parts.push(String(metadata.recommendation));
+
+                                if (metadata.confidence !== null && metadata.confidence !== undefined && metadata.confidence !== '') {
+                                        const confidence = Number(metadata.confidence);
+                                        if (Number.isFinite(confidence)) {
+                                                parts.push('confidence ' + Math.round(confidence * 100) + '%');
+                                        }
+                                }
+
+                                if (resultMetadata.parse_status && resultMetadata.parse_status !== 'valid') {
+                                        parts.push('parse ' + String(resultMetadata.parse_status));
+                                }
+
+                                return parts;
+                        };
+
+
+                        const toolCacheActivityMeta = payload => {
+                                const resultMetadata = (payload.result_metadata && typeof payload.result_metadata === 'object')
+                                        ? payload.result_metadata
+                                        : {};
+                                const cache = (resultMetadata.tool_cache && typeof resultMetadata.tool_cache === 'object')
+                                        ? resultMetadata.tool_cache
+                                        : null;
+
+                                if (!cache) return [];
+
+                                const parts = [];
+                                const names = ['hits', 'misses', 'bypassed', 'stored', 'skipped', 'errors'];
+
+                                names.forEach(name => {
+                                        const value = Number(cache[name]);
+                                        if (Number.isFinite(value) && value > 0) {
+                                                parts.push(name + ' ' + Math.round(value));
+                                        }
+                                });
+
+                                if (!parts.length) parts.push('no cache changes');
+                                return parts;
+                        };
+
+                        const progressActivityMeta = payload => {
+                                const resultMetadata = (payload.result_metadata && typeof payload.result_metadata === 'object')
+                                        ? payload.result_metadata
+                                        : {};
+                                const progress = (resultMetadata.progress && typeof resultMetadata.progress === 'object')
+                                        ? resultMetadata.progress
+                                        : null;
+
+                                if (!progress) return [];
+
+                                const parts = [];
+                                if (progress.verdict) parts.push(String(progress.verdict));
+
+                                const stalled = Number(progress.consecutive_stalled_iterations);
+                                if (Number.isFinite(stalled) && stalled > 0) {
+                                        parts.push('stalled ' + Math.round(stalled));
+                                }
+
+                                const metadata = (progress.metadata && typeof progress.metadata === 'object')
+                                        ? progress.metadata
+                                        : {};
+                                if (metadata.terminated === true) parts.push('tool phase ended');
+
+                                return parts;
+                        };
+
+                        const outputActivityMeta = payload => {
+                                const resultMetadata = (payload.result_metadata && typeof payload.result_metadata === 'object')
+                                        ? payload.result_metadata
+                                        : {};
+                                const output = (resultMetadata.output && typeof resultMetadata.output === 'object')
+                                        ? resultMetadata.output
+                                        : null;
+
+                                if (!output) return [];
+
+                                const parts = [];
+                                if (output.source) parts.push('source ' + String(output.source));
+                                if (output.warning) parts.push('warning ' + String(output.warning));
+                                return parts;
+                        };
+
+                        const renderStageActivity = (payload, status) => {
+                                const elem = ensureStageActivity(payload);
+                                const aiUsage = String(payload.ai_usage || 'none');
+                                const name = String(payload.name || payload.id || 'stage');
+                                const description = String(payload.description || '');
+                                const duration = Number(payload.duration_ms);
+                                const iteration = Number(payload.iteration || 0);
+                                const usesAi = aiUsage === 'required' || aiUsage === 'conditional';
+                                const meta = [];
+
+                                if (iteration > 0) meta.push('loop ' + iteration);
+                                if (aiUsage === 'required') meta.push('AI');
+                                if (aiUsage === 'conditional') meta.push('AI if needed');
+                                if (aiUsage === 'none') meta.push('no AI');
+                                if (Number.isFinite(duration)) meta.push(Math.round(duration) + ' ms');
+                                meta.push(...budgetActivityMeta(payload));
+                                meta.push(...semanticVerificationActivityMeta(payload));
+                                meta.push(...continuationActivityMeta(payload));
+                                meta.push(...toolCacheActivityMeta(payload));
+                                meta.push(...progressActivityMeta(payload));
+                                meta.push(...outputActivityMeta(payload));
+
+                                elem.attr('data-status', status || 'running');
+                                elem.find('.agent-activity-icon').text(usesAi ? '🧠' : '⚙');
+                                elem.find('.agent-activity-label').text(name);
+                                elem.find('.agent-activity-description').text(description);
+                                elem.find('.agent-activity-meta').text(meta.join(' · '));
+                                scrollActivityToBottom();
+                        };
+
+                        const toolActivityKey = payload => {
+                                const callId = String(payload.call_id || '').trim();
+                                if (callId) return callId;
+
+                                return [
+                                        String(payload.iteration || 0),
+                                        String(payload.call_index || 0),
+                                        String(payload.tool || payload.label || 'tool')
+                                ].join(':');
+                        };
+
+                        const ensureToolActivity = payload => {
+                                const key = toolActivityKey(payload);
+                                let elem = toolActivityRows.get(key);
+
+                                if (elem && elem.length) return elem;
+
+                                elem = $(`
+                                        <div class="agent-activity-entry tool-event" data-status="running">
+                                                <div class="agent-activity-line">
+                                                        <span class="agent-activity-icon" aria-hidden="true">🔧</span>
+                                                        <span class="agent-activity-label"></span>
+                                                        <span class="agent-activity-description"></span>
+                                                        <span class="agent-activity-meta"></span>
+                                                        <span class="agent-activity-state" aria-hidden="true"></span>
+                                                </div>
+                                                <details class="tool-params">
+                                                        <summary>params</summary>
+                                                        <pre></pre>
+                                                </details>
+                                        </div>
+                                `);
+                                elem.find('details.tool-params').on('toggle', event => {
+                                        const detailsNode = event.currentTarget;
+
+                                        if (!detailsNode || !detailsNode.open) return;
+
+                                        requestAnimationFrame(() => {
+                                                const logNode = ensureActivityLog()[0];
+
+                                                if (!logNode) return;
+
+                                                const logRect = logNode.getBoundingClientRect();
+                                                const detailsRect = detailsNode.getBoundingClientRect();
+
+                                                if (detailsRect.bottom > logRect.bottom) {
+                                                        logNode.scrollTop += detailsRect.bottom - logRect.bottom + 4;
+                                                }
+
+                                                if (detailsRect.top < logRect.top) {
+                                                        logNode.scrollTop -= logRect.top - detailsRect.top + 4;
+                                                }
+                                        });
+                                });
+
+                                toolActivityRows.set(key, elem);
+                                ensureActivityLog().append(elem);
+                                return elem;
+                        };
+
+                        const renderToolActivity = (payload, status) => {
+                                const elem = ensureToolActivity(payload);
+                                const toolName = String(payload.label || payload.tool || 'tool');
+                                const args = (payload.args && typeof payload.args === 'object') ? payload.args : {};
+                                const preview = toolArgsPreview(toolName, args);
+                                const iteration = Number(payload.iteration || 0);
+                                const callIndex = Number(payload.call_index || 0);
+                                const meta = [];
+
+                                if (iteration > 0) meta.push('loop ' + iteration);
+                                if (callIndex > 0) meta.push('#' + callIndex);
+                                if (status === 'completed') meta.push(payload.cached ? 'cached' : 'done');
+                                if (status === 'failed') meta.push('failed');
+
+                                elem.attr('data-status', status || 'running');
+                                elem.find('.agent-activity-label').text(toolName);
+                                elem.find('.agent-activity-description').text(preview ? '“' + preview + '”' : 'tool call');
+                                elem.find('.agent-activity-meta').text(meta.join(' · '));
+                                elem.find('pre').text(JSON.stringify(args, null, 2)
+                                        .replace(/\n/g, '\n')
+                                        .replace(/ {4}/g, '  '));
+
+                                if (status === 'failed' && payload.error) {
+                                        elem.find('.agent-activity-description').text(String(payload.error));
+                                }
+
+                                scrollActivityToBottom();
+                        };
 
                         await client.connect((event, data) => {
+
+                                // -----------------------------
+                                // AGENT STAGE ACTIVITY
+                                // -----------------------------
+                                if (event === 'stage.started') {
+                                        hideThinking();
+                                        data = parseEventPayload(data);
+                                        renderStageActivity((data && typeof data === 'object') ? data : {}, 'running');
+                                        return;
+                                }
+
+                                if (event === 'stage.finished') {
+                                        data = parseEventPayload(data);
+                                        const payload = (data && typeof data === 'object') ? data : {};
+                                        renderStageActivity(payload, payload.status === 'failed' ? 'failed' : 'completed');
+                                        return;
+                                }
+
+                                if (event === 'stage.error') {
+                                        data = parseEventPayload(data);
+                                        renderStageActivity((data && typeof data === 'object') ? data : {}, 'failed');
+                                        return;
+                                }
 
                                 // -----------------------------
                                 // CANVAS EVENTS
@@ -717,63 +1152,24 @@
                                 }
 
                                 // -----------------------------
-                                // TOOL STARTED (Phase 1)
+                                // TOOL ACTIVITY
                                 // -----------------------------
                                 if (event === 'tool.started') {
                                         hideThinking();
-
                                         data = parseEventPayload(data);
-                                        const payload = (data && typeof data === 'object') ? data : {};
-
-                                        const toolName = payload.label || payload.tool || 'tool';
-                                        const args = payload.args || {};
-
-                                        const prevCount = parseInt(respElem.attr('data-toolcount') || '0', 10);
-                                        const callIndex = prevCount + 1;
-                                        respElem.attr('data-toolcount', String(callIndex));
-
-                                        const prettyArgs = JSON.stringify(args, null, 2)
-                                                .replace(/\\n/g, '\n')
-                                                .replace(/ {4}/g, '  ');
-
-                                        const preview = toolArgsPreview(toolName, args);
-
-                                        const elem = $(`
-                                                <div class="message tool-event" data-tool="${escapeHtml(toolName)}" data-callindex="${callIndex}">
-                                                        <span class="tool-badge">
-                                                                <span class="tool-ic" aria-hidden="true">🔧</span>
-                                                                <span class="tool-name">${escapeHtml(toolName)}</span>
-                                                                ${preview ? `<span class="tool-preview">“${escapeHtml(preview)}”</span>` : ``}
-                                                                <span class="tool-activity" aria-hidden="true"></span>
-                                                                <span class="tool-meta" aria-hidden="true">#${callIndex}</span>
-                                                        </span>
-                                                        <details class="tool-params">
-                                                                <summary>params</summary>
-                                                                <pre></pre>
-                                                        </details>
-                                                </div>
-                                        `);
-
-                                        elem.find('pre').text(prettyArgs);
-
-                                        elem.find('details.tool-params').on('toggle', () => {
-                                                if (!isNearBottom()) return;
-                                                requestAnimationFrame(() => scrollToBottom());
-                                        });
-
-                                        chatControl.append(elem);
-                                        scrollToBottom();
+                                        renderToolActivity((data && typeof data === 'object') ? data : {}, 'running');
                                         return;
                                 }
 
-                                // -----------------------------
-                                // TOOL FINISHED (currently disabled)
-                                // -----------------------------
-                                if (false && event === 'tool.finished') {
+                                if (event === 'tool.finished') {
                                         data = parseEventPayload(data);
-                                        const payload = (data && typeof data === 'object') ? data : {};
-                                        const toolName = payload.tool || 'tool';
-                                        chatControl.find('.tool-event[data-tool="' + toolName + '"]').remove();
+                                        renderToolActivity((data && typeof data === 'object') ? data : {}, 'completed');
+                                        return;
+                                }
+
+                                if (event === 'tool.error') {
+                                        data = parseEventPayload(data);
+                                        renderToolActivity((data && typeof data === 'object') ? data : {}, 'failed');
                                         return;
                                 }
 
@@ -781,10 +1177,8 @@
                                 // TOKEN (Phase 2)
                                 // -----------------------------
                                 if (event === 'token') {
+                                        beginOutputPhase();
                                         hideThinking();
-
-                                        // Remove all tool events when token stream starts
-                                        chatControl.find('.tool-event').remove();
 
                                         let tokenText = '';
 
@@ -809,11 +1203,15 @@
                                         if (finished) return;
                                         finished = true;
 
+                                        beginOutputPhase();
                                         hideThinking();
-
                                         if (!currentMessageId) {
                                                 currentMessageId = 'msg_' + Date.now();
                                                 respElem.attr('data-msgid', currentMessageId);
+                                        }
+
+                                        if (fullText.trim() === '') {
+                                                fullText = 'Es konnte keine sichtbare Antwort erzeugt werden. Bitte versuche die Anfrage erneut.';
                                         }
 
                                         renderMarkdownOrText(contentElem, fullText);
