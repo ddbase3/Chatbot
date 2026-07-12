@@ -2,7 +2,10 @@
 
 namespace Test\Chatbot\Service;
 
+use AssistantFoundation\Api\IAgentExecutionService;
+use AssistantFoundation\Dto\AgentExecutionResult;
 use Base3\Api\IRequest;
+use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Service\ChatbotService;
 use MissionBay\Api\IAgentContextFactory;
 use MissionBay\Api\IAgentFlowFactory;
@@ -19,14 +22,10 @@ final class ChatbotServiceTest extends TestCase {
 		$this->assertSame('chatbotservice', ChatbotService::getName());
 	}
 
-	public function testGetHelpReturnsString(): void {
-		$service = $this->makeService(
-			$this->createStub(IRequest::class),
-			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class)
-		);
+	public function testGetHelpReturnsConfiguredServiceHelp(): void {
+		$service = $this->makeService($this->createStub(IRequest::class));
 
-		$this->assertSame('Help on ChatbotService.', $service->getHelp());
+		$this->assertSame('SettingsStore backed chatbot service.', $service->getHelp());
 	}
 
 	public function testGetOutputReturnsEmptyStringByDefault(): void {
@@ -34,241 +33,230 @@ final class ChatbotServiceTest extends TestCase {
 		$request->method('get')->willReturn(null);
 		$request->method('request')->willReturn(null);
 
-		$service = $this->makeService(
-			$request,
-			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class)
-		);
-
-		$this->assertSame('', $service->getOutput('json'));
+		$this->assertSame('', $this->makeService($request)->getOutput('json'));
 	}
 
 	public function testGetOutputReturnsBasePromptWhenBasepromptIsSet(): void {
 		$request = $this->createMock(IRequest::class);
 		$request->method('get')->willReturnMap([
-			['baseprompt', null, '1'],
+			['baseprompt', null, '1']
 		]);
 		$request->method('request')->willReturn(null);
 
-		$service = $this->makeService(
-			$request,
-			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class)
-		);
-
-		$out = $service->getOutput('json');
-		$this->assertNotSame('', $out);
-		$this->assertIsString($out);
+		$this->assertSame('Test base prompt', $this->makeService($request)->getOutput('json'));
 	}
 
 	public function testGetOutputRunsStreamingFlowWhenPromptIsSet(): void {
 		$request = $this->createMock(IRequest::class);
 		$request->method('get')->willReturn(null);
 		$request->method('request')->willReturnMap([
-			['prompt', null, 'Hello'],
+			['suggestions', null, null],
+			['prompt', null, 'Hello']
 		]);
 
-		$contextFactory = $this->createMock(IAgentContextFactory::class);
-		$contextFactory->expects($this->once())->method('createContext');
+		$this->assertSame('STREAM_OK', $this->makeService($request)->getOutput('json'));
+	}
 
-		$flowFactory = $this->createMock(IAgentFlowFactory::class);
+	public function testGetOutputRunsStreamingFlowWhenOnlyResumeIsSet(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['suggestions', null, null],
+			['prompt', null, null],
+			['resume', null, null],
+			['resume_handle', null, str_repeat('a', 43)],
+			['resume_response', null, 'jo hau rein'],
+			['resume_responses', null, null]
+		]);
 
-		$service = $this->makeService($request, $contextFactory, $flowFactory);
+		$this->assertSame('STREAM_OK', $this->makeService($request)->getOutput('json'));
+	}
 
-		$this->assertSame('STREAM_OK', $service->getOutput('json'));
+	public function testResumeInputIsIncludedInStreamingAgentInputs(): void {
+		$handle = str_repeat('b', 43);
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['resume', null, null],
+			['resume_handle', null, $handle],
+			['resume_response', null, 'in Ordnung'],
+			['resume_responses', null, null]
+		]);
+		$service = $this->makeService($request);
+
+		$inputs = $service->callBuildAgentInputs('system', 'in Ordnung', false);
+
+		$this->assertSame('system', $inputs['system']);
+		$this->assertSame('in Ordnung', $inputs['prompt']);
+		$this->assertArrayNotHasKey('mode', $inputs);
+		$this->assertSame([
+			'resume_handle' => $handle,
+			'responses' => [],
+			'response_text' => 'in Ordnung'
+		], $inputs['resume']);
+	}
+
+	public function testExplicitResumeResponsesAreAcceptedAsJson(): void {
+		$handle = str_repeat('c', 43);
+		$responses = [[
+			'request_id' => 'air-1',
+			'decision' => 'approve',
+			'input' => []
+		]];
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['resume', null, null],
+			['resume_handle', null, $handle],
+			['resume_response', null, null],
+			['resume_responses', null, json_encode($responses, JSON_THROW_ON_ERROR)]
+		]);
+		$service = $this->makeService($request);
+
+		$this->assertSame([
+			'resume_handle' => $handle,
+			'responses' => $responses
+		], $service->callResumeInput());
+	}
+
+	public function testRestSuspensionReturnsInteractionRequiredAndPassesResumeInput(): void {
+		$handle = str_repeat('d', 43);
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['suggestions', null, null],
+			['prompt', null, 'go'],
+			['transport_mode', null, 'rest'],
+			['resume', null, null],
+			['resume_handle', null, $handle],
+			['resume_response', null, 'go'],
+			['resume_responses', null, null],
+			['config_group', null, null],
+			['config_name', null, null],
+			['reference', null, null]
+		]);
+		$executionService = $this->createMock(IAgentExecutionService::class);
+		$executionService->expects($this->once())
+			->method('run')
+			->with(
+				$this->isType('array'),
+				$this->callback(static function(array $inputs) use ($handle): bool {
+					return ($inputs['mode'] ?? null) === 'chat'
+						&& ($inputs['resume']['resume_handle'] ?? null) === $handle
+						&& ($inputs['resume']['response_text'] ?? null) === 'go';
+				}),
+				$this->isType('array')
+			)
+			->willReturn(new AgentExecutionResult([
+				'assistant' => [
+					'status' => 'awaiting_approval',
+					'resume_handle' => $handle,
+					'interaction_requests' => [[
+						'id' => 'air-1',
+						'kind' => 'approval',
+						'title' => 'Confirm update',
+						'message' => 'Update the preference?',
+						'risk' => 'medium'
+					]]
+				]
+			]));
+
+		$data = json_decode($this->makeService($request, $executionService)->getOutput('json'), true);
+
+		$this->assertSame('interaction_required', $data['type'] ?? null);
+		$this->assertSame('awaiting_approval', $data['status'] ?? null);
+		$this->assertSame($handle, $data['resume_handle'] ?? null);
+		$this->assertSame('air-1', $data['interaction_requests'][0]['id'] ?? null);
+	}
+
+	public function testRestCompletedResultRemainsNormalMessage(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['suggestions', null, null],
+			['prompt', null, 'Hello'],
+			['transport_mode', null, 'rest'],
+			['resume', null, null],
+			['resume_handle', null, null],
+			['config_group', null, null],
+			['config_name', null, null],
+			['reference', null, null]
+		]);
+		$executionService = $this->createMock(IAgentExecutionService::class);
+		$executionService->method('run')->willReturn(new AgentExecutionResult([
+			'assistant' => [
+				'message' => [
+					'id' => 'msg-1',
+					'content' => 'Hello back'
+				]
+			]
+		]));
+
+		$data = json_decode($this->makeService($request, $executionService)->getOutput('json'), true);
+
+		$this->assertSame('message', $data['type'] ?? null);
+		$this->assertSame('msg-1', $data['id'] ?? null);
+		$this->assertSame('Hello back', $data['text'] ?? null);
 	}
 
 	public function testGetOutputReturnsSuggestionsJsonWhenSuggestionsIsSet(): void {
 		$request = $this->createMock(IRequest::class);
 		$request->method('get')->willReturn(null);
 		$request->method('request')->willReturnMap([
-			['prompt', null, null],        // ensure streaming branch does not win
-			['suggestions', null, '1'],
+			['suggestions', null, '1']
 		]);
 
-		$service = $this->makeService(
-			$request,
-			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class)
+		$this->assertSame(
+			['S1', 'S2', 'S3'],
+			json_decode($this->makeService($request)->getOutput('json'), true)
 		);
-
-		$json = $service->getOutput('json');
-		$this->assertNotSame('', $json);
-
-		$data = json_decode($json, true);
-		$this->assertIsArray($data);
-		$this->assertCount(3, $data);
 	}
 
-	public function testSuggestPromptsCleansJsonCodeblockAndReturnsArrayJson(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['prompt', null, null],
-			['suggestions', null, '1'],
-		]);
-
-		$service = new class(
+	private function makeService(
+		IRequest $request,
+		?IAgentExecutionService $executionService = null
+	): TestableChatbotService {
+		return new TestableChatbotService(
 			$request,
 			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class)
-		) extends ChatbotService {
+			$this->createStub(IAgentFlowFactory::class),
+			$this->createStub(ISettingsStore::class),
+			$executionService ?? $this->createStub(IAgentExecutionService::class)
+		);
+	}
+}
 
-			// prevent file IO in suggestPrompts()
-			protected function getSuggestionFlowFile(): string {
-				return '';
-			}
+final class TestableChatbotService extends ChatbotService {
 
-			protected function getSimpleSuggestionFlow(): ?array {
-				return ['DUMMY_FLOW'];
-			}
-
-			protected function getSuggestionPromptFile(): string {
-				return '';
-			}
-
-			protected function getSimpleSuggestionPrompt(): string {
-				return 'Suggest three prompts.';
-			}
-
-			// fully override to test ONLY the cleanup behavior (no flow, no files)
-			protected function runSuggestionModelAndReturnMessage(): string {
-				return "```json\n[\"A\",\"B\",\"C\"]\n```";
-			}
-
-			// helper method we add only in the anonymous subclass;
-			// we re-implement suggestPrompts() logic by calling this helper for msg
-			public function callSuggestPromptsForTest(): string {
-				$msg = $this->runSuggestionModelAndReturnMessage();
-
-				$clean = trim($msg);
-				$clean = preg_replace('/^```json/i', '', $clean);
-				$clean = preg_replace('/^```/i', '', $clean);
-				$clean = preg_replace('/```$/', '', $clean);
-				$clean = trim($clean);
-
-				$decoded = json_decode($clean, true);
-
-				if (!is_array($decoded)) {
-					return json_encode([
-						'error' => 'Invalid JSON from suggestions model',
-						'raw'   => $msg,
-						'clean' => $clean
-					], JSON_UNESCAPED_UNICODE);
-				}
-
-				return json_encode($decoded, JSON_UNESCAPED_UNICODE);
-			}
-		};
-
-		$json = $service->callSuggestPromptsForTest();
-
-		$data = json_decode($json, true);
-		$this->assertSame(['A', 'B', 'C'], $data);
+	protected function getBasePrompt(): string {
+		return 'Test base prompt';
 	}
 
-	public function testSuggestPromptsReturnsErrorObjectWhenJsonInvalid(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['prompt', null, null],
-			['suggestions', null, '1'],
-		]);
-
-		$service = new class(
-			$request,
-			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class)
-		) extends ChatbotService {
-
-			public function callSuggestPromptsForTest(): string {
-				$msg = "```json\n{not valid}\n```";
-
-				$clean = trim($msg);
-				$clean = preg_replace('/^```json/i', '', $clean);
-				$clean = preg_replace('/^```/i', '', $clean);
-				$clean = preg_replace('/```$/', '', $clean);
-				$clean = trim($clean);
-
-				$decoded = json_decode($clean, true);
-
-				if (!is_array($decoded)) {
-					return json_encode([
-						'error' => 'Invalid JSON from suggestions model',
-						'raw'   => $msg,
-						'clean' => $clean
-					], JSON_UNESCAPED_UNICODE);
-				}
-
-				return json_encode($decoded, JSON_UNESCAPED_UNICODE);
-			}
-		};
-
-		$json = $service->callSuggestPromptsForTest();
-
-		$data = json_decode($json, true);
-		$this->assertIsArray($data);
-		$this->assertSame('Invalid JSON from suggestions model', $data['error'] ?? null);
-		$this->assertArrayHasKey('raw', $data);
-		$this->assertArrayHasKey('clean', $data);
+	protected function getSimpleAgentFlow(): ?array {
+		return [
+			'nodes' => [[
+				'id' => 'assistant',
+				'type' => 'aiassistantnode'
+			]],
+			'connections' => []
+		];
 	}
 
-	// ---------------------------------------------------------
-	// Helpers
-	// ---------------------------------------------------------
+	protected function runStreamingFlow(): string {
+		return 'STREAM_OK';
+	}
 
-	private function makeService(IRequest $request, IAgentContextFactory $contextFactory, IAgentFlowFactory $flowFactory): ChatbotService {
-		// Avoid:
-		// - file_get_contents()
-		// - createFromArray()/run()
-		// - exit
-		return new class($request, $contextFactory, $flowFactory) extends ChatbotService {
+	protected function suggestPrompts(): string {
+		return json_encode(['S1', 'S2', 'S3'], JSON_UNESCAPED_UNICODE);
+	}
 
-			protected function getBasePromptFile(): string {
-				return '';
-			}
+	/** @return array<string,mixed>|null */
+	public function callResumeInput(): ?array {
+		return $this->getResumeInput();
+	}
 
-			protected function getAgentFlowFile(): string {
-				return '';
-			}
-
-			protected function getSystemPromptFile(): string {
-				return '';
-			}
-
-			protected function runStreamingFlow(): string {
-				// We still want to ensure createContext() is called in some tests,
-				// so call parent parts lightly:
-				$this->contextFactory->createContext();
-				return 'STREAM_OK';
-			}
-
-			// For suggestPrompts(): do not touch disk; just return JSON directly.
-			protected function getSuggestionFlowFile(): string {
-				return '';
-			}
-
-			protected function getSuggestionPromptFile(): string {
-				return '';
-			}
-
-			// Re-route suggestPrompts() without file IO by hijacking getOutput() branch:
-			// easiest is to override getOutput() suggestions branch:
-			public function getOutput(string $out = 'html', bool $final = false): string {
-				if ($this->request->get('baseprompt') !== null) {
-					return $this->getBasePrompt();
-				}
-
-				if ($this->request->request('prompt') !== null) {
-					return $this->runStreamingFlow();
-				}
-
-				if ($this->request->request('suggestions') !== null) {
-					return json_encode(['S1', 'S2', 'S3'], JSON_UNESCAPED_UNICODE);
-				}
-
-				return '';
-			}
-		};
+	/** @return array<string,mixed> */
+	public function callBuildAgentInputs(string $systemPrompt, string $userPrompt, bool $rest): array {
+		return $this->buildAgentInputs($systemPrompt, $userPrompt, $rest);
 	}
 }

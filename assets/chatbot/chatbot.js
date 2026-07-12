@@ -22,6 +22,8 @@
                 const suggestionsContainer = $('<div class="chat-suggestions" aria-live="polite"></div>');
                 $root.find('.chatbot-main').append(suggestionsContainer);
 
+                let pendingInteraction = null;
+
                 // ---------------------------------------------------------------------
                 // Utility
                 // ---------------------------------------------------------------------
@@ -66,6 +68,89 @@
                         } catch {
                                 return data;
                         }
+                }
+
+                function normalizeInteractionPayload(payload) {
+                        payload = parseEventPayload(payload);
+
+                        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+                                return null;
+                        }
+
+                        const resumeHandle = String(payload.resume_handle || '').trim();
+                        const requests = Array.isArray(payload.interaction_requests)
+                                ? payload.interaction_requests.filter(request => request && typeof request === 'object')
+                                : [];
+
+                        if (!resumeHandle || !requests.length) {
+                                return null;
+                        }
+
+                        return {
+                                status: String(payload.status || ''),
+                                resume_handle: resumeHandle,
+                                interaction_requests: requests
+                        };
+                }
+
+                function renderInteractionRequired(targetElem, payload, onDecision) {
+                        const interaction = normalizeInteractionPayload(payload);
+                        if (!interaction) return false;
+
+                        targetElem.empty();
+                        const container = $('<div class="agent-interaction-required" role="group" aria-label="Bestätigung erforderlich"></div>');
+
+                        interaction.interaction_requests.forEach(request => {
+                                const card = $('<div class="agent-interaction-card"></div>');
+                                const header = $('<div class="agent-interaction-header"></div>');
+                                const title = $('<strong class="agent-interaction-title"></strong>').text(
+                                        String(request.title || 'Bestätigung erforderlich')
+                                );
+                                const risk = String(request.risk || '').trim();
+                                header.append(title);
+                                if (risk) {
+                                        header.append($('<span class="agent-interaction-risk"></span>').text(risk));
+                                }
+                                card.append(header);
+
+                                const message = String(request.message || '').trim();
+                                if (message) {
+                                        card.append($('<div class="agent-interaction-message"></div>').text(message));
+                                }
+
+                                const summary = request.summary && typeof request.summary === 'object' ? request.summary : null;
+                                if (summary) {
+                                        const details = $('<details class="agent-interaction-details"><summary>Details</summary><pre></pre></details>');
+                                        details.find('pre').text(JSON.stringify(summary, null, 2));
+                                        card.append(details);
+                                }
+
+                                container.append(card);
+                        });
+
+                        container.append($('<div class="agent-interaction-hint"></div>').text(
+                                'Antworte in deiner nächsten Nachricht frei formuliert mit Zustimmung, Ablehnung oder den angeforderten Angaben.'
+                        ));
+
+                        const approvalOnly = interaction.interaction_requests.every(request => String(request.kind || '') === 'approval');
+                        if (approvalOnly && typeof onDecision === 'function') {
+                                const actions = $('<div class="agent-interaction-actions"></div>');
+                                const approve = $('<button type="button" class="agent-interaction-approve">Zustimmen</button>');
+                                const deny = $('<button type="button" class="agent-interaction-deny">Ablehnen</button>');
+                                approve.on('click', () => {
+                                        actions.find('button').prop('disabled', true);
+                                        onDecision('Ich stimme zu.');
+                                });
+                                deny.on('click', () => {
+                                        actions.find('button').prop('disabled', true);
+                                        onDecision('Ich lehne ab.');
+                                });
+                                actions.append(approve, deny);
+                                container.append(actions);
+                        }
+
+                        targetElem.append(container);
+                        return true;
                 }
 
                 function getGlobalValue(path) {
@@ -552,6 +637,18 @@
                         const plain = raw.trim();
                         if (!plain) return;
 
+                        const resumeContext = pendingInteraction && pendingInteraction.resume_handle
+                                ? { ...pendingInteraction }
+                                : null;
+                        const buildRequestPayload = base => {
+                                const data = { ...base };
+                                if (resumeContext) {
+                                        data.resume_handle = resumeContext.resume_handle;
+                                        data.resume_response = plain;
+                                }
+                                return appendReference(data);
+                        };
+
                         // Clear current suggestions while new answer is generated
                         suggestionsContainer.removeClass('has-suggestions loading');
                         suggestionsContainer.empty();
@@ -589,6 +686,7 @@
                         let fullText = '';
                         let renderTimeout = null;
                         let currentMessageId = null;
+                        let interactionRendered = false;
 
                         // Reset per-message tool counter
                         respElem.attr('data-toolcount', '0');
@@ -618,7 +716,7 @@
                                                 headers: {
                                                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
                                                 },
-                                                body: new URLSearchParams(appendReference({
+                                                body: new URLSearchParams(buildRequestPayload({
                                                         prompt: plain,
                                                         transport_mode: 'rest'
                                                 }))
@@ -633,9 +731,22 @@
                                         currentMessageId = json.id || ('msg_' + Date.now());
                                         respElem.attr('data-msgid', currentMessageId);
 
-                                        fullText = json.text || '';
                                         hideThinking();
-                                        renderMarkdownOrText(contentElem, fullText);
+                                        if (json && json.type === 'interaction_required') {
+                                                const interaction = normalizeInteractionPayload(json);
+                                                if (!interaction) {
+                                                        throw new Error('Invalid interaction_required response.');
+                                                }
+                                                pendingInteraction = interaction;
+                                                interactionRendered = renderInteractionRequired(contentElem, interaction, text => {
+                                                        msgControl.val(text).trigger('input');
+                                                        sendMessage();
+                                                });
+                                        } else {
+                                                pendingInteraction = null;
+                                                fullText = json.text || '';
+                                                renderMarkdownOrText(contentElem, fullText);
+                                        }
                                 } catch (err) {
                                         console.error('REST request failed:', err);
                                         hideThinking();
@@ -644,15 +755,17 @@
                                         loader.remove();
                                         scrollToBottom();
 
-                                        renderIconBar(toolsElem, fullText, currentMessageId);
+                                        if (!interactionRendered) {
+                                                renderIconBar(toolsElem, fullText, currentMessageId);
+                                        }
 
                                         if (config.useVoice && root._voiceCtrl) {
                                                 const txt = cleanForVoice(contentElem.text());
                                                 root._voiceCtrl.handleAssistantReply(txt);
                                         }
 
-                                        // After assistant answered: fetch prompt suggestions
-                                        fetchSuggestions(currentMessageId);
+                                        // After a completed assistant answer: fetch prompt suggestions.
+                                        if (!interactionRendered) fetchSuggestions(currentMessageId);
                                 }
 
                                 return;
@@ -671,9 +784,10 @@
                                         'msgid', 'token', 'done', 'error',
                                         'tool.started', 'tool.finished', 'tool.error',
                                         'stage.started', 'stage.finished', 'stage.error',
-                                        'canvas.open', 'canvas.close', 'canvas.render'
+                                        'canvas.open', 'canvas.close', 'canvas.render',
+                                        'agent.interaction.required'
                                 ],
-                                payload: appendReference({
+                                payload: buildRequestPayload({
                                         prompt: plain,
                                         transport_mode: config.transportMode || 'auto'
                                 })
@@ -1174,9 +1288,28 @@
                                 }
 
                                 // -----------------------------
+                                // AGENT INTERACTION
+                                // -----------------------------
+                                if (event === 'agent.interaction.required') {
+                                        beginOutputPhase();
+                                        hideThinking();
+                                        const interaction = normalizeInteractionPayload(data);
+                                        if (!interaction) return;
+
+                                        pendingInteraction = interaction;
+                                        interactionRendered = renderInteractionRequired(contentElem, interaction, text => {
+                                                msgControl.val(text).trigger('input');
+                                                sendMessage();
+                                        });
+                                        scrollToResponse();
+                                        return;
+                                }
+
+                                // -----------------------------
                                 // TOKEN (Phase 2)
                                 // -----------------------------
                                 if (event === 'token') {
+                                        pendingInteraction = null;
                                         beginOutputPhase();
                                         hideThinking();
 
@@ -1210,13 +1343,15 @@
                                                 respElem.attr('data-msgid', currentMessageId);
                                         }
 
-                                        if (fullText.trim() === '') {
-                                                fullText = 'Es konnte keine sichtbare Antwort erzeugt werden. Bitte versuche die Anfrage erneut.';
+                                        if (!interactionRendered) {
+                                                pendingInteraction = null;
+                                                if (fullText.trim() === '') {
+                                                        fullText = 'Es konnte keine sichtbare Antwort erzeugt werden. Bitte versuche die Anfrage erneut.';
+                                                }
+
+                                                renderMarkdownOrText(contentElem, fullText);
+                                                renderIconBar(toolsElem, fullText, currentMessageId);
                                         }
-
-                                        renderMarkdownOrText(contentElem, fullText);
-
-                                        renderIconBar(toolsElem, fullText, currentMessageId);
                                         scrollToResponse();
 
                                         if (config.useVoice && root._voiceCtrl) {
@@ -1226,8 +1361,8 @@
 
                                         client.close();
 
-                                        // After assistant answered: fetch prompt suggestions
-                                        fetchSuggestions(currentMessageId);
+                                        // After a completed assistant answer: fetch prompt suggestions.
+                                        if (!interactionRendered) fetchSuggestions(currentMessageId);
                                         return;
                                 }
 

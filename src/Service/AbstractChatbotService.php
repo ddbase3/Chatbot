@@ -20,6 +20,8 @@ namespace Chatbot\Service;
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentExecutionService;
+use AssistantFoundation\Dto\AgentExecutionResult;
+use AssistantFoundation\Dto\AgentInteractionRequest;
 use Chatbot\Api\IChatbotService;
 use AssistantFoundation\Api\IAgentContext;
 use MissionBay\Api\IAgentContextFactory;
@@ -57,7 +59,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 			return $this->suggestPrompts();
 		}
 
-		if ($this->getPromptInput() !== null) {
+		if ($this->getPromptInput() !== null || $this->getResumeInput() !== null) {
 			$chatbotSettings = $this->getChatbotSettings();
 
 			if ($this->isRestTransport($chatbotSettings)) {
@@ -428,6 +430,85 @@ abstract class AbstractChatbotService implements IChatbotService {
 	}
 
 	/**
+	 * Reads a transport-neutral AgentResume payload from request data.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	protected function getResumeInput(): ?array {
+		$raw = $this->request->request('resume');
+		if ($raw === null) {
+			$raw = $this->request->get('resume');
+		}
+
+		$resume = null;
+		if (is_array($raw)) {
+			$resume = $raw;
+		}
+		elseif (is_string($raw) && trim($raw) !== '') {
+			$decoded = json_decode($raw, true);
+			if (is_array($decoded)) {
+				$resume = $decoded;
+			}
+		}
+
+		$handle = trim((string)($resume['resume_handle'] ?? $this->readRequestScalar('resume_handle')));
+		if ($handle === '') {
+			return null;
+		}
+
+		$responseText = trim((string)($resume['response_text'] ?? $this->readRequestScalar('resume_response')));
+		$responses = $resume['responses'] ?? $this->readRequestValue('resume_responses');
+		if (is_string($responses) && trim($responses) !== '') {
+			$decoded = json_decode($responses, true);
+			$responses = is_array($decoded) ? $decoded : [];
+		}
+		if (!is_array($responses)) {
+			$responses = [];
+		}
+
+		$result = [
+			'resume_handle' => $handle,
+			'responses' => $responses
+		];
+		if ($responseText !== '') {
+			$result['response_text'] = $responseText;
+		}
+
+		return $result;
+	}
+
+	protected function getResumeResponseText(): string {
+		$resume = $this->getResumeInput();
+		return is_array($resume) ? trim((string)($resume['response_text'] ?? '')) : '';
+	}
+
+	protected function readRequestValue(string $key): mixed {
+		$value = $this->request->request($key);
+		return $value !== null ? $value : $this->request->get($key);
+	}
+
+	protected function readRequestScalar(string $key): string {
+		$value = $this->readRequestValue($key);
+		return is_scalar($value) || $value === null ? trim((string)$value) : '';
+	}
+
+	/** @return array<string,mixed> */
+	protected function buildAgentInputs(string $systemPrompt, string $userPrompt, bool $rest): array {
+		$inputs = [
+			'system' => $systemPrompt,
+			'prompt' => $userPrompt
+		];
+		if ($rest) {
+			$inputs['mode'] = 'chat';
+		}
+		$resume = $this->getResumeInput();
+		if ($resume !== null) {
+			$inputs['resume'] = $resume;
+		}
+		return $inputs;
+	}
+
+	/**
 	 * Executes the AgentFlow for streaming.
 	 * The actual streaming is executed inside the StreamingAiAssistantNode.
 	 *
@@ -440,14 +521,11 @@ abstract class AbstractChatbotService implements IChatbotService {
 			$chatbotSettings = $this->getChatbotSettings();
 			$agentSettings = $this->getAgentSettingsForExecution($chatbotSettings);
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
-			$userPrompt = (string) $this->getPromptInput();
+			$userPrompt = (string)($this->getPromptInput() ?? $this->getResumeResponseText());
 
 			$this->agentExecutionService->stream(
 				$agentSettings,
-				[
-					'system' => $systemPrompt,
-					'prompt' => $userPrompt
-				],
+				$this->buildAgentInputs($systemPrompt, $userPrompt, false),
 				$this->getAgentContextVars($chatbotSettings)
 			);
 
@@ -474,20 +552,20 @@ abstract class AbstractChatbotService implements IChatbotService {
 
 			$agentSettings = $this->getAgentSettingsForExecution($chatbotSettings);
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
-			$userPrompt = (string) $this->getPromptInput();
+			$userPrompt = (string)($this->getPromptInput() ?? $this->getResumeResponseText());
 
 			$result = $this->agentExecutionService->run(
 				$agentSettings,
-				[
-					'system' => $systemPrompt,
-					'prompt' => $userPrompt,
-					'mode' => 'chat'
-				],
+				$this->buildAgentInputs($systemPrompt, $userPrompt, true),
 				$this->getAgentContextVars($chatbotSettings)
 			);
 
 			$output = $result->getOutput();
 			$assistantNodeId = $this->getAssistantNodeId($chatbotSettings);
+			$interaction = $this->extractInteractionRequired($result, $output, $assistantNodeId);
+			if ($interaction !== null) {
+				return $this->interactionRequiredResponse($interaction);
+			}
 			$message = $this->extractAssistantMessage($output, $assistantNodeId);
 
 			if ($message === null) {
@@ -578,6 +656,92 @@ abstract class AbstractChatbotService implements IChatbotService {
 		$nodeId = $this->getChatbotSettingString($chatbotSettings, 'agent_components_assistant_node', 'assistant');
 
 		return $nodeId !== '' ? $nodeId : 'assistant';
+	}
+
+	/**
+	 * @param array<string,mixed> $output
+	 * @return array<string,mixed>|null
+	 */
+	protected function extractInteractionRequired(
+		AgentExecutionResult $result,
+		array $output,
+		string $assistantNodeId
+	): ?array {
+		$agentResult = $result->getAgentResult();
+		if ($agentResult !== null && $agentResult->isSuspended()) {
+			$suspension = $agentResult->getState()->getSuspension();
+			if ($suspension !== null && $suspension->isSuspended()) {
+				return [
+					'status' => $suspension->getStatus(),
+					'interaction_requests' => $this->normalizeInteractionRequests($suspension->getInteractionRequests()),
+					'resume_handle' => $suspension->getResumeHandle()
+				];
+			}
+		}
+
+		$candidates = [];
+		if (isset($output[$assistantNodeId]) && is_array($output[$assistantNodeId])) {
+			$candidates[] = $output[$assistantNodeId];
+		}
+		if (isset($output['assistant']) && is_array($output['assistant'])) {
+			$candidates[] = $output['assistant'];
+		}
+		foreach ($output as $nodeOutput) {
+			if (is_array($nodeOutput)) {
+				$candidates[] = $nodeOutput;
+			}
+		}
+
+		foreach ($candidates as $candidate) {
+			$handle = trim((string)($candidate['resume_handle'] ?? ''));
+			$requests = $candidate['interaction_requests'] ?? null;
+			$status = trim((string)($candidate['status'] ?? ''));
+			if ($handle !== '' && is_array($requests) && $requests !== []) {
+				return [
+					'status' => $status,
+					'interaction_requests' => $requests,
+					'resume_handle' => $handle
+				];
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array<int,mixed> $requests
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function normalizeInteractionRequests(array $requests): array {
+		$result = [];
+		foreach ($requests as $request) {
+			if ($request instanceof AgentInteractionRequest) {
+				$result[] = $request->toArray();
+				continue;
+			}
+			if (is_array($request)) {
+				$result[] = $request;
+			}
+		}
+		return $result;
+	}
+
+	/** @param array<string,mixed> $interaction */
+	protected function interactionRequiredResponse(array $interaction): string {
+		$json = json_encode([
+			'id' => uniqid('msg_', true),
+			'type' => 'interaction_required',
+			'status' => (string)($interaction['status'] ?? ''),
+			'resume_handle' => (string)($interaction['resume_handle'] ?? ''),
+			'interaction_requests' => $this->normalizeInteractionRequests(
+				is_array($interaction['interaction_requests'] ?? null) ? $interaction['interaction_requests'] : []
+			),
+			'meta' => [
+				'timestamp' => gmdate('c')
+			]
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+		return is_string($json) ? $json : $this->errorResponse('[Chatbot runtime error] Could not encode interaction request.');
 	}
 
 	/**
