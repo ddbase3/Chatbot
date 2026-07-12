@@ -135,6 +135,23 @@
 		font-size: 18px;
 	}
 
+	.base3-chatbot-config-expert {
+		margin: 0 0 18px;
+		border: 1px solid #d7d7d7;
+		border-radius: 6px;
+		background: #fafafa;
+	}
+
+	.base3-chatbot-config-expert > summary {
+		padding: 12px 14px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.base3-chatbot-config-expert-body {
+		padding: 0 14px 14px;
+	}
+
 	.base3-chatbot-config-row {
 		display: grid;
 		grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
@@ -393,44 +410,45 @@
 			</div>
 		</div>
 
-		<div class="base3-chatbot-config-section">
-			<h3>Reference context</h3>
+		<details class="base3-chatbot-config-expert">
+			<summary>Reference context</summary>
+			<div class="base3-chatbot-config-expert-body">
+				<div class="base3-chatbot-config-row">
+					<label for="<?php echo $e($formId); ?>_reference_mode" class="base3-chatbot-config-label">Reference mode</label>
+					<div>
+						<select id="<?php echo $e($formId); ?>_reference_mode" name="reference_mode" class="form-control">
+							<option value="none"<?php echo $selected($values['reference_mode'] ?? 'url', 'none'); ?>>none</option>
+							<option value="url"<?php echo $selected($values['reference_mode'] ?? 'url', 'url'); ?>>url</option>
+							<option value="custom"<?php echo $selected($values['reference_mode'] ?? 'url', 'custom'); ?>>custom</option>
+							<option value="provider"<?php echo $selected($values['reference_mode'] ?? 'url', 'provider'); ?>>provider</option>
+						</select>
+						<p class="base3-chatbot-config-help">
+							Controls which contextual reference is sent with requests. The service can store this in the agent context.
+						</p>
+					</div>
+				</div>
 
-			<div class="base3-chatbot-config-row">
-				<label for="<?php echo $e($formId); ?>_reference_mode" class="base3-chatbot-config-label">Reference mode</label>
-				<div>
-					<select id="<?php echo $e($formId); ?>_reference_mode" name="reference_mode" class="form-control">
-						<option value="none"<?php echo $selected($values['reference_mode'] ?? 'url', 'none'); ?>>none</option>
-						<option value="url"<?php echo $selected($values['reference_mode'] ?? 'url', 'url'); ?>>url</option>
-						<option value="custom"<?php echo $selected($values['reference_mode'] ?? 'url', 'custom'); ?>>custom</option>
-						<option value="provider"<?php echo $selected($values['reference_mode'] ?? 'url', 'provider'); ?>>provider</option>
-					</select>
-					<p class="base3-chatbot-config-help">
-						Controls which contextual reference is sent with requests. The service can store this in the agent context.
-					</p>
+				<div class="base3-chatbot-config-row">
+					<label for="<?php echo $e($formId); ?>_reference" class="base3-chatbot-config-label">Static reference JSON</label>
+					<div>
+						<textarea id="<?php echo $e($formId); ?>_reference" name="reference" class="form-control base3-chatbot-config-json"><?php echo $e($values['reference_json'] ?? '{}'); ?></textarea>
+						<p class="base3-chatbot-config-help">
+							Only used for custom reference mode. Must be valid JSON.
+						</p>
+					</div>
+				</div>
+
+				<div class="base3-chatbot-config-row">
+					<label for="<?php echo $e($formId); ?>_reference_provider" class="base3-chatbot-config-label">Reference provider</label>
+					<div>
+						<input type="text" id="<?php echo $e($formId); ?>_reference_provider" name="reference_provider" class="form-control" value="<?php echo $e($values['reference_provider'] ?? ''); ?>" />
+						<p class="base3-chatbot-config-help">
+							Global JavaScript function name used by provider reference mode.
+						</p>
+					</div>
 				</div>
 			</div>
-
-			<div class="base3-chatbot-config-row">
-				<label for="<?php echo $e($formId); ?>_reference" class="base3-chatbot-config-label">Static reference JSON</label>
-				<div>
-					<textarea id="<?php echo $e($formId); ?>_reference" name="reference" class="form-control base3-chatbot-config-json"><?php echo $e($values['reference_json'] ?? '{}'); ?></textarea>
-					<p class="base3-chatbot-config-help">
-						Only used for custom reference mode. Must be valid JSON.
-					</p>
-				</div>
-			</div>
-
-			<div class="base3-chatbot-config-row">
-				<label for="<?php echo $e($formId); ?>_reference_provider" class="base3-chatbot-config-label">Reference provider</label>
-				<div>
-					<input type="text" id="<?php echo $e($formId); ?>_reference_provider" name="reference_provider" class="form-control" value="<?php echo $e($values['reference_provider'] ?? ''); ?>" />
-					<p class="base3-chatbot-config-help">
-						Global JavaScript function name used by provider reference mode.
-					</p>
-				</div>
-			</div>
-		</div>
+		</details>
 
 		<div class="base3-chatbot-config-section">
 			<h3>Chatbot service</h3>
