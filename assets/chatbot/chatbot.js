@@ -795,6 +795,7 @@
 
                         let finished = false;
                         let activityOutputPhase = false;
+                        let turnIdElem = null;
                         const stageActivityRows = new Map();
                         const toolActivityRows = new Map();
 
@@ -824,7 +825,7 @@
 
                         const updateActivityToggle = () => {
                                 const shell = ensureActivityShell();
-                                const count = ensureActivityLog().children('.agent-activity-entry').length;
+                                const count = ensureActivityLog().children('.agent-activity-entry:not(.agent-turn-id)').length;
                                 const button = shell.children('.agent-activity-toggle');
                                 const collapsed = shell.hasClass('is-collapsed');
 
@@ -854,7 +855,7 @@
                                 if (activityOutputPhase) return;
 
                                 activityOutputPhase = true;
-                                const count = ensureActivityLog().children('.agent-activity-entry').length;
+                                const count = ensureActivityLog().children('.agent-activity-entry:not(.agent-turn-id)').length;
                                 if (count > 0) {
                                         setActivityCollapsed(true);
                                 } else {
@@ -874,6 +875,25 @@
                                         node.scrollTop = node.scrollHeight;
                                         scrollToBottom();
                                 });
+                        };
+
+                        const renderTurnId = turnId => {
+                                turnId = String(turnId || '').trim();
+                                if (!turnId) return;
+
+                                if (!turnIdElem || !turnIdElem.length) {
+                                        turnIdElem = $(`
+                                                <div class="agent-activity-entry agent-stage-activity agent-turn-id" data-status="completed">
+                                                        <span class="agent-activity-icon" aria-hidden="true">#</span>
+                                                        <span class="agent-activity-label">Turn ID</span>
+                                                        <span class="agent-activity-description"></span>
+                                                </div>
+                                        `);
+                                }
+
+                                turnIdElem.find('.agent-activity-description').text(turnId);
+                                ensureActivityLog().prepend(turnIdElem);
+                                updateActivityToggle();
                         };
 
                         const stageActivityKey = payload => {
@@ -1262,6 +1282,7 @@
                                         }
 
                                         respElem.attr('data-msgid', currentMessageId);
+                                        renderTurnId(currentMessageId);
                                         return;
                                 }
 
