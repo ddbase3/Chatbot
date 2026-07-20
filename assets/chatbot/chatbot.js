@@ -841,14 +841,6 @@
                                 const shell = ensureActivityShell();
                                 shell.toggleClass('is-collapsed', Boolean(collapsed));
                                 updateActivityToggle();
-
-                                if (!collapsed) {
-                                        requestAnimationFrame(() => {
-                                                const node = ensureActivityLog()[0];
-                                                if (node) node.scrollTop = node.scrollHeight;
-                                                scrollToBottom();
-                                        });
-                                }
                         };
 
                         const beginOutputPhase = () => {
