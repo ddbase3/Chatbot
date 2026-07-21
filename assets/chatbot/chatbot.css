@@ -1016,6 +1016,31 @@
 	color: #666;
 }
 
+#chatbot .agent-interaction-summary {
+	display: grid;
+	grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.4fr);
+	gap: 5px 12px;
+	margin: 10px 0 0;
+	padding: 9px 10px;
+	border: 1px solid #e2e2e2;
+	border-radius: 7px;
+	background: #fff;
+}
+
+#chatbot .agent-interaction-summary dt,
+#chatbot .agent-interaction-summary dd {
+	margin: 0;
+	min-width: 0;
+	font-size: 12px;
+	line-height: 1.4;
+	word-break: break-word;
+}
+
+#chatbot .agent-interaction-summary dt {
+	font-weight: 600;
+	color: #555;
+}
+
 #chatbot .agent-interaction-details {
 	margin-top: 8px;
 }

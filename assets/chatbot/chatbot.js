@@ -93,6 +93,23 @@
                         };
                 }
 
+                function formatInteractionValue(value) {
+                        if (value === null || value === undefined || value === '') {
+                                return '-';
+                        }
+                        if (typeof value === 'boolean') {
+                                return value ? 'Ja' : 'Nein';
+                        }
+                        if (typeof value === 'object') {
+                                try {
+                                        return JSON.stringify(value);
+                                } catch {
+                                        return String(value);
+                                }
+                        }
+                        return String(value);
+                }
+
                 function renderInteractionRequired(targetElem, payload, onDecision) {
                         const interaction = normalizeInteractionPayload(payload);
                         if (!interaction) return false;
@@ -118,10 +135,26 @@
                                         card.append($('<div class="agent-interaction-message"></div>').text(message));
                                 }
 
-                                const summary = request.summary && typeof request.summary === 'object' ? request.summary : null;
-                                if (summary) {
-                                        const details = $('<details class="agent-interaction-details"><summary>Details</summary><pre></pre></details>');
-                                        details.find('pre').text(JSON.stringify(summary, null, 2));
+                                const summary = request.summary && typeof request.summary === 'object' && !Array.isArray(request.summary)
+                                        ? request.summary
+                                        : null;
+                                if (summary && Object.keys(summary).length) {
+                                        const summaryGrid = $('<dl class="agent-interaction-summary"></dl>');
+                                        Object.entries(summary).forEach(([label, value]) => {
+                                                summaryGrid.append($('<dt></dt>').text(String(label)));
+                                                summaryGrid.append($('<dd></dd>').text(formatInteractionValue(value)));
+                                        });
+                                        card.append(summaryGrid);
+                                }
+
+                                const action = request.action && typeof request.action === 'object' ? request.action : null;
+                                if (action) {
+                                        const technical = {
+                                                tool: String(action.name || ''),
+                                                input: action.input && typeof action.input === 'object' ? action.input : {}
+                                        };
+                                        const details = $('<details class="agent-interaction-details"><summary>Technische Details</summary><pre></pre></details>');
+                                        details.find('pre').text(JSON.stringify(technical, null, 2));
                                         card.append(details);
                                 }
 
