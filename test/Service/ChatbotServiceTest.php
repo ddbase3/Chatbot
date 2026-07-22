@@ -7,9 +7,12 @@ use AssistantFoundation\Api\IAgentExecutionService;
 use AssistantFoundation\Dto\AgentExecutionRequest;
 use AssistantFoundation\Dto\AgentExecutionResult;
 use AssistantRuntime\Service\CollectingAgentEventSink;
+use Base3\Accesscontrol\Api\IAccesscontrol;
 use Base3\Api\IRequest;
+use Base3\Session\Api\ISession;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Dto\ChatbotTurnRequest;
+use Chatbot\Service\ChatbotConversationContextFactory;
 use Chatbot\Service\ChatbotService;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
@@ -102,6 +105,45 @@ final class ChatbotServiceTest extends TestCase {
 		$this->assertSame('Done', $result->getText());
 	}
 
+	public function testExecuteTurnPassesConversationContext(): void {
+		$ownerKey = str_repeat('a', 64);
+		$executionService = $this->createMock(IAgentExecutionService::class);
+		$executionService->expects($this->once())
+			->method('execute')
+			->with(
+				$this->callback(static function(AgentExecutionRequest $request) use ($ownerKey): bool {
+					$context = $request->getContext();
+
+					return ($context['conversation_id'] ?? null) === 'conversation-1'
+						&& ($context['conversation_owner_key'] ?? null) === $ownerKey
+						&& ($context['chatbot_config_group'] ?? null) === 'chatbot'
+						&& ($context['chatbot_config_name'] ?? null) === 'example';
+				}),
+				$this->isInstanceOf(IAgentEventSink::class)
+			)
+			->willReturn(new AgentExecutionResult([
+				'assistant' => [
+					'message' => [
+						'id' => 'msg-3',
+						'content' => 'Remembered'
+					]
+				]
+			]));
+
+		$result = $this->makeService($this->createRequest([]), $executionService)->executeTurn(
+			new ChatbotTurnRequest([
+				'prompt' => 'Remember this',
+				'conversation_id' => 'conversation-1',
+				'conversation_owner_key' => $ownerKey,
+				'config_group' => 'chatbot',
+				'config_name' => 'example'
+			]),
+			new CollectingAgentEventSink()
+		);
+
+		$this->assertSame('Remembered', $result->getText());
+	}
+
 	public function testSuspendedResultReturnsInteractionRequired(): void {
 		$handle = str_repeat('b', 43);
 		$executionService = $this->createStub(IAgentExecutionService::class);
@@ -148,8 +190,18 @@ final class ChatbotServiceTest extends TestCase {
 			$request,
 			$this->createStub(ISettingsStore::class),
 			$executionService ?? $this->createStub(IAgentExecutionService::class),
-			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnRequestFactory($request, $this->makeConversationContextFactory()),
 			new ChatbotTurnResponder()
+		);
+	}
+
+	private function makeConversationContextFactory(): ChatbotConversationContextFactory {
+		$accesscontrol = $this->createStub(IAccesscontrol::class);
+		$accesscontrol->method('getUserId')->willReturn(42);
+
+		return new ChatbotConversationContextFactory(
+			$accesscontrol,
+			$this->createStub(ISession::class)
 		);
 	}
 }

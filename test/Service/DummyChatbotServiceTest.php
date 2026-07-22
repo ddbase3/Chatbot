@@ -3,8 +3,11 @@
 namespace Test\Chatbot\Service;
 
 use AssistantRuntime\Service\CollectingAgentEventSink;
+use Base3\Accesscontrol\Api\IAccesscontrol;
 use Base3\Api\IRequest;
+use Base3\Session\Api\ISession;
 use Chatbot\Dto\ChatbotTurnRequest;
+use Chatbot\Service\ChatbotConversationContextFactory;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\DummyChatbotService;
@@ -25,7 +28,7 @@ final class DummyChatbotServiceTest extends TestCase {
 		$request = $this->createStub(IRequest::class);
 		$service = new DummyChatbotService(
 			$request,
-			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnRequestFactory($request, $this->makeConversationContextFactory()),
 			new ChatbotTurnResponder()
 		);
 		$sink = new CollectingAgentEventSink();
@@ -54,7 +57,7 @@ final class DummyChatbotServiceTest extends TestCase {
 		);
 		$service = new DummyChatbotService(
 			$request,
-			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnRequestFactory($request, $this->makeConversationContextFactory()),
 			new ChatbotTurnResponder()
 		);
 
@@ -62,5 +65,15 @@ final class DummyChatbotServiceTest extends TestCase {
 
 		$this->assertSame('message', $data['type'] ?? null);
 		$this->assertStringContainsString('Hello', (string)($data['text'] ?? ''));
+	}
+
+	private function makeConversationContextFactory(): ChatbotConversationContextFactory {
+		$accesscontrol = $this->createStub(IAccesscontrol::class);
+		$accesscontrol->method('getUserId')->willReturn(42);
+
+		return new ChatbotConversationContextFactory(
+			$accesscontrol,
+			$this->createStub(ISession::class)
+		);
 	}
 }

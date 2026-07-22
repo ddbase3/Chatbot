@@ -17,11 +17,14 @@
 
 namespace Chatbot;
 
+use Base3\Accesscontrol\Api\IAccesscontrol;
 use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
 use Base3\Api\IRequest;
+use Base3\Session\Api\ISession;
 use Chatbot\Api\IChatbotTurnRequestStore;
+use Chatbot\Service\ChatbotConversationContextFactory;
 use Chatbot\Service\ChatbotServiceRegistry;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
@@ -39,8 +42,19 @@ class ChatbotPlugin implements IPlugin {
 		$this->container
 			->set(self::getName(), $this, IContainer::SHARED)
 			->set(
+				ChatbotConversationContextFactory::class,
+				fn($c) => new ChatbotConversationContextFactory(
+					$c->get(IAccesscontrol::class),
+					$c->get(ISession::class)
+				),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
 				ChatbotTurnRequestFactory::class,
-				fn($c) => new ChatbotTurnRequestFactory($c->get(IRequest::class)),
+				fn($c) => new ChatbotTurnRequestFactory(
+					$c->get(IRequest::class),
+					$c->get(ChatbotConversationContextFactory::class)
+				),
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			)
 			->set(

@@ -150,6 +150,8 @@ abstract class AbstractChatbotService implements IChatbotService {
 	protected function getAgentContextVars(ChatbotTurnRequest $turn, array $chatbotSettings): array {
 		return [
 			'reference' => $turn->getReference(),
+			'conversation_id' => $turn->getConversationId(),
+			'conversation_owner_key' => $turn->getConversationOwnerKey(),
 			'chatbot_config_group' => $turn->getConfigGroup(),
 			'chatbot_config_name' => $turn->getConfigName(),
 			'chatbot_config' => $chatbotSettings

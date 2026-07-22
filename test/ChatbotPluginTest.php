@@ -5,6 +5,7 @@ namespace Chatbot\Test;
 use Base3\Api\IContainer;
 use Chatbot\Api\IChatbotTurnRequestStore;
 use Chatbot\ChatbotPlugin;
+use Chatbot\Service\ChatbotConversationContextFactory;
 use Chatbot\Service\ChatbotServiceRegistry;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
@@ -24,6 +25,7 @@ class ChatbotPluginTest extends TestCase {
 		$plugin->init();
 
 		$this->assertTrue($container->has(ChatbotPlugin::getName()));
+		$this->assertTrue($container->has(ChatbotConversationContextFactory::class));
 		$this->assertTrue($container->has(ChatbotTurnRequestFactory::class));
 		$this->assertTrue($container->has(ChatbotTurnResponder::class));
 		$this->assertTrue($container->has(SessionChatbotTurnRequestStore::class));

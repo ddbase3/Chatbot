@@ -38,6 +38,20 @@ Supported transport values are:
 
 The current browser UI, voice integration, threads and canvas events use the same event names for every agent runtime.
 
+## Conversation identity
+
+The browser creates one stable `conversation_id` per configured chatbot and
+stores it in `localStorage`. The ID is included in REST turns and in the
+POST-to-ID-to-SSE payload. Before execution, Chatbot replaces any submitted
+owner value with a server-generated hash of the authenticated user or anonymous
+BASE3 session.
+
+The runtime receives the conversation ID, owner key and chatbot configuration
+identity in `AgentExecutionRequest::context`. Runtimes that support persistent
+memory can use that scope; runtimes that do not support it remain unaffected.
+The current "Start new chat" button creates a new conversation ID and reloads
+the widget.
+
 ## Chatbot backend selection
 
 The configuration UI has one backend field. It combines direct chatbot services and registered agent runtimes in one list, for example:

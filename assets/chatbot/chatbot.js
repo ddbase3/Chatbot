@@ -23,10 +23,53 @@
                 $root.find('.chatbot-main').append(suggestionsContainer);
 
                 let pendingInteraction = null;
+                const conversationStorageKey = [
+                        'base3.chatbot.conversation',
+                        String(config.configGroup || 'default'),
+                        String(config.configName || 'default')
+                ].join('.');
+                let conversationId = loadConversationId();
 
                 // ---------------------------------------------------------------------
                 // Utility
                 // ---------------------------------------------------------------------
+
+                function createConversationId() {
+                        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                                return window.crypto.randomUUID();
+                        }
+
+                        const randomPart = Math.random().toString(16).slice(2);
+                        return 'conversation-' + Date.now().toString(16) + '-' + randomPart;
+                }
+
+                function loadConversationId() {
+                        try {
+                                const stored = String(window.localStorage.getItem(conversationStorageKey) || '').trim();
+                                if (stored) {
+                                        return stored;
+                                }
+                        } catch (error) {
+                        }
+
+                        const id = createConversationId();
+                        persistConversationId(id);
+                        return id;
+                }
+
+                function persistConversationId(id) {
+                        try {
+                                window.localStorage.setItem(conversationStorageKey, id);
+                        } catch (error) {
+                        }
+                }
+
+                function startNewConversation() {
+                        conversationId = createConversationId();
+                        persistConversationId(conversationId);
+                        pendingInteraction = null;
+                        window.location.reload();
+                }
 
                 function scrollToBottom() {
                         chatControl.stop().animate({ scrollTop: chatControl[0].scrollHeight }, 300);
@@ -677,7 +720,8 @@
                                 const data = {
                                         ...base,
                                         config_group: String(config.configGroup || ''),
-                                        config_name: String(config.configName || '')
+                                        config_name: String(config.configName || ''),
+                                        conversation_id: conversationId
                                 };
                                 if (resumeContext) {
                                         data.resume_handle = resumeContext.resume_handle;
@@ -1418,8 +1462,29 @@
                                 // ERROR
                                 // -----------------------------
                                 if (event === 'error') {
+                                        if (finished) return;
+                                        finished = true;
+
+                                        beginOutputPhase();
                                         hideThinking();
                                         console.error('Streaming error event:', data);
+
+                                        const technicalMessage = data && typeof data === 'object'
+                                                ? String(data.message || '')
+                                                : String(data || '');
+                                        const userMessage = data && typeof data === 'object' && data.user_message
+                                                ? String(data.user_message)
+                                                : 'Es ist ein technischer Fehler aufgetreten. Die Anfrage konnte nicht vollständig abgeschlossen werden.';
+                                        contentElem.empty();
+                                        contentElem.append($('<div class="error"></div>').text(userMessage));
+
+                                        if (technicalMessage && technicalMessage !== userMessage) {
+                                                const details = $('<details class="chatbot-error-details"><summary>Technische Details</summary><pre></pre></details>');
+                                                details.find('pre').text(technicalMessage);
+                                                contentElem.append(details);
+                                        }
+
+                                        scrollToResponse();
                                         client.close();
                                 }
                         });
@@ -1456,10 +1521,11 @@
                         const threadsCtrl = new ChatThreadsControl({
                                 events: {
                                         onListRequested: () => {},
-                                        onNewThreadRequested: () => {}
+                                        onNewThreadRequested: () => startNewConversation()
                                 }
                         });
 
+                        threadsCtrl.setActiveThread(conversationId);
                         threadsCtrl.attachTo(threadsHost[0]);
                         root._threadsCtrl = threadsCtrl;
                 }

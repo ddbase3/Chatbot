@@ -25,7 +25,10 @@ use Chatbot\Dto\ChatbotTurnRequest;
  */
 final class ChatbotTurnRequestFactory {
 
-	public function __construct(private readonly IRequest $request) {}
+	public function __construct(
+		private readonly IRequest $request,
+		private readonly ChatbotConversationContextFactory $conversationContextFactory
+	) {}
 
 	public static function getName(): string {
 		return 'chatbotturnrequestfactory';
@@ -37,18 +40,21 @@ final class ChatbotTurnRequestFactory {
 			$prompt = $this->readValue('user');
 		}
 
-		return new ChatbotTurnRequest([
+		$payload = [
 			'prompt' => $prompt,
 			'config_group' => $this->readValue('config_group'),
 			'config_name' => $this->readValue('config_name'),
 			'transport_mode' => $this->readValue('transport_mode'),
+			'conversation_id' => $this->readValue('conversation_id'),
 			'reference' => $this->readValue('reference'),
 			'reference_format' => $this->readValue('reference_format'),
 			'resume' => $this->readValue('resume'),
 			'resume_handle' => $this->readValue('resume_handle'),
 			'resume_response' => $this->readValue('resume_response'),
 			'resume_responses' => $this->readValue('resume_responses')
-		]);
+		];
+
+		return new ChatbotTurnRequest($this->conversationContextFactory->enrich($payload));
 	}
 
 	private function readValue(string $key): mixed {
