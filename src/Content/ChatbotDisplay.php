@@ -52,6 +52,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 		$config = $this->getClientConfig();
 		$config['service_url'] = $this->buildServiceUrl($config);
+		$config['turn_prepare_url'] = $this->buildTurnPrepareUrl();
 
 		foreach ($config as $tag => $content) {
 			$this->view->assign($tag, $content);
@@ -127,7 +128,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'use_threads' => $this->toBool($config['use_threads'] ?? $defaults['use_threads']),
 			'transport_mode' => $this->normalizeEnum(
 				(string) ($config['transport_mode'] ?? $defaults['transport_mode']),
-				['auto', 'sse', 'websocket', 'rest'],
+				['auto', 'sse', 'rest'],
 				'auto'
 			),
 			'reference_mode' => $this->normalizeEnum(
@@ -197,6 +198,12 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			],
 			$params
 		);
+	}
+
+	protected function buildTurnPrepareUrl(): string {
+		return $this->linkTargetService->getLink([
+			'name' => 'chatbotturnprepare'
+		]);
 	}
 
 	/** @param array<string,mixed> $config */
@@ -317,7 +324,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 				'transport_mode' => [
 					'type' => 'string',
-					'enum' => ['auto', 'sse', 'websocket', 'rest'],
+					'enum' => ['auto', 'sse', 'rest'],
 					'description' => 'Transport protocol for streaming responses',
 					'default' => 'auto'
 				],

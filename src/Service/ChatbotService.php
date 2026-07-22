@@ -20,7 +20,6 @@ namespace Chatbot\Service;
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentExecutionService;
-use EventTransport\Api\IEventStreamFactory;
 
 /**
  * Class ChatbotService
@@ -37,9 +36,16 @@ class ChatbotService extends AbstractChatbotService {
 		IRequest $request,
 		ISettingsStore $settingsStore,
 		IAgentExecutionService $agentExecutionService,
-		IEventStreamFactory $eventStreamFactory
+		ChatbotTurnRequestFactory $turnRequestFactory,
+		ChatbotTurnResponder $turnResponder
 	) {
-		parent::__construct($request, $settingsStore, $agentExecutionService, $eventStreamFactory);
+		parent::__construct(
+			$request,
+			$settingsStore,
+			$agentExecutionService,
+			$turnRequestFactory,
+			$turnResponder
+		);
 	}
 
 	public static function getName(): string {

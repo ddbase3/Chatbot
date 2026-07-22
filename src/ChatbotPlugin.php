@@ -17,23 +17,51 @@
 
 namespace Chatbot;
 
+use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
+use Base3\Api\IRequest;
+use Chatbot\Api\IChatbotTurnRequestStore;
+use Chatbot\Service\ChatbotServiceRegistry;
+use Chatbot\Service\ChatbotTurnRequestFactory;
+use Chatbot\Service\ChatbotTurnResponder;
+use Chatbot\Service\SessionChatbotTurnRequestStore;
 
 class ChatbotPlugin implements IPlugin {
 
 	public function __construct(private readonly IContainer $container) {}
 
-	// Implementation of IBase
-
 	public static function getName(): string {
 		return 'chatbotplugin';
 	}
 
-	// Implementation of IPlugin
-
 	public function init() {
 		$this->container
-			->set(self::getName(), $this, IContainer::SHARED);
+			->set(self::getName(), $this, IContainer::SHARED)
+			->set(
+				ChatbotTurnRequestFactory::class,
+				fn($c) => new ChatbotTurnRequestFactory($c->get(IRequest::class)),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotTurnResponder::class,
+				fn() => new ChatbotTurnResponder(),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				SessionChatbotTurnRequestStore::class,
+				fn() => new SessionChatbotTurnRequestStore(),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				IChatbotTurnRequestStore::class,
+				fn($c) => $c->get(SessionChatbotTurnRequestStore::class),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotServiceRegistry::class,
+				fn($c) => new ChatbotServiceRegistry($c->get(IClassMap::class)),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			);
 	}
 }

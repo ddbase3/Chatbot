@@ -17,13 +17,13 @@
 
 namespace Chatbot\Api;
 
+use AssistantFoundation\Api\IAgentEventSink;
 use Base3\Api\IOutput;
+use Chatbot\Dto\ChatbotTurnRequest;
+use Chatbot\Dto\ChatbotTurnResult;
 
 /**
- * Interface IChatbotService
- *
- * Marks routable chatbot service endpoints and provides small UI metadata
- * for configuration displays.
+ * Routable chatbot backend with explicit turn execution.
  */
 interface IChatbotService extends IOutput {
 
@@ -36,4 +36,12 @@ interface IChatbotService extends IOutput {
 	 * Returns a short description for administrators configuring a chatbot.
 	 */
 	public static function getServiceDescription(): string;
+
+	/**
+	 * Executes one explicit chatbot turn without depending on HTTP request state.
+	 */
+	public function executeTurn(
+		ChatbotTurnRequest $request,
+		IAgentEventSink $eventSink
+	): ChatbotTurnResult;
 }

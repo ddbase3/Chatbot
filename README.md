@@ -1,82 +1,71 @@
 # Chatbot
 
-Chatbot provides a configurable BASE3 chat application that is independent of the concrete agent runtime. It consumes the shared AssistantFoundation contracts and currently uses EventTransport only as its HTTP event-stream adapter.
+Chatbot provides a configurable BASE3 chat application that is independent of the concrete agent runtime. It consumes the shared AssistantFoundation contracts and owns its complete REST/SSE transport.
 
 ## Runtime boundary
 
-`Chatbot\Service\AbstractChatbotService` calls `AssistantFoundation\Api\IAgentExecutionService::execute()` for both REST and streaming requests.
+`Chatbot\Service\AbstractChatbotService` calls `AssistantFoundation\Api\IAgentExecutionService::execute()` for every agent-backed turn.
 
 - REST uses a collecting event sink and formats the terminal result as JSON.
-- Streaming creates an `EventStreamAgentEventSink` and forwards runtime events to the browser.
+- SSE uses the Chatbot-owned `SseAgentEventSink`.
 - MissionBay and alternative runtimes are selected per chatbot record without changing the chatbot service or UI protocol.
+- Runtime-specific configuration is supplied through the shared `IAgentConfigFormService` contract.
 
-Runtime-specific configuration fields are supplied through `IAgentConfigFormService`. Its concrete composite implementation lives in `AssistantRuntime`; Chatbot imports neither MissionBay nor NeuronAi contracts.
+Chatbot imports neither MissionBay nor NeuronAi contracts.
 
 ## Large prompts and SSE
 
-The existing EventTransport POST-to-ID-to-GET sequence remains supported:
+Browser `EventSource` supports GET only, while chatbot prompts can exceed practical URL limits. Chatbot therefore owns a two-step, single-use turn transport:
 
-1. The browser submits the complete prompt payload through POST.
-2. EventTransport stores it temporarily and returns an opaque request ID.
-3. Browser `EventSource` opens the GET stream using that ID.
-4. The server consumes the stored payload and invokes the chatbot endpoint.
+1. `chatbotturnprepare` receives the complete turn through POST.
+2. `SessionChatbotTurnRequestStore` stores the payload for at most five minutes and returns an opaque random ID.
+3. `chatbotturnstream` claims and deletes the turn by ID.
+4. The stream endpoint resolves the selected `IChatbotService` and executes it directly.
 
-This avoids URL-length limits while retaining browser-native SSE. A later cleanup can move the request store and stream endpoint into Chatbot without changing `IAgentExecutionService`.
+There is no internal HTTP or cURL request. The session lock is released before the long-running agent execution starts.
+
+The session-backed request store is the default implementation. Multi-node installations can replace `IChatbotTurnRequestStore` through DI with a shared store without changing the browser protocol.
 
 ## Configuration
 
-A chatbot instance stores UI settings, transport mode, prompts, references, and runtime-specific agent settings in `ISettingsStore`.
+A chatbot instance stores UI settings, prompts, references, transport mode and runtime-specific agent settings in `ISettingsStore`.
 
 Supported transport values are:
 
-- `auto`
+- `auto`, resolved as SSE by the browser client
 - `sse`
-- `websocket`
 - `rest`
 
-The current browser UI, voice integration, threads, and canvas events remain compatible with the existing event names.
+The current browser UI, voice integration, threads and canvas events use the same event names for every agent runtime.
+
+## Chatbot backend selection
+
+The configuration UI has one backend field. It combines direct chatbot services and registered agent runtimes in one list, for example:
+
+- Dummy Chatbot Service
+- MissionBay
+- Neuron AI
+
+Choosing a runtime activates only that runtime's configuration fields. The chatbot stores `chatbot_backend=runtime:<id>` while Agent Admin stores `agent_runtime=<id>`. Both paths execute through the same AssistantRuntime router.
+
+## Runtime form data contract
+
+`IAgentConfigFormService::assignViewData()` receives persisted or normalized settings. Host displays must not pass values that were already transformed by `settingsToViewValues()`, because runtime-specific structured values such as the MissionBay `agent_flow` would otherwise be converted twice and lost.
+
+## Persisted backend resolution
+
+The public `ChatbotDisplay` resolves the backend and UI settings from the same SettingsStore record edited by `ChatbotConfigDisplay`. Page-component data only provides the `config_group` and `config_name` identity. Legacy page components that still contain a direct `service` value remain supported.
+
+`DummyChatbotService` implements both SSE and REST responses and uses the same `msgid`, `token` and `done` event names as the regular agent-backed service.
 
 ## Requirements
 
 - PHP 8.1 or newer
 - BASE3 Framework
 - AssistantFoundation
-- an `IAgentExecutionService` implementation
-- EventTransport while the current SSE adapter is in use
+- AssistantRuntime
+- an `IAgentExecutionService` implementation for agent-backed backends
 
 ## License
 
 GPL-3.0. See `LICENSE`.
-
-## Chatbot backend selection
-
-The configuration UI has one backend field. It combines direct chatbot
-services and registered agent runtimes in one list, for example:
-
-- Dummy Chatbot Service
-- MissionBay
-- Neuron AI
-
-Choosing a runtime activates only that runtime's configuration fields. The
-chatbot stores `chatbot_backend=runtime:<id>` while Agent Admin stores
-`agent_runtime=<id>`. Both paths execute through the same AssistantRuntime
-router.
-
-## Runtime form data contract
-
-`IAgentConfigFormService::assignViewData()` receives persisted or normalized
-settings. Host displays must not pass values that were already transformed by
-`settingsToViewValues()`, because runtime-specific structured values such as the
-MissionBay `agent_flow` would otherwise be converted twice and lost.
-
-## Persisted backend resolution
-
-The public `ChatbotDisplay` resolves the backend and UI settings from the same
-SettingsStore record edited by `ChatbotConfigDisplay`. Page-component data only
-provides the `config_group` and `config_name` identity. This prevents a saved
-direct service such as `DummyChatbotService` from falling back to the host's
-default agent runtime. Legacy page components that still contain a direct
-`service` value remain supported.
-
-`DummyChatbotService` implements both SSE and REST responses and uses the same
-`msgid`, `token` and `done` event names as the regular chatbot client.

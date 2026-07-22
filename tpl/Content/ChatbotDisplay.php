@@ -185,7 +185,7 @@ function initChatbotWidget() {
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/ClientStack/assets/marked/marked.js'); ?>');
 <?php } ?>
 <?php if ($this->_['transport_mode'] !== 'rest') { ?>
-		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/EventTransport/assets/eventtransportclient.js'); ?>');
+		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbotstreamclient.js'); ?>');
 <?php } ?>
 		await AssetLoader.loadScriptAsync('<?php echo $this->_['resolve']('plugin/Chatbot/assets/chatbot/chatbot.js'); ?>');
 
@@ -196,6 +196,8 @@ function initChatbotWidget() {
 			useThreads: <?php echo !empty($this->_['use_threads']) ? 'true' : 'false'; ?>,
 
 			serviceUrl: <?php echo json_encode((string) $this->_['service_url'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			serviceId: <?php echo json_encode((string) $this->_['service'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			turnPrepareUrl: <?php echo json_encode((string) $this->_['turn_prepare_url'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 			transportMode: <?php echo json_encode((string) $this->_['transport_mode'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 
 			configGroup: <?php echo json_encode((string) ($this->_['config_group'] ?? ''), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,

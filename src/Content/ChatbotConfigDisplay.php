@@ -350,7 +350,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_threads' => $this->request->request('use_threads') !== null,
 			'transport_mode' => $this->normalizeEnum(
 				(string)$this->request->request('transport_mode'),
-				['auto', 'sse', 'websocket', 'rest'],
+				['auto', 'sse', 'rest'],
 				'auto'
 			),
 			'reference_mode' => $this->normalizeEnum(
@@ -386,7 +386,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_threads' => $this->request->request('use_threads') !== null,
 			'transport_mode' => $this->normalizeEnum(
 				(string)$this->request->request('transport_mode'),
-				['auto', 'sse', 'websocket', 'rest'],
+				['auto', 'sse', 'rest'],
 				'auto'
 			),
 			'reference_mode' => $this->normalizeEnum(
@@ -605,7 +605,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_threads' => $this->toBool($settings['use_threads'] ?? $defaults['use_threads']),
 			'transport_mode' => $this->normalizeEnum(
 				(string)($settings['transport_mode'] ?? $defaults['transport_mode']),
-				['auto', 'sse', 'websocket', 'rest'],
+				['auto', 'sse', 'rest'],
 				(string)$defaults['transport_mode']
 			),
 			'reference_mode' => $this->normalizeEnum(

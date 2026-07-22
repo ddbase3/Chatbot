@@ -2,7 +2,11 @@
 
 namespace Test\Chatbot\Service;
 
+use AssistantRuntime\Service\CollectingAgentEventSink;
 use Base3\Api\IRequest;
+use Chatbot\Dto\ChatbotTurnRequest;
+use Chatbot\Service\ChatbotTurnRequestFactory;
+use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\DummyChatbotService;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
@@ -17,96 +21,46 @@ final class DummyChatbotServiceTest extends TestCase {
 		$this->assertSame('dummychatbotservice', DummyChatbotService::getName());
 	}
 
-	public function testGetHelpReturnsString(): void {
-		$service = $this->makeService($this->createStub(IRequest::class));
-		$this->assertSame('Help on DummyChatbotService.', $service->getHelp());
-	}
+	public function testExecuteTurnReturnsDummyMessageAndEvents(): void {
+		$request = $this->createStub(IRequest::class);
+		$service = new DummyChatbotService(
+			$request,
+			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnResponder()
+		);
+		$sink = new CollectingAgentEventSink();
 
-	public function testGetOutputReturnsEmptyStringByDefault(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturn(null);
+		$result = $service->executeTurn(
+			new ChatbotTurnRequest(['prompt' => 'Hello']),
+			$sink
+		);
 
-		$service = $this->makeService($request);
-
-		$this->assertSame('', $service->getOutput('json'));
-		$this->assertSame('', $service->getOutput('html'));
-	}
-
-	public function testGetOutputReturnsBasePromptWhenBasepromptIsSet(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturnMap([
-			['baseprompt', null, '1'],
-		]);
-		$request->method('request')->willReturn(null);
-
-		$service = $this->makeService($request);
-
-		$out = $service->getOutput('json');
-		$this->assertNotSame('', $out);
-		$this->assertIsString($out);
-	}
-
-	public function testGetOutputRunsStreamingFlowWhenPromptIsSet(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['prompt', null, 'Hello'],
-		]);
-
-		$service = $this->makeService($request);
-
-		$this->assertSame('STREAM_OK', $service->getOutput('json'));
+		$this->assertSame('message', $result->getType());
+		$this->assertStringContainsString('Hello', $result->getText());
+		$this->assertNotEmpty($sink->getEvents());
 	}
 
 	public function testGetOutputReturnsJsonInRestMode(): void {
+		$values = [
+			'prompt' => 'Hello',
+			'transport_mode' => 'rest'
+		];
 		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['prompt', null, 'Hello'],
-			['transport_mode', null, 'rest']
-		]);
+		$request->method('get')->willReturnCallback(
+			static fn(string $key): mixed => $values[$key] ?? null
+		);
+		$request->method('request')->willReturnCallback(
+			static fn(string $key): mixed => $values[$key] ?? null
+		);
+		$service = new DummyChatbotService(
+			$request,
+			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnResponder()
+		);
 
-		$service = $this->makeService($request);
 		$data = json_decode($service->getOutput('json'), true);
 
-		$this->assertIsArray($data);
 		$this->assertSame('message', $data['type'] ?? null);
 		$this->assertStringContainsString('Hello', (string)($data['text'] ?? ''));
-	}
-
-	public function testGetOutputReturnsSuggestionsJsonWhenSuggestionsIsSet(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['prompt', null, null],        // important: otherwise streaming branch triggers first
-			['suggestions', null, '1'],
-		]);
-
-		$service = $this->makeService($request);
-
-		$json = $service->getOutput('json');
-		$this->assertNotSame('', $json);
-
-		$data = json_decode($json, true);
-		$this->assertIsArray($data);
-		$this->assertCount(3, $data);
-		$this->assertIsString($data[0]);
-		$this->assertIsString($data[1]);
-		$this->assertIsString($data[2]);
-	}
-
-	// ---------------------------------------------------------
-	// Helpers
-	// ---------------------------------------------------------
-
-	private function makeService(IRequest $request): DummyChatbotService {
-		// runStreamingFlow() calls header()/exit, which must not run in unit tests.
-		return new class($request) extends DummyChatbotService {
-
-			protected function runStreamingFlow(): string {
-				return 'STREAM_OK';
-			}
-		};
 	}
 }

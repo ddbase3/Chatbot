@@ -674,7 +674,11 @@
                                 ? { ...pendingInteraction }
                                 : null;
                         const buildRequestPayload = base => {
-                                const data = { ...base };
+                                const data = {
+                                        ...base,
+                                        config_group: String(config.configGroup || ''),
+                                        config_name: String(config.configName || '')
+                                };
                                 if (resumeContext) {
                                         data.resume_handle = resumeContext.resume_handle;
                                         data.resume_response = plain;
@@ -808,11 +812,9 @@
                         // STREAMING MODE
                         // -----------------------------------------------------------------
 
-                        const streamUrl = config.serviceUrl;
-
-                        const client = new EventTransportClient({
-                                endpoint: streamUrl,
-                                transport: config.transportMode || 'auto',
+                        const client = new ChatbotStreamClient({
+                                prepareUrl: config.turnPrepareUrl,
+                                service: config.serviceId,
                                 events: [
                                         'msgid', 'token', 'done', 'error',
                                         'tool.started', 'tool.finished', 'tool.error',
@@ -822,7 +824,7 @@
                                 ],
                                 payload: buildRequestPayload({
                                         prompt: plain,
-                                        transport_mode: config.transportMode || 'auto'
+                                        transport_mode: 'sse'
                                 })
                         });
 

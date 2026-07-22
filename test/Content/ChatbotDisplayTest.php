@@ -33,6 +33,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('runtime:neuronai', $view->getAssigned('chatbot_backend'));
 		$this->assertSame('chatbotservice', $view->getAssigned('service'));
 		$this->assertSame('/service/chatbotservice', $view->getAssigned('service_url'));
+		$this->assertSame('/service/chatbotturnprepare', $view->getAssigned('turn_prepare_url'));
 		$this->assertTrue($view->getAssigned('use_markdown'));
 		$this->assertTrue($view->getAssigned('use_icons'));
 		$this->assertTrue($view->getAssigned('use_voice'));
@@ -108,7 +109,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('object', $schema['type'] ?? null);
 		$this->assertArrayHasKey('chatbot_backend', $properties);
 		$this->assertSame('runtime:neuronai', $properties['chatbot_backend']['default'] ?? null);
-		$this->assertSame(['auto', 'sse', 'websocket', 'rest'], $properties['transport_mode']['enum'] ?? null);
+		$this->assertSame(['auto', 'sse', 'rest'], $properties['transport_mode']['enum'] ?? null);
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
 	}
 

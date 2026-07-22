@@ -2,9 +2,14 @@
 
 namespace Chatbot\Test;
 
-use PHPUnit\Framework\TestCase;
-use Chatbot\ChatbotPlugin;
 use Base3\Api\IContainer;
+use Chatbot\Api\IChatbotTurnRequestStore;
+use Chatbot\ChatbotPlugin;
+use Chatbot\Service\ChatbotServiceRegistry;
+use Chatbot\Service\ChatbotTurnRequestFactory;
+use Chatbot\Service\ChatbotTurnResponder;
+use Chatbot\Service\SessionChatbotTurnRequestStore;
+use PHPUnit\Framework\TestCase;
 
 class ChatbotPluginTest extends TestCase {
 
@@ -12,23 +17,24 @@ class ChatbotPluginTest extends TestCase {
 		$this->assertSame('chatbotplugin', ChatbotPlugin::getName());
 	}
 
-	public function testInitRegistersPluginInContainerAsShared(): void {
+	public function testInitRegistersChatbotTransportServices(): void {
 		$container = new FakeContainer();
 		$plugin = new ChatbotPlugin($container);
 
 		$plugin->init();
 
 		$this->assertTrue($container->has(ChatbotPlugin::getName()));
-		$this->assertSame(IContainer::SHARED, $container->getLastFlags());
-		$this->assertSame($plugin, $container->get(ChatbotPlugin::getName()));
+		$this->assertTrue($container->has(ChatbotTurnRequestFactory::class));
+		$this->assertTrue($container->has(ChatbotTurnResponder::class));
+		$this->assertTrue($container->has(SessionChatbotTurnRequestStore::class));
+		$this->assertTrue($container->has(IChatbotTurnRequestStore::class));
+		$this->assertTrue($container->has(ChatbotServiceRegistry::class));
 	}
-
 }
 
 class FakeContainer implements IContainer {
 
 	private array $items = [];
-	private ?int $lastFlags = null;
 
 	public function getServiceList(): array {
 		return array_keys($this->items);
@@ -36,7 +42,6 @@ class FakeContainer implements IContainer {
 
 	public function set(string $name, $classDefinition, $flags = 0): IContainer {
 		$this->items[$name] = $classDefinition;
-		$this->lastFlags = (int)$flags;
 		return $this;
 	}
 
@@ -51,9 +56,4 @@ class FakeContainer implements IContainer {
 	public function get(string $name) {
 		return $this->items[$name] ?? null;
 	}
-
-	public function getLastFlags(): ?int {
-		return $this->lastFlags;
-	}
-
 }

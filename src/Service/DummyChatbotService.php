@@ -17,21 +17,23 @@
 
 namespace Chatbot\Service;
 
+use AssistantFoundation\Api\IAgentEventSink;
+use AssistantFoundation\Dto\AgentExecutionEvent;
 use Base3\Api\IRequest;
 use Chatbot\Api\IChatbotService;
+use Chatbot\Dto\ChatbotTurnRequest;
+use Chatbot\Dto\ChatbotTurnResult;
 
 /**
- * DummyChatbotService
- *
  * Dummy / UI-test service without external dependencies.
  */
 class DummyChatbotService implements IChatbotService {
 
-	private IRequest $request;
-
-	public function __construct(IRequest $request) {
-		$this->request = $request;
-	}
+	public function __construct(
+		private readonly IRequest $request,
+		private readonly ChatbotTurnRequestFactory $turnRequestFactory,
+		private readonly ChatbotTurnResponder $turnResponder
+	) {}
 
 	public static function getName(): string {
 		return 'dummychatbotservice';
@@ -54,47 +56,49 @@ class DummyChatbotService implements IChatbotService {
 			return $this->suggestPrompts();
 		}
 
-		if ($this->getPromptInput() !== null) {
-			return $this->getTransportMode() === 'rest'
-				? $this->runRestFlow($final)
-				: $this->runStreamingFlow();
+		$turn = $this->turnRequestFactory->fromCurrentRequest();
+		if (!$turn->hasPromptOrResume()) {
+			return '';
 		}
 
-		return '';
+		return $turn->getTransportMode() === 'rest'
+			? $this->turnResponder->respondRest($this, $turn, $final)
+			: $this->turnResponder->respondSse($this, $turn);
+	}
+
+	public function executeTurn(
+		ChatbotTurnRequest $request,
+		IAgentEventSink $eventSink
+	): ChatbotTurnResult {
+		$id = uniqid('msg_', true);
+		$tokens = $this->getResponseTokens($request);
+
+		$eventSink->emit(new AgentExecutionEvent('msgid', ['id' => $id]));
+		foreach ($tokens as $token) {
+			if ($eventSink->isCancelled()) {
+				break;
+			}
+			$eventSink->emit(new AgentExecutionEvent('token', [
+				'type' => 'token',
+				'text' => $token
+			]));
+		}
+		$eventSink->emit(new AgentExecutionEvent('done', [
+			'type' => 'done',
+			'status' => 'completed',
+			'meta' => [
+				'timestamp' => gmdate('c')
+			]
+		]));
+
+		return ChatbotTurnResult::message($id, implode('', $tokens));
 	}
 
 	public function getHelp(): string {
 		return 'Help on DummyChatbotService.';
 	}
 
-	protected function getPromptInput(): ?string {
-		$prompt = $this->request->request('prompt');
-
-		if ($prompt === null) {
-			$prompt = $this->request->get('prompt');
-		}
-
-		if ($prompt === null) {
-			return null;
-		}
-
-		return (string)$prompt;
-	}
-
-	protected function getTransportMode(): string {
-		$mode = $this->request->request('transport_mode');
-		if ($mode === null) {
-			$mode = $this->request->get('transport_mode');
-		}
-
-		return strtolower(trim((string)$mode));
-	}
-
 	protected function getBasePrompt(): string {
-		return $this->getSimpleBasePrompt();
-	}
-
-	protected function getSimpleBasePrompt(): string {
 		$base = [
 			'Hallo! 👋',
 			'Hi! Womit soll ich dir helfen?',
@@ -104,84 +108,24 @@ class DummyChatbotService implements IChatbotService {
 		return $base[array_rand($base)];
 	}
 
-	protected function runRestFlow(bool $final): string {
-		if ($final && !headers_sent()) {
-			header('Content-Type: application/json; charset=UTF-8');
-		}
-
-		$response = [
-			'id' => uniqid('msg_', true),
-			'type' => 'message',
-			'text' => $this->buildResponseText()
-		];
-		$json = json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-		return is_string($json) ? $json : '{"type":"error","text":"Dummy response could not be encoded."}';
-	}
-
-	protected function runStreamingFlow(): string {
-		header('Content-Type: text/event-stream; charset=utf-8');
-		header('Cache-Control: no-cache');
-		header('Connection: keep-alive');
-
-		$emit = function(string $event, array $data): void {
-			echo "event: {$event}\n";
-			echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
-
-			if (function_exists('ob_flush')) {
-				@ob_flush();
-			}
-
-			@flush();
-		};
-
-		$emit('msgid', [
-			'id' => uniqid('msg_', true)
-		]);
-
-		foreach ($this->getResponseTokens() as $token) {
-			$emit('token', [
-				'type' => 'token',
-				'text' => $token
-			]);
-
-			usleep(120000);
-		}
-
-		$emit('done', [
-			'type' => 'done',
-			'status' => 'completed',
-			'meta' => [
-				'timestamp' => gmdate('c')
-			]
-		]);
-
-		exit;
-	}
-
-	protected function buildResponseText(): string {
-		return implode('', $this->getResponseTokens());
-	}
-
 	/** @return array<int,string> */
-	protected function getResponseTokens(): array {
+	protected function getResponseTokens(ChatbotTurnRequest $request): array {
 		return [
 			'OK.',
 			' This is a dummy response for UI testing.',
 			' Your prompt was: ',
-			(string)$this->getPromptInput(),
+			$request->getPrompt(),
 			' ✅'
 		];
 	}
 
 	protected function suggestPrompts(): string {
-		$suggestions = [
+		$json = json_encode([
 			'Gib mir ein kurzes Beispiel dazu.',
 			'Welche nächsten Schritte empfiehlst du?',
 			'Fass das in 3 Bulletpoints zusammen.'
-		];
+		], JSON_UNESCAPED_UNICODE);
 
-		$json = json_encode($suggestions, JSON_UNESCAPED_UNICODE);
 		return is_string($json) ? $json : '[]';
 	}
 }
