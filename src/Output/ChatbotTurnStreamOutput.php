@@ -53,9 +53,6 @@ final class ChatbotTurnStreamOutput implements IOutput {
 			return $this->emitBootstrapError($exception->getMessage());
 		}
 
-		if (session_status() === PHP_SESSION_ACTIVE) {
-			session_write_close();
-		}
 
 		if ($turn === null) {
 			return $this->emitBootstrapError('Invalid or expired chatbot turn id.');
