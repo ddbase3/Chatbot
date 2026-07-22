@@ -20,23 +20,22 @@ namespace Chatbot\Service;
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentExecutionService;
+use AssistantFoundation\Dto\AgentExecutionEvent;
+use AssistantFoundation\Dto\AgentExecutionRequest;
 use AssistantFoundation\Dto\AgentExecutionResult;
 use AssistantFoundation\Dto\AgentInteractionRequest;
+use AssistantRuntime\Service\CollectingAgentEventSink;
 use Chatbot\Api\IChatbotService;
-use AssistantFoundation\Api\IAgentContext;
-use MissionBay\Api\IAgentContextFactory;
-use MissionBay\Api\IAgentFlow;
-use MissionBay\Api\IAgentFlowFactory;
+use EventTransport\Api\IEventStreamFactory;
 use Throwable;
 
 abstract class AbstractChatbotService implements IChatbotService {
 
 	public function __construct(
 		protected readonly IRequest $request,
-		protected readonly IAgentContextFactory $contextFactory,
-		protected readonly IAgentFlowFactory $flowFactory,
 		protected readonly ISettingsStore $settingsStore,
-		protected readonly IAgentExecutionService $agentExecutionService
+		protected readonly IAgentExecutionService $agentExecutionService,
+		protected readonly IEventStreamFactory $eventStreamFactory
 	) {}
 
 	abstract public static function getName(): string;
@@ -132,23 +131,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 	}
 
 	/**
-	 * Stores instance metadata and loaded settings in the agent context.
-	 *
-	 * This gives later nodes access to the concrete chatbot instance without
-	 * exposing server-side settings to the browser. The complete settings array
-	 * is stored intentionally because upcoming configuration areas such as
-	 * agent tools will be service-side concerns as well.
-	 */
-	protected function applyChatbotConfigContext(IAgentContext $context, array $chatbotSettings): void {
-		$identity = $this->getConfigIdentity();
-
-		$context->setVar('chatbot_config_group', $identity['group']);
-		$context->setVar('chatbot_config_name', $identity['name']);
-		$context->setVar('chatbot_config', $chatbotSettings);
-	}
-
-	/**
-	 * Builds context variables for MissionBay agent execution.
+	 * Builds context variables for the configured agent runtime.
 	 *
 	 * @return array<string,mixed>
 	 */
@@ -260,13 +243,6 @@ abstract class AbstractChatbotService implements IChatbotService {
 		$decoded = json_decode($json, true);
 
 		return is_array($decoded) ? $decoded : null;
-	}
-
-	/**
-	 * Stores the client reference payload in the agent context.
-	 */
-	protected function applyReferenceContext(IAgentContext $context): void {
-		$context->setVar('reference', $this->getReferenceInput());
 	}
 
 	/**
@@ -493,14 +469,12 @@ abstract class AbstractChatbotService implements IChatbotService {
 	}
 
 	/** @return array<string,mixed> */
-	protected function buildAgentInputs(string $systemPrompt, string $userPrompt, bool $rest): array {
+	protected function buildAgentInputs(string $systemPrompt, string $userPrompt): array {
 		$inputs = [
 			'system' => $systemPrompt,
-			'prompt' => $userPrompt
+			'prompt' => $userPrompt,
+			'mode' => 'chat'
 		];
-		if ($rest) {
-			$inputs['mode'] = 'chat';
-		}
 		$resume = $this->getResumeInput();
 		if ($resume !== null) {
 			$inputs['resume'] = $resume;
@@ -509,13 +483,12 @@ abstract class AbstractChatbotService implements IChatbotService {
 	}
 
 	/**
-	 * Executes the AgentFlow for streaming.
-	 * The actual streaming is executed inside the StreamingAiAssistantNode.
-	 *
-	 * Streaming now uses the canonical external prompt input name.
-	 * The MissionBay runtime keeps legacy "user" flow connections compatible.
+	 * Executes the configured agent and forwards its neutral events to SSE.
 	 */
 	protected function runStreamingFlow(): string {
+		$stream = $this->eventStreamFactory->createStream('chatbot', uniqid('chat-', true));
+		$stream->start();
+		$eventSink = new EventStreamAgentEventSink($stream);
 
 		try {
 			$chatbotSettings = $this->getChatbotSettings();
@@ -523,23 +496,32 @@ abstract class AbstractChatbotService implements IChatbotService {
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
 			$userPrompt = (string)($this->getPromptInput() ?? $this->getResumeResponseText());
 
-			$this->agentExecutionService->stream(
-				$agentSettings,
-				$this->buildAgentInputs($systemPrompt, $userPrompt, false),
-				$this->getAgentContextVars($chatbotSettings)
+			$this->agentExecutionService->execute(
+				new AgentExecutionRequest(
+					$agentSettings,
+					$this->buildAgentInputs($systemPrompt, $userPrompt),
+					$this->getAgentContextVars($chatbotSettings)
+				),
+				$eventSink
 			);
-
-			exit;
 		}
 		catch (Throwable $e) {
-			return $this->errorResponse('[Chatbot runtime error] ' . $e->getMessage());
+			$userMessage = 'Es ist ein technischer Fehler aufgetreten. Die Anfrage konnte nicht vollständig abgeschlossen werden.';
+			$eventSink->emit(new AgentExecutionEvent('token', ['text' => $userMessage]));
+			$eventSink->emit(new AgentExecutionEvent('error', [
+				'message' => $e->getMessage(),
+				'user_message' => $userMessage,
+				'type' => get_class($e),
+				'code' => $e->getCode()
+			]));
+			$eventSink->emit(new AgentExecutionEvent('done', ['status' => 'error']));
 		}
 
 		return '';
 	}
 
 	/**
-	 * Executes the AgentFlow for REST and returns a JSON response.
+	 * Executes the configured agent for REST and returns a JSON response.
 	 *
 	 * REST uses the canonical external prompt input name.
 	 */
@@ -554,10 +536,13 @@ abstract class AbstractChatbotService implements IChatbotService {
 			$systemPrompt = $this->getSystemPrompt($chatbotSettings);
 			$userPrompt = (string)($this->getPromptInput() ?? $this->getResumeResponseText());
 
-			$result = $this->agentExecutionService->run(
-				$agentSettings,
-				$this->buildAgentInputs($systemPrompt, $userPrompt, true),
-				$this->getAgentContextVars($chatbotSettings)
+			$result = $this->agentExecutionService->execute(
+				new AgentExecutionRequest(
+					$agentSettings,
+					$this->buildAgentInputs($systemPrompt, $userPrompt),
+					$this->getAgentContextVars($chatbotSettings)
+				),
+				new CollectingAgentEventSink()
 			);
 
 			$output = $result->getOutput();
@@ -586,13 +571,23 @@ abstract class AbstractChatbotService implements IChatbotService {
 	}
 
 	/**
-	 * Returns the settings that should be passed to MissionBay agent execution.
+	 * Returns the settings that should be passed to the configured agent runtime.
 	 *
 	 * @param array<string,mixed> $chatbotSettings
 	 * @return array<string,mixed>
 	 */
 	protected function getAgentSettingsForExecution(array $chatbotSettings): array {
 		$settings = $chatbotSettings;
+		if (!array_key_exists('agent_runtime', $settings)) {
+			$backend = strtolower(trim((string)($settings['chatbot_backend'] ?? '')));
+			if (str_starts_with($backend, 'runtime:')) {
+				$runtimeId = preg_replace('/[^a-z0-9._-]+/', '', substr($backend, 8)) ?? '';
+				if ($runtimeId !== '') {
+					$settings['agent_runtime'] = $runtimeId;
+				}
+			}
+		}
+
 		$flowFile = $this->getAgentFlowFile();
 
 		if ($flowFile !== '') {
@@ -612,20 +607,6 @@ abstract class AbstractChatbotService implements IChatbotService {
 		}
 
 		return $settings;
-	}
-
-	protected function createConfiguredFlow(IAgentContext $context): IAgentFlow {
-		$flowFile = $this->getAgentFlowFile();
-
-		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
-		$config = is_string($json) ? json_decode($json, true) : null;
-		$config ??= $this->getSimpleAgentFlow();
-
-		if (!is_array($config) || $config === []) {
-			throw new \RuntimeException('Invalid Flow JSON');
-		}
-
-		return $this->flowFactory->createFromArray('strictflow', $config, $context);
 	}
 
 	protected function isRestTransport(array $chatbotSettings): bool {
@@ -918,20 +899,10 @@ abstract class AbstractChatbotService implements IChatbotService {
 
 		$chatbotSettings = $this->getChatbotSettings();
 
-		$context = $this->contextFactory->createContext();
-		$this->applyReferenceContext($context);
-		$this->applyChatbotConfigContext($context, $chatbotSettings);
-
 		$flowFile = $this->getSuggestionFlowFile();
 		$json = $flowFile !== '' ? @file_get_contents($flowFile) : false;
 		$config = is_string($json) ? json_decode($json, true) : null;
 		$config ??= $this->getSimpleSuggestionFlow();
-
-		if (!is_array($config) || $config === []) {
-			return $this->errorResponse('[Invalid Suggestions Flow JSON]');
-		}
-
-		$flow = $this->flowFactory->createFromArray('strictflow', $config, $context);
 
 		$systemPrompt = $this->getSuggestionPrompt($chatbotSettings);
 		$userPrompt = 'Generate suggestions.';
@@ -942,7 +913,16 @@ abstract class AbstractChatbotService implements IChatbotService {
 			'mode' => 'suggestions'
 		];
 
-		$output = $flow->run($inputs);
+		$agentSettings = $this->getAgentSettingsForExecution($chatbotSettings);
+		if (is_array($config) && $config !== []) {
+			$agentSettings['agent_flow'] = $config;
+		}
+		$result = $this->agentExecutionService->execute(new AgentExecutionRequest(
+			$agentSettings,
+			$inputs,
+			$this->getAgentContextVars($chatbotSettings)
+		));
+		$output = $result->getOutput();
 
 		$msg = '';
 		if (isset($output['assistant']['message']['content'])) {

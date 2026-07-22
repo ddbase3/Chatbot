@@ -1,95 +1,82 @@
-# MissionBay Chatbot Module
+# Chatbot
 
-This repository contains a modular, flow-based chatbot built with the [MissionBay Agent System](https://github.com/ddbase3/MissionBay). It was originally developed as part of a larger web project and has been extracted for independent reuse, maintenance, and deployment.
+Chatbot provides a configurable BASE3 chat application that is independent of the concrete agent runtime. It consumes the shared AssistantFoundation contracts and currently uses EventTransport only as its HTTP event-stream adapter.
 
-## Features
+## Runtime boundary
 
-* **Flow-based architecture** using JSON-defined agent flows
-* **OpenAI Chat API integration** with dynamic prompts and system behavior
-* **Session memory support** for context-aware conversations
-* **High RAG capabilities** (Retrieval-Augmented Generation)
-* **Modular node structure** allows for flexible extension and reuse
-* **Web-based interface** using jQuery and HTML/CSS
-* **Multiple backends** for static and dynamic flow execution
+`Chatbot\Service\AbstractChatbotService` calls `AssistantFoundation\Api\IAgentExecutionService::execute()` for both REST and streaming requests.
 
-## Components
+- REST uses a collecting event sink and formats the terminal result as JSON.
+- Streaming creates an `EventStreamAgentEventSink` and forwards runtime events to the browser.
+- MissionBay and alternative runtimes are selected per chatbot record without changing the chatbot service or UI protocol.
 
-### 1. `ChatbotPageModule`
+Runtime-specific configuration fields are supplied through `IAgentConfigFormService`. Its concrete composite implementation lives in `AssistantRuntime`; Chatbot imports neither MissionBay nor NeuronAi contracts.
 
-A page module that renders the chatbot UI. Implements `IMvcView` and `ISchemaProvider` and integrates into the Base3 content framework.
+## Large prompts and SSE
 
-### 2. `ChatbotService`
+The existing EventTransport POST-to-ID-to-GET sequence remains supported:
 
-A service that loads a pre-defined JSON flow and runs it with user input and session memory. Designed for structured conversations and logging.
+1. The browser submits the complete prompt payload through POST.
+2. EventTransport stores it temporarily and returns an opaque request ID.
+3. Browser `EventSource` opens the GET stream using that ID.
+4. The server consumes the stored payload and invokes the chatbot endpoint.
 
-### 3. `ChatbotDynamicService`
-
-An alternative service that dynamically builds and executes flows. Demonstrates how behavior can be modified programmatically.
-
-### 4. `ChatbotPageModule.php` (Template)
-
-An HTML/CSS/JS frontend template that renders the chat UI, handles user input, and asynchronously calls the chatbot backend.
-
-## Usage
-
-### Run Static Flow (via `ChatbotService`)
-
-```php
-POST /chatbotservice.php
-prompt=Your+message+here
-```
-
-The service fetches the OpenAI API key from configuration, builds a predefined flow, and returns the response.
-
-## Example Flow (Static)
-
-```json
-{
-  "nodes": [
-    {"id": "cfg", "type": "getconfigurationnode", "inputs": {"section": "openai", "key": "apikey"}},
-    {"id": "ai", "type": "simpleopenainode", "inputs": {"model": "gpt-3.5-turbo"}},
-    {"id": "log", "type": "loggernode", "inputs": {"scope": "development"}},
-    {"id": "msg", "type": "staticmessagenode"}
-  ],
-  "connections": [
-    {"from": "cfg", "output": "value", "to": "ai", "input": "apikey"},
-    {"from": "__input__", "output": "system", "to": "ai", "input": "system"},
-    {"from": "__input__", "output": "prompt", "to": "ai", "input": "prompt"},
-    {"from": "ai", "output": "response", "to": "log", "input": "message"},
-    {"from": "ai", "output": "response", "to": "msg", "input": "text"}
-  ]
-}
-```
-
-## Frontend UI
-
-* **HTML structure**: Simple chat layout with a chat log and input form
-* **JS behavior**: Handles user submission, sends prompt via AJAX, scrolls chat to response
-* **CSS styling**: Differentiates user and assistant messages, styles chatbox
+This avoids URL-length limits while retaining browser-native SSE. A later cleanup can move the request store and stream endpoint into Chatbot without changing `IAgentExecutionService`.
 
 ## Configuration
 
-Requires the following config section for OpenAI access:
+A chatbot instance stores UI settings, transport mode, prompts, references, and runtime-specific agent settings in `ISettingsStore`.
 
-```json
-{
-  "openai": {
-    "apikey": "sk-..."
-  }
-}
-```
+Supported transport values are:
+
+- `auto`
+- `sse`
+- `websocket`
+- `rest`
+
+The current browser UI, voice integration, threads, and canvas events remain compatible with the existing event names.
 
 ## Requirements
 
-* PHP 8+
-* Base3 Framework with MissionBay Agent system
-* OpenAI API key
+- PHP 8.1 or newer
+- BASE3 Framework
+- AssistantFoundation
+- an `IAgentExecutionService` implementation
+- EventTransport while the current SSE adapter is in use
 
 ## License
 
-GPL-3.0 License. See `LICENSE` file.
+GPL-3.0. See `LICENSE`.
 
-## Author
+## Chatbot backend selection
 
-Developed by \[Daniel Dahme] as part of the [BASE3](https://base3.de) ecosystem.
+The configuration UI has one backend field. It combines direct chatbot
+services and registered agent runtimes in one list, for example:
 
+- Dummy Chatbot Service
+- MissionBay
+- Neuron AI
+
+Choosing a runtime activates only that runtime's configuration fields. The
+chatbot stores `chatbot_backend=runtime:<id>` while Agent Admin stores
+`agent_runtime=<id>`. Both paths execute through the same AssistantRuntime
+router.
+
+## Runtime form data contract
+
+`IAgentConfigFormService::assignViewData()` receives persisted or normalized
+settings. Host displays must not pass values that were already transformed by
+`settingsToViewValues()`, because runtime-specific structured values such as the
+MissionBay `agent_flow` would otherwise be converted twice and lost.
+
+## Persisted backend resolution
+
+The public `ChatbotDisplay` resolves the backend and UI settings from the same
+SettingsStore record edited by `ChatbotConfigDisplay`. Page-component data only
+provides the `config_group` and `config_name` identity. This prevents a saved
+direct service such as `DummyChatbotService` from falling back to the host's
+default agent runtime. Legacy page components that still contain a direct
+`service` value remain supported.
+
+`DummyChatbotService` implements both SSE and REST responses and uses the same
+`msgid`, `token` and `done` event names as the regular chatbot client.

@@ -20,8 +20,7 @@ namespace Chatbot\Service;
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentExecutionService;
-use MissionBay\Api\IAgentContextFactory;
-use MissionBay\Api\IAgentFlowFactory;
+use EventTransport\Api\IEventStreamFactory;
 
 /**
  * Class ChatbotService
@@ -36,12 +35,11 @@ class ChatbotService extends AbstractChatbotService {
 
 	public function __construct(
 		IRequest $request,
-		IAgentContextFactory $contextFactory,
-		IAgentFlowFactory $flowFactory,
 		ISettingsStore $settingsStore,
-		IAgentExecutionService $agentExecutionService
+		IAgentExecutionService $agentExecutionService,
+		IEventStreamFactory $eventStreamFactory
 	) {
-		parent::__construct($request, $contextFactory, $flowFactory, $settingsStore, $agentExecutionService);
+		parent::__construct($request, $settingsStore, $agentExecutionService, $eventStreamFactory);
 	}
 
 	public static function getName(): string {
@@ -49,15 +47,15 @@ class ChatbotService extends AbstractChatbotService {
 	}
 
 	public static function getServiceLabel(): string {
-		return 'Configured Chatbot Service';
+		return 'Agent-backed Chatbot Service';
 	}
 
 	public static function getServiceDescription(): string {
-		return 'Uses SettingsStore based prompts, AgentFlow configuration and selected LLM resources.';
+		return 'Uses the selected agent runtime with SettingsStore based prompts and runtime-specific configuration.';
 	}
 
 	public function getHelp(): string {
-		return 'SettingsStore backed chatbot service.';
+		return 'SettingsStore backed chatbot service using the selected agent runtime.';
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -114,21 +112,12 @@ class ChatbotService extends AbstractChatbotService {
 	 *
 	 * The value may be an already decoded array or a JSON string from the temporary
 	 * textarea configuration UI. Effective component expansion now happens in
-	 * MissionBay\Service\AgentExecutionService.
+	 * the configured IAgentExecutionService implementation.
 	 */
 	protected function getSimpleAgentFlow(): ?array {
 		$settings = $this->getChatbotSettings();
 
 		return $this->getArraySetting($settings, 'agent_flow');
-	}
-
-	/**
-	 * Returns non-fatal warnings from the last MissionBay agent flow build.
-	 *
-	 * @return array<int,string>
-	 */
-	protected function getAgentComponentWarnings(): array {
-		return $this->agentExecutionService->getWarnings();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////

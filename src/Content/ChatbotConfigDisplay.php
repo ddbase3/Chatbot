@@ -25,18 +25,23 @@ use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
 use JsonException;
-use MissionBay\Api\IAgentConfigFormService;
+use AssistantFoundation\Api\IAgentConfigFormService;
+use AssistantFoundation\Api\IAgentRuntimeRegistry;
+use AssistantFoundation\Api\IAgentRuntimeSelector;
 use Throwable;
 
 /**
  * Class ChatbotConfigDisplay
  *
  * Provides a reusable configuration display for one concrete chatbot instance.
- * Existing settings keys are kept stable for backwards compatibility.
+ * Legacy service settings are migrated to one explicit chatbot backend value.
  */
 class ChatbotConfigDisplay implements IDisplay {
 
 	protected const FORM_ACTION_SAVE = 'save';
+	protected const BACKEND_SERVICE_PREFIX = 'service:';
+	protected const BACKEND_RUNTIME_PREFIX = 'runtime:';
+	protected const AGENT_CHATBOT_SERVICE = 'chatbotservice';
 
 	protected array $data = [];
 
@@ -44,13 +49,17 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	protected ?array $postedValues = null;
 
+	protected ?array $postedSettings = null;
+
 	public function __construct(
 		private readonly IMvcView $view,
 		private readonly IRequest $request,
 		private readonly ISettingsStore $settingsStore,
 		private readonly ILinkTargetService $linkTargetService,
 		private readonly IClassMap $classMap,
-		private readonly IAgentConfigFormService $agentConfigFormService
+		private readonly IAgentConfigFormService $agentConfigFormService,
+		private readonly IAgentRuntimeRegistry $agentRuntimeRegistry,
+		private readonly IAgentRuntimeSelector $agentRuntimeSelector
 	) {}
 
 	public static function getName(): string {
@@ -78,9 +87,8 @@ class ChatbotConfigDisplay implements IDisplay {
 			$this->handleSave($context);
 		}
 
-		$values = $this->postedValues ?? $this->settingsToViewValues(
-			$this->loadSettings($context)
-		);
+		$settings = $this->loadSettings($context);
+		$values = $this->postedValues ?? $this->settingsToViewValues($settings);
 
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
 		$this->view->setTemplate('Content/ChatbotConfigDisplay.php');
@@ -97,11 +105,21 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->view->assign('save_url', $context['save_url']);
 		$this->view->assign('render_form', $context['render_form']);
 		$this->view->assign('values', $values);
-		$this->view->assign('service_options', $this->listChatbotServiceOptions($context));
+		$this->view->assign('backend_options', $this->listChatbotBackendOptions($context));
 		$this->view->assign('messages', $this->messages);
 
-		$this->agentConfigFormService->assignViewData($this->view, $values, [
-			'form_id' => $context['form_id']
+		$runtimeId = $this->getRuntimeIdFromBackend((string)($values['chatbot_backend'] ?? ''));
+		$runtimeActive = $runtimeId !== '';
+		$runtimeSettings = $this->postedSettings ?? $settings;
+		if ($runtimeActive) {
+			$runtimeSettings['agent_runtime'] = $runtimeId;
+		}
+
+		$this->agentConfigFormService->assignViewData($this->view, $runtimeSettings, [
+			'form_id' => $context['form_id'],
+			'selected_runtime' => $runtimeActive ? $runtimeId : $this->agentRuntimeSelector->getDefaultRuntimeId(),
+			'show_runtime_selector' => false,
+			'runtime_active' => $runtimeActive
 		]);
 
 		return $this->view->loadTemplate();
@@ -115,6 +133,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->data = is_array($data) ? $data : [];
 		$this->messages = [];
 		$this->postedValues = null;
+		$this->postedSettings = null;
 	}
 
 	// ---------------------------------------------------------------------
@@ -279,6 +298,7 @@ class ChatbotConfigDisplay implements IDisplay {
 	protected function saveSettingsFromRequest(array $context): array {
 		$errors = [];
 		$settings = $this->getPostedSettings($errors);
+		$this->postedSettings = $settings;
 		$this->postedValues = $this->getPostedViewValues();
 
 		if ($errors !== []) {
@@ -312,28 +332,17 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	protected function getPostedSettings(array &$errors): array {
-		$service = $this->normalizeTechnicalKey((string)$this->request->request('service'));
-
-		if ($service === '') {
-			$errors[] = 'Please select a chatbot service.';
-		}
-		elseif (!$this->chatbotServiceExists($service)) {
-			$errors[] = 'Selected chatbot service does not exist: ' . $service;
-		}
-
+		$backend = $this->normalizeBackendId((string)$this->request->request('chatbot_backend'));
+		$backendInfo = $this->validateBackend($backend, $errors);
 		$reference = $this->decodeReferenceInput(
 			trim((string)$this->request->request('reference')),
 			$errors
 		);
-
 		$basePrompts = $this->normalizeBasePromptsInput(
 			$this->request->request('base_prompts', [])
 		);
-
-		$agentSettings = $this->agentConfigFormService->getPostedSettings($errors);
-
-		return $this->normalizeSettings(array_merge([
-			'service' => $service,
+		$settings = [
+			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
@@ -352,12 +361,24 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference' => $reference,
 			'reference_provider' => trim((string)$this->request->request('reference_provider')),
 			'base_prompts' => $basePrompts
-		], $agentSettings));
+		];
+
+		if (($backendInfo['type'] ?? '') === 'runtime') {
+			$runtimeId = (string)$backendInfo['id'];
+			$settings = array_merge(
+				$settings,
+				$this->agentConfigFormService->getPostedSettings($errors, $runtimeId)
+			);
+		}
+
+		return $this->normalizeSettings($settings);
 	}
 
 	protected function getPostedViewValues(): array {
-		return array_merge([
-			'service' => $this->normalizeTechnicalKey((string)$this->request->request('service')),
+		$backend = $this->normalizeBackendId((string)$this->request->request('chatbot_backend'));
+		$runtimeId = $this->getRuntimeIdFromBackend($backend);
+		$values = [
+			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
@@ -376,7 +397,16 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_json' => (string)$this->request->request('reference'),
 			'reference_provider' => trim((string)$this->request->request('reference_provider')),
 			'base_prompts' => $this->normalizeBasePromptsInput($this->request->request('base_prompts', []))
-		], $this->agentConfigFormService->getPostedViewValues());
+		];
+
+		if ($runtimeId !== '' && $this->agentRuntimeRegistry->hasRuntime($runtimeId)) {
+			$values = array_merge(
+				$values,
+				$this->agentConfigFormService->getPostedViewValues($runtimeId)
+			);
+		}
+
+		return $values;
 	}
 
 	protected function decodeReferenceInput(string $raw, array &$errors): array {
@@ -412,13 +442,13 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	// ---------------------------------------------------------------------
-	// Chatbot service options
+	// Chatbot backend options
 	// ---------------------------------------------------------------------
 
 	/**
 	 * @return array<int,array<string,mixed>>
 	 */
-	protected function listChatbotServiceOptions(array $context): array {
+	protected function listChatbotBackendOptions(array $context): array {
 		$rows = [];
 
 		try {
@@ -426,7 +456,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		}
 		catch (Throwable $e) {
 			$this->addMessage('danger', 'Chatbot services could not be loaded: ' . $e->getMessage());
-			return [];
+			$services = [];
 		}
 
 		foreach ($services as $service) {
@@ -435,68 +465,84 @@ class ChatbotConfigDisplay implements IDisplay {
 			}
 
 			$class = $service::class;
-			$id = $this->normalizeTechnicalKey((string)$class::getName());
-
-			if ($id === '') {
+			$serviceId = $this->normalizeTechnicalKey((string)$class::getName());
+			if ($serviceId === '' || $serviceId === self::AGENT_CHATBOT_SERVICE) {
 				continue;
 			}
 
-			$label = trim((string)$class::getServiceLabel());
-
-			if ($label === '') {
-				$label = $id;
-			}
-
-			$params = [
-				'config_group' => $context['group'],
-				'config_name' => $context['name']
-			];
-
-			try {
-				$url = $this->linkTargetService->getLink(
-					[
-						'name' => $id
-					],
-					$params
-				);
-			}
-			catch (Throwable) {
-				$url = '';
-			}
-
-			$rows[$id] = [
-				'id' => $id,
+			$label = trim((string)$class::getServiceLabel()) ?: $serviceId;
+			$rows[] = [
+				'id' => self::BACKEND_SERVICE_PREFIX . $serviceId,
 				'label' => $label,
 				'description' => trim((string)$class::getServiceDescription()),
-				'class' => $class,
-				'url' => $url
+				'url' => $this->buildServiceUrl($serviceId, $context)
 			];
 		}
 
-		$rows = array_values($rows);
-
-		usort($rows, static function(array $a, array $b): int {
-			$aSort = trim((string)($a['label'] ?? ''));
-			$bSort = trim((string)($b['label'] ?? ''));
-
-			if ($aSort === '') {
-				$aSort = (string)($a['id'] ?? '');
+		foreach ($this->agentRuntimeRegistry->getRuntimeOptions() as $runtimeOption) {
+			$runtimeId = $this->normalizeTechnicalKey((string)($runtimeOption['id'] ?? ''));
+			if ($runtimeId === '') {
+				continue;
 			}
 
-			if ($bSort === '') {
-				$bSort = (string)($b['id'] ?? '');
-			}
+			$rows[] = [
+				'id' => self::BACKEND_RUNTIME_PREFIX . $runtimeId,
+				'label' => trim((string)($runtimeOption['label'] ?? '')) ?: $runtimeId,
+				'description' => trim((string)($runtimeOption['description'] ?? '')),
+				'url' => $this->buildServiceUrl(self::AGENT_CHATBOT_SERVICE, $context)
+			];
+		}
 
-			$cmp = strcasecmp($aSort, $bSort);
+		usort($rows, static function(array $left, array $right): int {
+			$labelCompare = strcasecmp((string)($left['label'] ?? ''), (string)($right['label'] ?? ''));
 
-			if ($cmp !== 0) {
-				return $cmp;
-			}
-
-			return strcasecmp((string)($a['id'] ?? ''), (string)($b['id'] ?? ''));
+			return $labelCompare !== 0
+				? $labelCompare
+				: strcmp((string)($left['id'] ?? ''), (string)($right['id'] ?? ''));
 		});
 
 		return $rows;
+	}
+
+	protected function buildServiceUrl(string $serviceId, array $context): string {
+		try {
+			return $this->linkTargetService->getLink(
+				['name' => $serviceId],
+				[
+					'config_group' => $context['group'],
+					'config_name' => $context['name']
+				]
+			);
+		}
+		catch (Throwable) {
+			return '';
+		}
+	}
+
+	/** @param array<int,string> $errors @return array{type:string,id:string}|array{} */
+	protected function validateBackend(string $backend, array &$errors): array {
+		if ($backend === '') {
+			$errors[] = 'Please select a chatbot backend.';
+			return [];
+		}
+
+		$runtimeId = $this->getRuntimeIdFromBackend($backend);
+		if ($runtimeId !== '') {
+			if (!$this->agentRuntimeRegistry->hasRuntime($runtimeId)) {
+				$errors[] = 'Selected agent runtime does not exist: ' . $runtimeId;
+				return [];
+			}
+
+			return ['type' => 'runtime', 'id' => $runtimeId];
+		}
+
+		$serviceId = $this->getServiceIdFromBackend($backend);
+		if ($serviceId === '' || !$this->chatbotServiceExists($serviceId)) {
+			$errors[] = 'Selected chatbot service does not exist: ' . ($serviceId !== '' ? $serviceId : $backend);
+			return [];
+		}
+
+		return ['type' => 'service', 'id' => $serviceId];
 	}
 
 	protected function chatbotServiceExists(string $id): bool {
@@ -531,8 +577,10 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	protected function getDefaultSettings(): array {
+		$runtimeId = $this->agentRuntimeSelector->getDefaultRuntimeId();
+
 		return array_merge([
-			'service' => 'chatbotservice',
+			'chatbot_backend' => self::BACKEND_RUNTIME_PREFIX . $runtimeId,
 			'use_markdown' => true,
 			'use_icons' => true,
 			'use_voice' => true,
@@ -548,15 +596,9 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	protected function normalizeSettings(array $settings): array {
 		$defaults = $this->getDefaultSettings();
-		$agentSettings = $this->agentConfigFormService->normalizeSettings($settings);
-		$service = $this->normalizeTechnicalKey((string)($settings['service'] ?? $defaults['service']));
-
-		if ($service === '') {
-			$service = (string)$defaults['service'];
-		}
-
-		return array_merge([
-			'service' => $service,
+		$backend = $this->resolveBackendFromSettings($settings);
+		$normalized = [
+			'chatbot_backend' => $backend,
 			'use_markdown' => $this->toBool($settings['use_markdown'] ?? $defaults['use_markdown']),
 			'use_icons' => $this->toBool($settings['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($settings['use_voice'] ?? $defaults['use_voice']),
@@ -575,14 +617,25 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_provider' => trim((string)($settings['reference_provider'] ?? $defaults['reference_provider'])),
 			'default_lang' => trim((string)($settings['default_lang'] ?? $defaults['default_lang'])),
 			'base_prompts' => $this->normalizeBasePromptsInput($settings['base_prompts'] ?? $defaults['base_prompts'])
-		], $agentSettings);
+		];
+
+		$runtimeId = $this->getRuntimeIdFromBackend($backend);
+		if ($runtimeId !== '') {
+			$runtimeSettings = $settings;
+			$runtimeSettings['agent_runtime'] = $runtimeId;
+			$normalized = array_merge(
+				$normalized,
+				$this->agentConfigFormService->normalizeSettings($runtimeSettings)
+			);
+		}
+
+		return $normalized;
 	}
 
 	protected function settingsToViewValues(array $settings): array {
 		$settings = $this->normalizeSettings($settings);
-
-		return array_merge([
-			'service' => $settings['service'],
+		$values = [
+			'chatbot_backend' => $settings['chatbot_backend'],
 			'use_markdown' => $settings['use_markdown'],
 			'use_icons' => $settings['use_icons'],
 			'use_voice' => $settings['use_voice'],
@@ -593,7 +646,65 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_provider' => $settings['reference_provider'],
 			'default_lang' => $settings['default_lang'],
 			'base_prompts' => $settings['base_prompts']
-		], $this->agentConfigFormService->settingsToViewValues($settings));
+		];
+
+		$runtimeId = $this->getRuntimeIdFromBackend((string)$settings['chatbot_backend']);
+		if ($runtimeId !== '') {
+			$values = array_merge(
+				$values,
+				$this->agentConfigFormService->settingsToViewValues($settings)
+			);
+		}
+
+		return $values;
+	}
+
+	protected function resolveBackendFromSettings(array $settings): string {
+		$backend = $this->normalizeBackendId((string)($settings['chatbot_backend'] ?? ''));
+		if ($backend !== '') {
+			return $backend;
+		}
+
+		$legacyService = $this->normalizeTechnicalKey((string)($settings['service'] ?? ''));
+		if ($legacyService !== '' && $legacyService !== self::AGENT_CHATBOT_SERVICE) {
+			return self::BACKEND_SERVICE_PREFIX . $legacyService;
+		}
+
+		$runtimeId = $this->agentRuntimeSelector->selectRuntimeId($settings);
+
+		return self::BACKEND_RUNTIME_PREFIX . $runtimeId;
+	}
+
+	protected function normalizeBackendId(string $backend): string {
+		$backend = strtolower(trim($backend));
+		if (str_starts_with($backend, self::BACKEND_RUNTIME_PREFIX)) {
+			$id = $this->normalizeTechnicalKey(substr($backend, strlen(self::BACKEND_RUNTIME_PREFIX)));
+			return $id !== '' ? self::BACKEND_RUNTIME_PREFIX . $id : '';
+		}
+		if (str_starts_with($backend, self::BACKEND_SERVICE_PREFIX)) {
+			$id = $this->normalizeTechnicalKey(substr($backend, strlen(self::BACKEND_SERVICE_PREFIX)));
+			return $id !== '' ? self::BACKEND_SERVICE_PREFIX . $id : '';
+		}
+
+		return '';
+	}
+
+	protected function getRuntimeIdFromBackend(string $backend): string {
+		$backend = $this->normalizeBackendId($backend);
+		if (!str_starts_with($backend, self::BACKEND_RUNTIME_PREFIX)) {
+			return '';
+		}
+
+		return substr($backend, strlen(self::BACKEND_RUNTIME_PREFIX));
+	}
+
+	protected function getServiceIdFromBackend(string $backend): string {
+		$backend = $this->normalizeBackendId($backend);
+		if (!str_starts_with($backend, self::BACKEND_SERVICE_PREFIX)) {
+			return '';
+		}
+
+		return substr($backend, strlen(self::BACKEND_SERVICE_PREFIX));
 	}
 
 	protected function normalizeBasePromptsInput(mixed $value): array {

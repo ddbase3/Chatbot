@@ -3,12 +3,15 @@
 namespace Test\Chatbot\Service;
 
 use AssistantFoundation\Api\IAgentExecutionService;
+use AssistantFoundation\Dto\AgentExecutionRequest;
 use AssistantFoundation\Dto\AgentExecutionResult;
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
+use AssistantRuntime\Service\CollectingAgentEventSink;
 use Chatbot\Service\ChatbotService;
-use MissionBay\Api\IAgentContextFactory;
-use MissionBay\Api\IAgentFlowFactory;
+use Chatbot\Service\EventStreamAgentEventSink;
+use EventTransport\Api\IEventStream;
+use EventTransport\Api\IEventStreamFactory;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 
@@ -25,7 +28,7 @@ final class ChatbotServiceTest extends TestCase {
 	public function testGetHelpReturnsConfiguredServiceHelp(): void {
 		$service = $this->makeService($this->createStub(IRequest::class));
 
-		$this->assertSame('SettingsStore backed chatbot service.', $service->getHelp());
+		$this->assertSame('SettingsStore backed chatbot service using the selected agent runtime.', $service->getHelp());
 	}
 
 	public function testGetOutputReturnsEmptyStringByDefault(): void {
@@ -57,6 +60,42 @@ final class ChatbotServiceTest extends TestCase {
 		$this->assertSame('STREAM_OK', $this->makeService($request)->getOutput('json'));
 	}
 
+	public function testStreamingUsesSameExecuteOperationWithEventSink(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['suggestions', null, null],
+			['prompt', null, 'Hello'],
+			['transport_mode', null, 'sse']
+		]);
+
+		$stream = $this->createMock(IEventStream::class);
+		$stream->expects($this->once())->method('start');
+		$streamFactory = $this->createMock(IEventStreamFactory::class);
+		$streamFactory->expects($this->once())
+			->method('createStream')
+			->with('chatbot', $this->stringStartsWith('chat-'))
+			->willReturn($stream);
+
+		$executionService = $this->createMock(IAgentExecutionService::class);
+		$executionService->expects($this->once())
+			->method('execute')
+			->with(
+				$this->isInstanceOf(AgentExecutionRequest::class),
+				$this->isInstanceOf(EventStreamAgentEventSink::class)
+			)
+			->willReturn(new AgentExecutionResult([]));
+
+		$service = new StreamingTestChatbotService(
+			$request,
+			$this->createStub(ISettingsStore::class),
+			$executionService,
+			$streamFactory
+		);
+
+		$this->assertSame('', $service->getOutput('json'));
+	}
+
 	public function testGetOutputRunsStreamingFlowWhenOnlyResumeIsSet(): void {
 		$request = $this->createMock(IRequest::class);
 		$request->method('get')->willReturn(null);
@@ -72,7 +111,7 @@ final class ChatbotServiceTest extends TestCase {
 		$this->assertSame('STREAM_OK', $this->makeService($request)->getOutput('json'));
 	}
 
-	public function testResumeInputIsIncludedInStreamingAgentInputs(): void {
+	public function testResumeInputIsIncludedInAgentInputs(): void {
 		$handle = str_repeat('b', 43);
 		$request = $this->createMock(IRequest::class);
 		$request->method('get')->willReturn(null);
@@ -84,11 +123,11 @@ final class ChatbotServiceTest extends TestCase {
 		]);
 		$service = $this->makeService($request);
 
-		$inputs = $service->callBuildAgentInputs('system', 'in Ordnung', false);
+		$inputs = $service->callBuildAgentInputs('system', 'in Ordnung');
 
 		$this->assertSame('system', $inputs['system']);
 		$this->assertSame('in Ordnung', $inputs['prompt']);
-		$this->assertArrayNotHasKey('mode', $inputs);
+		$this->assertSame('chat', $inputs['mode']);
 		$this->assertSame([
 			'resume_handle' => $handle,
 			'responses' => [],
@@ -121,31 +160,18 @@ final class ChatbotServiceTest extends TestCase {
 
 	public function testRestSuspensionReturnsInteractionRequiredAndPassesResumeInput(): void {
 		$handle = str_repeat('d', 43);
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['suggestions', null, null],
-			['prompt', null, 'go'],
-			['transport_mode', null, 'rest'],
-			['resume', null, null],
-			['resume_handle', null, $handle],
-			['resume_response', null, 'go'],
-			['resume_responses', null, null],
-			['config_group', null, null],
-			['config_name', null, null],
-			['reference', null, null]
-		]);
+		$request = $this->createRestRequest('go', $handle);
 		$executionService = $this->createMock(IAgentExecutionService::class);
 		$executionService->expects($this->once())
-			->method('run')
+			->method('execute')
 			->with(
-				$this->isType('array'),
-				$this->callback(static function(array $inputs) use ($handle): bool {
+				$this->callback(static function(AgentExecutionRequest $request) use ($handle): bool {
+					$inputs = $request->getInputs();
 					return ($inputs['mode'] ?? null) === 'chat'
 						&& ($inputs['resume']['resume_handle'] ?? null) === $handle
 						&& ($inputs['resume']['response_text'] ?? null) === 'go';
 				}),
-				$this->isType('array')
+				$this->isInstanceOf(CollectingAgentEventSink::class)
 			)
 			->willReturn(new AgentExecutionResult([
 				'assistant' => [
@@ -170,20 +196,9 @@ final class ChatbotServiceTest extends TestCase {
 	}
 
 	public function testRestCompletedResultRemainsNormalMessage(): void {
-		$request = $this->createMock(IRequest::class);
-		$request->method('get')->willReturn(null);
-		$request->method('request')->willReturnMap([
-			['suggestions', null, null],
-			['prompt', null, 'Hello'],
-			['transport_mode', null, 'rest'],
-			['resume', null, null],
-			['resume_handle', null, null],
-			['config_group', null, null],
-			['config_name', null, null],
-			['reference', null, null]
-		]);
+		$request = $this->createRestRequest('Hello');
 		$executionService = $this->createMock(IAgentExecutionService::class);
-		$executionService->method('run')->willReturn(new AgentExecutionResult([
+		$executionService->method('execute')->willReturn(new AgentExecutionResult([
 			'assistant' => [
 				'message' => [
 					'id' => 'msg-1',
@@ -212,16 +227,33 @@ final class ChatbotServiceTest extends TestCase {
 		);
 	}
 
+	private function createRestRequest(string $prompt, ?string $resumeHandle = null): IRequest {
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['suggestions', null, null],
+			['prompt', null, $prompt],
+			['transport_mode', null, 'rest'],
+			['resume', null, null],
+			['resume_handle', null, $resumeHandle],
+			['resume_response', null, $resumeHandle !== null ? $prompt : null],
+			['resume_responses', null, null],
+			['config_group', null, null],
+			['config_name', null, null],
+			['reference', null, null]
+		]);
+		return $request;
+	}
+
 	private function makeService(
 		IRequest $request,
 		?IAgentExecutionService $executionService = null
 	): TestableChatbotService {
 		return new TestableChatbotService(
 			$request,
-			$this->createStub(IAgentContextFactory::class),
-			$this->createStub(IAgentFlowFactory::class),
 			$this->createStub(ISettingsStore::class),
-			$executionService ?? $this->createStub(IAgentExecutionService::class)
+			$executionService ?? $this->createStub(IAgentExecutionService::class),
+			$this->createStub(IEventStreamFactory::class)
 		);
 	}
 }
@@ -256,7 +288,20 @@ final class TestableChatbotService extends ChatbotService {
 	}
 
 	/** @return array<string,mixed> */
-	public function callBuildAgentInputs(string $systemPrompt, string $userPrompt, bool $rest): array {
-		return $this->buildAgentInputs($systemPrompt, $userPrompt, $rest);
+	public function callBuildAgentInputs(string $systemPrompt, string $userPrompt): array {
+		return $this->buildAgentInputs($systemPrompt, $userPrompt);
+	}
+}
+
+final class StreamingTestChatbotService extends ChatbotService {
+
+	protected function getSimpleAgentFlow(): ?array {
+		return [
+			'nodes' => [[
+				'id' => 'assistant',
+				'type' => 'aiassistantnode'
+			]],
+			'connections' => []
+		];
 	}
 }

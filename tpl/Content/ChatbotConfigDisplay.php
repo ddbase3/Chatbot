@@ -1,7 +1,7 @@
 <?php
 	$values = is_array($this->_['values'] ?? null) ? $this->_['values'] : [];
 	$messages = is_array($this->_['messages'] ?? null) ? $this->_['messages'] : [];
-	$serviceOptions = is_array($this->_['service_options'] ?? null) ? $this->_['service_options'] : [];
+	$backendOptions = is_array($this->_['backend_options'] ?? null) ? $this->_['backend_options'] : [];
 	$basePrompts = is_array($values['base_prompts'] ?? null) ? $values['base_prompts'] : [];
 
 	if ($basePrompts === []) {
@@ -37,27 +37,27 @@
 	$saveUrl = (string)($this->_['save_url'] ?? '');
 	$useAjax = $saveMode === 'ajax';
 	$currentLang = trim((string)($values['default_lang'] ?? 'auto'));
-	$currentService = trim((string)($values['service'] ?? ''));
-	$currentServiceUrl = '';
-	$currentServiceDescription = '';
-	$serviceOptionIds = [];
+	$currentBackend = trim((string)($values['chatbot_backend'] ?? ''));
+	$currentBackendUrl = '';
+	$currentBackendDescription = '';
+	$backendOptionIds = [];
 
 	if ($currentLang === '') {
 		$currentLang = 'auto';
 	}
 
-	foreach ($serviceOptions as $serviceOption) {
-		$serviceId = (string)($serviceOption['id'] ?? '');
+	foreach ($backendOptions as $backendOption) {
+		$backendId = (string)($backendOption['id'] ?? '');
 
-		if ($serviceId === '') {
+		if ($backendId === '') {
 			continue;
 		}
 
-		$serviceOptionIds[$serviceId] = true;
+		$backendOptionIds[$backendId] = true;
 
-		if ($serviceId === $currentService) {
-			$currentServiceUrl = (string)($serviceOption['url'] ?? '');
-			$currentServiceDescription = (string)($serviceOption['description'] ?? '');
+		if ($backendId === $currentBackend) {
+			$currentBackendUrl = (string)($backendOption['url'] ?? '');
+			$currentBackendDescription = (string)($backendOption['description'] ?? '');
 		}
 	}
 ?>
@@ -451,53 +451,40 @@
 		</details>
 
 		<div class="base3-chatbot-config-section">
-			<h3>Chatbot service</h3>
+			<h3>Chatbot backend</h3>
 
 			<div class="base3-chatbot-config-row">
-				<label for="<?php echo $e($formId); ?>_service" class="base3-chatbot-config-label">Chatbot service</label>
+				<label for="<?php echo $e($formId); ?>_backend" class="base3-chatbot-config-label">Backend</label>
 				<div>
-					<select id="<?php echo $e($formId); ?>_service" name="service" class="form-control" data-base3-chatbot-service-select="1">
-<?php if ($serviceOptions === []) { ?>
-						<option value="">No chatbot services found</option>
+					<select id="<?php echo $e($formId); ?>_backend" name="chatbot_backend" class="form-control" data-base3-chatbot-backend-select="1">
+<?php if ($backendOptions === []) { ?>
+						<option value="">No chatbot backends found</option>
 <?php } else { ?>
-						<option value="">Select chatbot service</option>
-<?php if ($currentService !== '' && !isset($serviceOptionIds[$currentService])) { ?>
-						<option value="<?php echo $e($currentService); ?>" selected="selected" disabled="disabled">Unknown service: <?php echo $e($currentService); ?></option>
+						<option value="">Select chatbot backend</option>
+<?php if ($currentBackend !== '' && !isset($backendOptionIds[$currentBackend])) { ?>
+						<option value="<?php echo $e($currentBackend); ?>" selected="selected" disabled="disabled">Unknown backend: <?php echo $e($currentBackend); ?></option>
 <?php } ?>
-<?php foreach ($serviceOptions as $serviceOption) {
-	$serviceId = (string)($serviceOption['id'] ?? '');
-
-	if ($serviceId === '') {
+<?php foreach ($backendOptions as $backendOption) {
+	$backendId = (string)($backendOption['id'] ?? '');
+	if ($backendId === '') {
 		continue;
 	}
-
-	$label = trim((string)($serviceOption['label'] ?? ''));
-
-	if ($label === '') {
-		$label = $serviceId;
-	}
-
-	$description = (string)($serviceOption['description'] ?? '');
-	$url = (string)($serviceOption['url'] ?? '');
+	$label = trim((string)($backendOption['label'] ?? '')) ?: $backendId;
+	$description = (string)($backendOption['description'] ?? '');
+	$url = (string)($backendOption['url'] ?? '');
 ?>
-						<option value="<?php echo $e($serviceId); ?>" data-description="<?php echo $e($description); ?>" data-url="<?php echo $e($url); ?>" <?php echo $selected($currentService, $serviceId); ?>>
-							<?php echo $e($label); ?> (<?php echo $e($serviceId); ?>)
-						</option>
+						<option value="<?php echo $e($backendId); ?>" data-description="<?php echo $e($description); ?>" data-url="<?php echo $e($url); ?>"<?php echo $selected($currentBackend, $backendId); ?>><?php echo $e($label); ?></option>
 <?php } ?>
 <?php } ?>
 					</select>
 
-					<p class="base3-chatbot-config-help" data-base3-chatbot-service-description>
-						<?php echo $e($currentServiceDescription !== '' ? $currentServiceDescription : 'Select the service implementation used by this chatbot instance.'); ?>
+					<p class="base3-chatbot-config-help" data-base3-chatbot-backend-description>
+						<?php echo $e($currentBackendDescription !== '' ? $currentBackendDescription : 'Select the direct dummy service or one of the registered agent runtimes.'); ?>
 					</p>
 
 					<p class="base3-chatbot-config-help">
 						Generated endpoint:
-						<code class="base3-chatbot-config-service-url" data-base3-chatbot-service-url><?php echo $e($currentServiceUrl !== '' ? $currentServiceUrl : 'No endpoint generated.'); ?></code>
-					</p>
-
-					<p class="base3-chatbot-config-help">
-						The SettingsStore value is only the technical service name. The concrete endpoint URL is generated by the host system.
+						<code class="base3-chatbot-config-service-url" data-base3-chatbot-backend-url><?php echo $e($currentBackendUrl !== '' ? $currentBackendUrl : 'No endpoint generated.'); ?></code>
 					</p>
 				</div>
 			</div>
@@ -555,9 +542,9 @@
 	var basePromptsRoot = root.querySelector('[data-base3-chatbot-base-prompts]');
 	var basePromptsItems = root.querySelector('[data-base3-chatbot-base-prompts-items]');
 	var basePromptsAdd = root.querySelector('[data-base3-chatbot-base-prompt-add]');
-	var serviceSelect = root.querySelector('[data-base3-chatbot-service-select]');
-	var serviceDescription = root.querySelector('[data-base3-chatbot-service-description]');
-	var serviceUrl = root.querySelector('[data-base3-chatbot-service-url]');
+	var backendSelect = root.querySelector('[data-base3-chatbot-backend-select]');
+	var backendDescription = root.querySelector('[data-base3-chatbot-backend-description]');
+	var backendUrl = root.querySelector('[data-base3-chatbot-backend-url]');
 	var agentConfigRoot = root.querySelector('[data-base3-agent-config-root]');
 
 	if (!button || !saveUrl) {
@@ -573,21 +560,29 @@
 			.replace(/'/g, '&#039;');
 	}
 
-	function updateServicePreview() {
-		if (!serviceSelect) {
+	function getRuntimeIdFromBackend(value) {
+		value = String(value || '');
+		return value.indexOf('runtime:') === 0 ? value.substring(8) : '';
+	}
+
+	function updateBackend() {
+		if (!backendSelect) {
 			return;
 		}
 
-		var option = serviceSelect.options[serviceSelect.selectedIndex];
+		var option = backendSelect.options[backendSelect.selectedIndex];
 		var description = option ? option.getAttribute('data-description') || '' : '';
 		var url = option ? option.getAttribute('data-url') || '' : '';
+		var runtimeId = getRuntimeIdFromBackend(backendSelect.value);
 
-		if (serviceDescription) {
-			serviceDescription.textContent = description || 'Select the service implementation used by this chatbot instance.';
+		if (backendDescription) {
+			backendDescription.textContent = description || 'Select the direct dummy service or one of the registered agent runtimes.';
 		}
-
-		if (serviceUrl) {
-			serviceUrl.textContent = url || 'No endpoint generated.';
+		if (backendUrl) {
+			backendUrl.textContent = url || 'No endpoint generated.';
+		}
+		if (agentConfigRoot && typeof agentConfigRoot.__base3AgentConfigSelectRuntime === 'function') {
+			agentConfigRoot.__base3AgentConfigSelectRuntime(runtimeId, runtimeId !== '');
 		}
 	}
 
@@ -641,6 +636,10 @@
 	}
 
 	function collectFormData() {
+		if (agentConfigRoot && typeof agentConfigRoot.__base3AgentConfigPrepareSubmit === 'function') {
+			agentConfigRoot.__base3AgentConfigPrepareSubmit();
+		}
+
 		if (root.tagName && root.tagName.toLowerCase() === 'form') {
 			return new FormData(root);
 		}
@@ -687,7 +686,7 @@
 		}
 
 		var map = {
-			service: 'service',
+			chatbot_backend: 'chatbot_backend',
 			default_lang: 'default_lang',
 			transport_mode: 'transport_mode',
 			reference_mode: 'reference_mode',
@@ -723,7 +722,7 @@
 			agentConfigRoot.__base3AgentConfigUpdateValues(values);
 		}
 
-		updateServicePreview();
+		updateBackend();
 	}
 
 	function save(event) {
@@ -781,9 +780,9 @@
 		});
 	}
 
-	if (serviceSelect) {
-		serviceSelect.addEventListener('change', updateServicePreview);
-		updateServicePreview();
+	if (backendSelect) {
+		backendSelect.addEventListener('change', updateBackend);
+		updateBackend();
 	}
 
 	if (root.tagName && root.tagName.toLowerCase() === 'form') {

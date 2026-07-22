@@ -23,12 +23,7 @@ use Chatbot\Api\IChatbotService;
 /**
  * DummyChatbotService
  *
- * Dummy / UI-test service.
- * - baseprompt: returns a simple base prompt
- * - prompt: simulates a streaming endpoint (SSE-like) and exits
- * - suggestions: returns 3 short follow-up suggestions as JSON
- *
- * This is intentionally minimal and has no external dependencies.
+ * Dummy / UI-test service without external dependencies.
  */
 class DummyChatbotService implements IChatbotService {
 
@@ -51,20 +46,18 @@ class DummyChatbotService implements IChatbotService {
 	}
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
-
-		// Provide a base-test prompt.
 		if ($this->request->get('baseprompt') !== null) {
 			return $this->getBasePrompt();
 		}
 
-		// Streaming request.
-		if ($this->getPromptInput() !== null) {
-			return $this->runStreamingFlow();
-		}
-
-		// Suggestion.
 		if ($this->request->request('suggestions') !== null || $this->request->get('suggestions') !== null) {
 			return $this->suggestPrompts();
+		}
+
+		if ($this->getPromptInput() !== null) {
+			return $this->getTransportMode() === 'rest'
+				? $this->runRestFlow($final)
+				: $this->runStreamingFlow();
 		}
 
 		return '';
@@ -74,9 +67,6 @@ class DummyChatbotService implements IChatbotService {
 		return 'Help on DummyChatbotService.';
 	}
 
-	/**
-	 * Reads the user prompt from POST or GET.
-	 */
 	protected function getPromptInput(): ?string {
 		$prompt = $this->request->request('prompt');
 
@@ -88,19 +78,22 @@ class DummyChatbotService implements IChatbotService {
 			return null;
 		}
 
-		return (string) $prompt;
+		return (string)$prompt;
 	}
 
-	/**
-	 * Returns a base prompt for showing when start working with the chatbot.
-	 */
+	protected function getTransportMode(): string {
+		$mode = $this->request->request('transport_mode');
+		if ($mode === null) {
+			$mode = $this->request->get('transport_mode');
+		}
+
+		return strtolower(trim((string)$mode));
+	}
+
 	protected function getBasePrompt(): string {
 		return $this->getSimpleBasePrompt();
 	}
 
-	/**
-	 * Returns a simple base prompt.
-	 */
 	protected function getSimpleBasePrompt(): string {
 		$base = [
 			'Hallo! 👋',
@@ -111,21 +104,29 @@ class DummyChatbotService implements IChatbotService {
 		return $base[array_rand($base)];
 	}
 
-	/**
-	 * Dummy streaming endpoint (SSE-like).
-	 * Sends a few events and exits, so the UI can test streaming behavior.
-	 */
+	protected function runRestFlow(bool $final): string {
+		if ($final && !headers_sent()) {
+			header('Content-Type: application/json; charset=UTF-8');
+		}
+
+		$response = [
+			'id' => uniqid('msg_', true),
+			'type' => 'message',
+			'text' => $this->buildResponseText()
+		];
+		$json = json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+		return is_string($json) ? $json : '{"type":"error","text":"Dummy response could not be encoded."}';
+	}
+
 	protected function runStreamingFlow(): string {
-
-		$prompt = (string) $this->getPromptInput();
-
 		header('Content-Type: text/event-stream; charset=utf-8');
 		header('Cache-Control: no-cache');
 		header('Connection: keep-alive');
 
 		$emit = function(string $event, array $data): void {
 			echo "event: {$event}\n";
-			echo "data: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+			echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
 
 			if (function_exists('ob_flush')) {
 				@ob_flush();
@@ -134,27 +135,14 @@ class DummyChatbotService implements IChatbotService {
 			@flush();
 		};
 
-		$emit('start', [
-			'id' => uniqid('msg_', true),
-			'type' => 'start',
-			'text' => 'Dummy stream started',
-			'meta' => [
-				'timestamp' => gmdate('c')
-			]
+		$emit('msgid', [
+			'id' => uniqid('msg_', true)
 		]);
 
-		$tokens = [
-			'OK.',
-			' This is a dummy response for UI testing.',
-			' Your prompt was: ',
-			$prompt,
-			' ✅'
-		];
-
-		foreach ($tokens as $t) {
+		foreach ($this->getResponseTokens() as $token) {
 			$emit('token', [
 				'type' => 'token',
-				'text' => (string) $t
+				'text' => $token
 			]);
 
 			usleep(120000);
@@ -162,40 +150,38 @@ class DummyChatbotService implements IChatbotService {
 
 		$emit('done', [
 			'type' => 'done',
-			'text' => '',
+			'status' => 'completed',
 			'meta' => [
 				'timestamp' => gmdate('c')
 			]
 		]);
 
 		exit;
-
-		return '';
 	}
 
-	/**
-	 * Returns 3 short, concrete suggestions as JSON array.
-	 * Keeps it language-neutral-ish but defaults to German.
-	 */
+	protected function buildResponseText(): string {
+		return implode('', $this->getResponseTokens());
+	}
+
+	/** @return array<int,string> */
+	protected function getResponseTokens(): array {
+		return [
+			'OK.',
+			' This is a dummy response for UI testing.',
+			' Your prompt was: ',
+			(string)$this->getPromptInput(),
+			' ✅'
+		];
+	}
+
 	protected function suggestPrompts(): string {
-
-		$last = (string) $this->getPromptInput();
-		$hint = trim($last) !== '' ? $last : 'dein letztes Thema';
-
 		$suggestions = [
 			'Gib mir ein kurzes Beispiel dazu.',
 			'Welche nächsten Schritte empfiehlst du?',
 			'Fass das in 3 Bulletpoints zusammen.'
 		];
 
-		if (trim($hint) !== '' && $hint !== 'dein letztes Thema') {
-			$suggestions = [
-				'Gib mir ein kurzes Beispiel zu: ' . mb_substr($hint, 0, 40) . (mb_strlen($hint) > 40 ? '…' : ''),
-				'Welche 3 Optionen habe ich als Nächstes?',
-				'Mach daraus eine kurze Checkliste.'
-			];
-		}
-
-		return json_encode($suggestions, JSON_UNESCAPED_UNICODE);
+		$json = json_encode($suggestions, JSON_UNESCAPED_UNICODE);
+		return is_string($json) ? $json : '[]';
 	}
 }

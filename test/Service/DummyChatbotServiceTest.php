@@ -59,6 +59,22 @@ final class DummyChatbotServiceTest extends TestCase {
 		$this->assertSame('STREAM_OK', $service->getOutput('json'));
 	}
 
+	public function testGetOutputReturnsJsonInRestMode(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturn(null);
+		$request->method('request')->willReturnMap([
+			['prompt', null, 'Hello'],
+			['transport_mode', null, 'rest']
+		]);
+
+		$service = $this->makeService($request);
+		$data = json_decode($service->getOutput('json'), true);
+
+		$this->assertIsArray($data);
+		$this->assertSame('message', $data['type'] ?? null);
+		$this->assertStringContainsString('Hello', (string)($data['text'] ?? ''));
+	}
+
 	public function testGetOutputReturnsSuggestionsJsonWhenSuggestionsIsSet(): void {
 		$request = $this->createMock(IRequest::class);
 		$request->method('get')->willReturn(null);
@@ -85,16 +101,10 @@ final class DummyChatbotServiceTest extends TestCase {
 	// ---------------------------------------------------------
 
 	private function makeService(IRequest $request): DummyChatbotService {
-		// Patch two issues for testability:
-		// 1) getOutput() calls getBasePrompt(), but class only defines getSimpleBasePrompt()
-		// 2) runStreamingFlow() calls header()/exit, which must not run in unit tests
+		// runStreamingFlow() calls header()/exit, which must not run in unit tests.
 		return new class($request) extends DummyChatbotService {
 
-			protected function getBasePrompt(): string {
-				return $this->getSimpleBasePrompt();
-			}
-
-			protected function runStreamingFlow() {
+			protected function runStreamingFlow(): string {
 				return 'STREAM_OK';
 			}
 		};
