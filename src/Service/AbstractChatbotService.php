@@ -80,11 +80,21 @@ abstract class AbstractChatbotService implements IChatbotService {
 			$userPrompt = $request->getResumeResponseText();
 		}
 
+		$context = array_replace(
+			$this->getAgentContextVars($request, $chatbotSettings),
+			[
+				'config_group' => $request->getConfigGroup(),
+				'config_name' => $request->getConfigName(),
+				'chatbot_key' => $this->buildChatbotKey($request),
+				'prompt_text' => $userPrompt
+			]
+		);
+
 		$result = $this->agentExecutionService->execute(
 			new AgentExecutionRequest(
 				$agentSettings,
 				$this->buildAgentInputs($systemPrompt, $userPrompt, $request->getResume()),
-				$this->getAgentContextVars($request, $chatbotSettings)
+				$context
 			),
 			$eventSink
 		);
@@ -156,6 +166,17 @@ abstract class AbstractChatbotService implements IChatbotService {
 			'chatbot_config_name' => $turn->getConfigName(),
 			'chatbot_config' => $chatbotSettings
 		];
+	}
+
+	private function buildChatbotKey(ChatbotTurnRequest $turn): string {
+		$group = $turn->getConfigGroup();
+		$name = $turn->getConfigName();
+
+		if ($group !== '' && $name !== '') {
+			return $group . ':' . $name;
+		}
+
+		return $name !== '' ? $name : $group;
 	}
 
 	protected function getChatbotSettingString(array $settings, string $key, string $default = ''): string {

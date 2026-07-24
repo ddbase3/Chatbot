@@ -23,6 +23,7 @@
                 $root.find('.chatbot-main').append(suggestionsContainer);
 
                 let pendingInteraction = null;
+                let interactionDecisionInFlight = false;
                 const conversationStorageKey = [
                         'base3.chatbot.conversation',
                         String(config.configGroup || 'default'),
@@ -204,29 +205,60 @@
                                 container.append(card);
                         });
 
+                        const approvalOnly = interaction.interaction_requests.every(request => String(request.kind || '') === 'approval');
                         container.append($('<div class="agent-interaction-hint"></div>').text(
-                                'Antworte in deiner nächsten Nachricht frei formuliert mit Zustimmung, Ablehnung oder den angeforderten Angaben.'
+                                approvalOnly
+                                        ? 'Du kannst zustimmen, abbrechen oder einen Änderungswunsch im Eingabefeld senden.'
+                                        : 'Bitte gib die angeforderten Angaben in das Eingabefeld ein.'
                         ));
 
-                        const approvalOnly = interaction.interaction_requests.every(request => String(request.kind || '') === 'approval');
                         if (approvalOnly && typeof onDecision === 'function') {
                                 const actions = $('<div class="agent-interaction-actions"></div>');
                                 const approve = $('<button type="button" class="agent-interaction-approve">Zustimmen</button>');
-                                const deny = $('<button type="button" class="agent-interaction-deny">Ablehnen</button>');
-                                approve.on('click', () => {
+                                const deny = $('<button type="button" class="agent-interaction-deny">Abbrechen</button>');
+                                const submitDecision = decision => {
+                                        if (container.hasClass('is-submitting')) return;
+                                        container.addClass('is-submitting');
                                         actions.find('button').prop('disabled', true);
-                                        onDecision('Ich stimme zu.');
-                                });
-                                deny.on('click', () => {
-                                        actions.find('button').prop('disabled', true);
-                                        onDecision('Ich lehne ab.');
-                                });
+                                        onDecision({ decision });
+                                };
+                                approve.on('click', () => submitDecision('approve'));
+                                deny.on('click', () => submitDecision('deny'));
                                 actions.append(approve, deny);
                                 container.append(actions);
                         }
 
                         targetElem.append(container);
                         return true;
+                }
+
+                function isApprovalOnlyInteraction(interaction) {
+                        return Boolean(
+                                interaction
+                                && Array.isArray(interaction.interaction_requests)
+                                && interaction.interaction_requests.length
+                                && interaction.interaction_requests.every(request => String(request.kind || '') === 'approval')
+                        );
+                }
+
+                function submitInteractionDecision(interaction, decision) {
+                        if (interactionDecisionInFlight || !isApprovalOnlyInteraction(interaction)) return;
+
+                        decision = String(decision || '').trim();
+                        if (decision !== 'approve' && decision !== 'deny') return;
+
+                        interactionDecisionInFlight = true;
+                        pendingInteraction = {
+                                ...interaction,
+                                explicit_decision: decision
+                        };
+                        sendMessage({
+                                text: decision === 'approve' ? 'Zustimmen' : 'Abbrechen',
+                                displayUserMessage: false,
+                                interactionDecision: true
+                        }).finally(() => {
+                                interactionDecisionInFlight = false;
+                        });
                 }
 
                 function getGlobalValue(path) {
@@ -708,14 +740,18 @@
                 // Main Chat Send
                 // ---------------------------------------------------------------------
 
-                async function sendMessage() {
-                        const raw = msgControl.val() || '';
+                async function sendMessage(options = {}) {
+                        const interactionDecision = options.interactionDecision === true;
+                        const raw = options.text !== undefined ? String(options.text) : (msgControl.val() || '');
                         const plain = raw.trim();
                         if (!plain) return;
 
                         const resumeContext = pendingInteraction && pendingInteraction.resume_handle
                                 ? { ...pendingInteraction }
                                 : null;
+                        if (interactionDecision) {
+                                pendingInteraction = null;
+                        }
                         const buildRequestPayload = base => {
                                 const data = {
                                         ...base,
@@ -726,6 +762,17 @@
                                 if (resumeContext) {
                                         data.resume_handle = resumeContext.resume_handle;
                                         data.resume_response = plain;
+                                        if (resumeContext.explicit_decision) {
+                                                data.resume_responses = JSON.stringify(
+                                                        resumeContext.interaction_requests.map(request => ({
+                                                                request_id: String(request.id || ''),
+                                                                decision: resumeContext.explicit_decision,
+                                                                input: {},
+                                                                note: plain,
+                                                                metadata: {}
+                                                        }))
+                                                );
+                                        }
                                 }
                                 return appendReference(data);
                         };
@@ -739,9 +786,11 @@
                         root.classList.add('chatstarted');
 
                         // User message
-                        const userHtml = raw.replace(/\n/g, '<br>');
-                        msgControl.val('');
-                        chatControl.append('<div class="message user">' + userHtml + '</div>');
+                        if (options.displayUserMessage !== false) {
+                                const userHtml = escapeHtml(raw).replace(/\n/g, '<br>');
+                                chatControl.append('<div class="message user">' + userHtml + '</div>');
+                        }
+                        msgControl.val('').trigger('input');
                         scrollToBottom();
 
                         // Assistant message container
@@ -819,9 +868,8 @@
                                                         throw new Error('Invalid interaction_required response.');
                                                 }
                                                 pendingInteraction = interaction;
-                                                interactionRendered = renderInteractionRequired(contentElem, interaction, text => {
-                                                        msgControl.val(text).trigger('input');
-                                                        sendMessage();
+                                                interactionRendered = renderInteractionRequired(contentElem, interaction, decision => {
+                                                        submitInteractionDecision(interaction, decision.decision);
                                                 });
                                         } else {
                                                 pendingInteraction = null;
@@ -831,6 +879,7 @@
                                 } catch (err) {
                                         console.error('REST request failed:', err);
                                         hideThinking();
+                                        pendingInteraction = null;
                                         contentElem.append('<div class="error">Fehler bei der Serveranfrage.</div>');
                                 } finally {
                                         loader.remove();
@@ -904,7 +953,7 @@
 
                         const updateActivityToggle = () => {
                                 const shell = ensureActivityShell();
-                                const count = ensureActivityLog().children('.agent-activity-entry:not(.agent-turn-id)').length;
+                                const count = ensureActivityLog().children('.agent-activity-entry').length;
                                 const button = shell.children('.agent-activity-toggle');
                                 const collapsed = shell.hasClass('is-collapsed');
 
@@ -926,7 +975,7 @@
                                 if (activityOutputPhase) return;
 
                                 activityOutputPhase = true;
-                                const count = ensureActivityLog().children('.agent-activity-entry:not(.agent-turn-id)').length;
+                                const count = ensureActivityLog().children('.agent-activity-entry').length;
                                 if (count > 0) {
                                         setActivityCollapsed(true);
                                 } else {
@@ -1282,9 +1331,15 @@
                                 if (status === 'completed') meta.push(payload.cached ? 'cached' : 'done');
                                 if (status === 'failed') meta.push('failed');
 
+                                const description = preview
+                                        ? '“' + preview + '”'
+                                        : (status === 'completed'
+                                                ? 'abgeschlossen'
+                                                : (status === 'failed' ? 'fehlgeschlagen' : 'wird ausgeführt'));
+
                                 elem.attr('data-status', status || 'running');
                                 elem.find('.agent-activity-label').text(toolName);
-                                elem.find('.agent-activity-description').text(preview ? '“' + preview + '”' : 'tool call');
+                                elem.find('.agent-activity-description').text(description);
                                 elem.find('.agent-activity-meta').text(meta.join(' · '));
                                 elem.find('pre').text(JSON.stringify(args, null, 2)
                                         .replace(/\n/g, '\n')
@@ -1373,7 +1428,7 @@
                                         return;
                                 }
 
-                                if (event === 'tool.error') {
+                                if (event === 'tool.error' || event === 'tool.failed') {
                                         data = parseEventPayload(data);
                                         renderToolActivity((data && typeof data === 'object') ? data : {}, 'failed');
                                         return;
@@ -1384,16 +1439,22 @@
                                 // -----------------------------
                                 if (event === 'agent.interaction.required') {
                                         beginOutputPhase();
+                                        setActivityCollapsed(true);
                                         hideThinking();
                                         const interaction = normalizeInteractionPayload(data);
                                         if (!interaction) return;
 
+                                        if (renderTimeout) {
+                                                clearTimeout(renderTimeout);
+                                                renderTimeout = null;
+                                        }
+                                        finished = true;
                                         pendingInteraction = interaction;
-                                        interactionRendered = renderInteractionRequired(contentElem, interaction, text => {
-                                                msgControl.val(text).trigger('input');
-                                                sendMessage();
+                                        interactionRendered = renderInteractionRequired(contentElem, interaction, decision => {
+                                                submitInteractionDecision(interaction, decision.decision);
                                         });
                                         scrollToResponse();
+                                        client.close();
                                         return;
                                 }
 
@@ -1467,6 +1528,7 @@
 
                                         beginOutputPhase();
                                         hideThinking();
+                                        pendingInteraction = null;
                                         console.error('Streaming error event:', data);
 
                                         const technicalMessage = data && typeof data === 'object'
