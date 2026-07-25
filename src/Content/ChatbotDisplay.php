@@ -17,13 +17,12 @@
 
 namespace Chatbot\Content;
 
-use Base3\Api\IAssetResolver;
 use Base3\Api\IDisplay;
-use Base3\Api\IMvcView;
 use Base3\Api\ISchemaProvider;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
+use UiFoundation\Api\IChatbotDisplay;
 use Throwable;
 
 class ChatbotDisplay implements IDisplay, ISchemaProvider {
@@ -31,8 +30,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	private array $data = [];
 
 	public function __construct(
-		private readonly IMvcView $view,
-		private readonly IAssetResolver $assetResolver,
+		private readonly IChatbotDisplay $chatbotDisplay,
 		private readonly ILinkTargetService $linkTargetService,
 		private readonly ISettingsStore $settingsStore,
 		private readonly IAgentRuntimeSelector $agentRuntimeSelector
@@ -47,20 +45,13 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	// ---------------------------------------------------------------------
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
-		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
-		$this->view->setTemplate('Content/ChatbotDisplay.php');
-
 		$config = $this->getClientConfig();
 		$config['service_url'] = $this->buildServiceUrl($config);
 		$config['turn_prepare_url'] = $this->buildTurnPrepareUrl();
 
-		foreach ($config as $tag => $content) {
-			$this->view->assign($tag, $content);
-		}
+		$this->chatbotDisplay->setData($config);
 
-		$this->view->assign('resolve', fn($src) => $this->assetResolver->resolve($src));
-
-		return $this->view->loadTemplate();
+		return $this->chatbotDisplay->getOutput($out, $final);
 	}
 
 	public function getHelp(): string {

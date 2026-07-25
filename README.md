@@ -78,8 +78,18 @@ The public `ChatbotDisplay` resolves the backend and UI settings from the same S
 - BASE3 Framework
 - AssistantFoundation
 - AssistantRuntime
+- UiFoundation
+- an `IChatbotDisplay` implementation; ClientStack provides the classic default
 - an `IAgentExecutionService` implementation for agent-backed backends
 
 ## License
 
 GPL-3.0. See `LICENSE`.
+
+## Replaceable browser display
+
+`Chatbot\Content\ChatbotDisplay` remains the stable public BASE3 display. It resolves the chatbot backend, SettingsStore identity, feature configuration, and service URLs, then delegates rendering to `UiFoundation\Api\IChatbotDisplay`.
+
+The current classic browser implementation is owned by ClientStack as `ClientStack\Display\ClassicChatbotDisplay`. ClientStack registers that implementation as the default with `IContainer::NOOVERWRITE`, so a project plugin can replace the browser client without changing Chatbot backend or transport code.
+
+The preserved classic JavaScript source is maintained in the standalone repository `ClientStack/dev/ClassicChatbot` and deployed to `ClientStack/assets/classicchatbot`.

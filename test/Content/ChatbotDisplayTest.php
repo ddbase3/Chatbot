@@ -3,12 +3,11 @@
 namespace Chatbot\Test\Content;
 
 use AssistantFoundation\Api\IAgentRuntimeSelector;
-use Base3\Api\IAssetResolver;
-use Base3\Api\IMvcView;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotDisplay;
 use PHPUnit\Framework\TestCase;
+use UiFoundation\Api\IChatbotDisplay;
 
 class ChatbotDisplayTest extends TestCase {
 
@@ -17,38 +16,36 @@ class ChatbotDisplayTest extends TestCase {
 	}
 
 	public function testGetHelpReturnsString(): void {
-		$display = $this->createDisplay(new FakeMvcView());
+		$display = $this->createDisplay(new FakeChatbotDisplay());
 
 		$this->assertSame('Display a configurable Chatbot widget.', $display->getHelp());
 	}
 
 	public function testGetOutputUsesHostDefaultRuntime(): void {
-		$view = new FakeMvcView();
-		$display = $this->createDisplay($view, 'neuronai');
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay, 'neuronai');
 
-		$html = $display->getOutput('html');
+		$html = $display->getOutput('html', true);
+		$config = $chatbotDisplay->getData();
 
-		$this->assertSame(DIR_PLUGIN . 'Chatbot', $view->getLastPath());
-		$this->assertSame('Content/ChatbotDisplay.php', $view->getLastTemplate());
-		$this->assertSame('runtime:neuronai', $view->getAssigned('chatbot_backend'));
-		$this->assertSame('chatbotservice', $view->getAssigned('service'));
-		$this->assertSame('/service/chatbotservice', $view->getAssigned('service_url'));
-		$this->assertSame('/service/chatbotturnprepare', $view->getAssigned('turn_prepare_url'));
-		$this->assertTrue($view->getAssigned('use_markdown'));
-		$this->assertTrue($view->getAssigned('use_icons'));
-		$this->assertTrue($view->getAssigned('use_voice'));
-		$this->assertSame('auto', $view->getAssigned('transport_mode'));
-		$this->assertSame('auto', $view->getAssigned('default_lang'));
-
-		$resolve = $view->getAssigned('resolve');
-		$this->assertIsCallable($resolve);
-		$this->assertSame('/resolved/foo.js', $resolve('foo.js'));
-		$this->assertSame('FAKE_TEMPLATE_OUTPUT', $html);
+		$this->assertSame('runtime:neuronai', $config['chatbot_backend'] ?? null);
+		$this->assertSame('chatbotservice', $config['service'] ?? null);
+		$this->assertSame('/service/chatbotservice', $config['service_url'] ?? null);
+		$this->assertSame('/service/chatbotturnprepare', $config['turn_prepare_url'] ?? null);
+		$this->assertTrue($config['use_markdown'] ?? false);
+		$this->assertTrue($config['use_icons'] ?? false);
+		$this->assertTrue($config['use_voice'] ?? false);
+		$this->assertTrue($config['use_threads'] ?? false);
+		$this->assertSame('auto', $config['transport_mode'] ?? null);
+		$this->assertSame('auto', $config['default_lang'] ?? null);
+		$this->assertSame('html', $chatbotDisplay->getLastOutputFormat());
+		$this->assertTrue($chatbotDisplay->isLastOutputFinal());
+		$this->assertSame('FAKE_CHATBOT_OUTPUT', $html);
 	}
 
 	public function testStoredBackendOverridesHostDefaultRuntime(): void {
-		$view = new FakeMvcView();
-		$display = $this->createDisplay($view, 'missionbay', [
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay, 'missionbay', [
 			'chatbot_backend' => 'service:dummychatbotservice',
 			'transport_mode' => 'rest'
 		]);
@@ -58,29 +55,31 @@ class ChatbotDisplayTest extends TestCase {
 		]);
 
 		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
 
-		$this->assertSame('service:dummychatbotservice', $view->getAssigned('chatbot_backend'));
-		$this->assertSame('dummychatbotservice', $view->getAssigned('service'));
-		$this->assertSame('/service/dummychatbotservice', $view->getAssigned('service_url'));
-		$this->assertSame('rest', $view->getAssigned('transport_mode'));
+		$this->assertSame('service:dummychatbotservice', $config['chatbot_backend'] ?? null);
+		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
+		$this->assertSame('/service/dummychatbotservice', $config['service_url'] ?? null);
+		$this->assertSame('rest', $config['transport_mode'] ?? null);
 	}
 
 	public function testLegacyDirectServiceIsResolvedBeforeDefaultBackend(): void {
-		$view = new FakeMvcView();
-		$display = $this->createDisplay($view, 'missionbay');
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay, 'missionbay');
 		$display->setData([
 			'service' => 'dummychatbotservice'
 		]);
 
 		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
 
-		$this->assertSame('service:dummychatbotservice', $view->getAssigned('chatbot_backend'));
-		$this->assertSame('dummychatbotservice', $view->getAssigned('service'));
+		$this->assertSame('service:dummychatbotservice', $config['chatbot_backend'] ?? null);
+		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
 	}
 
 	public function testDirectBackendOverridesAgentRuntime(): void {
-		$view = new FakeMvcView();
-		$display = $this->createDisplay($view);
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay);
 		$display->setData([
 			'chatbot_backend' => 'service:dummychatbotservice',
 			'use_markdown' => false,
@@ -89,19 +88,20 @@ class ChatbotDisplayTest extends TestCase {
 		]);
 
 		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
 
-		$this->assertSame('service:dummychatbotservice', $view->getAssigned('chatbot_backend'));
-		$this->assertSame('dummychatbotservice', $view->getAssigned('service'));
-		$this->assertSame('/service/dummychatbotservice', $view->getAssigned('service_url'));
-		$this->assertFalse($view->getAssigned('use_markdown'));
-		$this->assertSame('rest', $view->getAssigned('transport_mode'));
-		$this->assertSame('de-DE', $view->getAssigned('default_lang'));
-		$this->assertTrue($view->getAssigned('use_icons'));
-		$this->assertTrue($view->getAssigned('use_voice'));
+		$this->assertSame('service:dummychatbotservice', $config['chatbot_backend'] ?? null);
+		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
+		$this->assertSame('/service/dummychatbotservice', $config['service_url'] ?? null);
+		$this->assertFalse($config['use_markdown'] ?? true);
+		$this->assertSame('rest', $config['transport_mode'] ?? null);
+		$this->assertSame('de-DE', $config['default_lang'] ?? null);
+		$this->assertTrue($config['use_icons'] ?? false);
+		$this->assertTrue($config['use_voice'] ?? false);
 	}
 
 	public function testGetSchemaUsesHostDefaultBackend(): void {
-		$display = $this->createDisplay(new FakeMvcView(), 'neuronai');
+		$display = $this->createDisplay(new FakeChatbotDisplay(), 'neuronai');
 		$schema = $display->getSchema();
 		$properties = $schema['properties'] ?? [];
 
@@ -115,7 +115,7 @@ class ChatbotDisplayTest extends TestCase {
 
 	/** @param array<string,mixed> $storedSettings */
 	private function createDisplay(
-		FakeMvcView $view,
+		FakeChatbotDisplay $chatbotDisplay,
 		string $defaultRuntime = 'missionbay',
 		array $storedSettings = []
 	): ChatbotDisplay {
@@ -129,8 +129,7 @@ class ChatbotDisplayTest extends TestCase {
 		$runtimeSelector->method('getDefaultRuntimeId')->willReturn($defaultRuntime);
 
 		return new ChatbotDisplay(
-			$view,
-			new FakeAssetResolver(),
+			$chatbotDisplay,
 			$linkTargetService,
 			$settingsStore,
 			$runtimeSelector
@@ -138,50 +137,40 @@ class ChatbotDisplayTest extends TestCase {
 	}
 }
 
-class FakeAssetResolver implements IAssetResolver {
+class FakeChatbotDisplay implements IChatbotDisplay {
 
-	public function resolve(string $path): string {
-		return '/resolved/' . $path;
-	}
-}
+	private array $data = [];
+	private string $lastOutputFormat = '';
+	private bool $lastOutputFinal = false;
 
-class FakeMvcView implements IMvcView {
-
-	private ?string $lastPath = null;
-	private ?string $lastTemplate = null;
-	private array $assigned = [];
-
-	public function setPath(string $path = '.'): void {
-		$this->lastPath = $path;
+	public static function getName(): string {
+		return 'fakechatbotdisplay';
 	}
 
-	public function assign(string $key, $value): void {
-		$this->assigned[$key] = $value;
+	public function setData($data): void {
+		$this->data = is_array($data) ? $data : [];
 	}
 
-	public function setTemplate(string $template = 'default'): void {
-		$this->lastTemplate = $template;
+	public function getOutput(string $out = 'html', bool $final = false): string {
+		$this->lastOutputFormat = $out;
+		$this->lastOutputFinal = $final;
+
+		return 'FAKE_CHATBOT_OUTPUT';
 	}
 
-	public function loadTemplate(): string {
-		return 'FAKE_TEMPLATE_OUTPUT';
+	public function getHelp(): string {
+		return 'Fake chatbot display.';
 	}
 
-	public function loadBricks(string $set, string $language = ''): void {}
-
-	public function getBricks(string $set): ?array {
-		return null;
+	public function getData(): array {
+		return $this->data;
 	}
 
-	public function getLastPath(): ?string {
-		return $this->lastPath;
+	public function getLastOutputFormat(): string {
+		return $this->lastOutputFormat;
 	}
 
-	public function getLastTemplate(): ?string {
-		return $this->lastTemplate;
-	}
-
-	public function getAssigned(string $tag): mixed {
-		return $this->assigned[$tag] ?? null;
+	public function isLastOutputFinal(): bool {
+		return $this->lastOutputFinal;
 	}
 }
