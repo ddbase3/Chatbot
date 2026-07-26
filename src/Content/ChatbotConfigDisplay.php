@@ -107,6 +107,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->view->assign('values', $values);
 		$this->view->assign('backend_options', $this->listChatbotBackendOptions($context));
 		$this->view->assign('speech_to_text_services', $this->listSpeechToTextServices());
+		$this->view->assign('text_to_speech_services', $this->listTextToSpeechServices());
 		$this->view->assign('messages', $this->messages);
 
 		$runtimeId = $this->getRuntimeIdFromBackend((string)($values['chatbot_backend'] ?? ''));
@@ -346,6 +347,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)$this->request->request('speech_to_text_service')),
+			'text_to_speech_service' => $this->normalizeTechnicalKey((string)$this->request->request('text_to_speech_service')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
@@ -383,6 +385,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)$this->request->request('speech_to_text_service')),
+			'text_to_speech_service' => $this->normalizeTechnicalKey((string)$this->request->request('text_to_speech_service')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
@@ -611,6 +614,51 @@ class ChatbotConfigDisplay implements IDisplay {
 		return $rows;
 	}
 
+	/**
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function listTextToSpeechServices(): array {
+		try {
+			$group = $this->settingsStore->getGroup('service-tts');
+		}
+		catch(Throwable) {
+			return [];
+		}
+
+		$rows = [];
+		foreach($group as $id => $settings) {
+			if(!is_string($id) || $id === '' || !is_array($settings)) {
+				continue;
+			}
+			if(strtolower(trim((string)($settings['serviceType'] ?? ''))) !== 'tts') {
+				continue;
+			}
+			if(!$this->toBool($settings['enabled'] ?? true)) {
+				continue;
+			}
+
+			$technicalId = $this->normalizeTechnicalKey((string)($settings['id'] ?? $id));
+			if($technicalId === '') {
+				continue;
+			}
+
+			$options = is_array($settings['options'] ?? null) ? $settings['options'] : [];
+			$rows[] = [
+				'id' => $technicalId,
+				'name' => trim((string)($settings['name'] ?? $technicalId)) ?: $technicalId,
+				'driver' => trim((string)($settings['driver'] ?? '')),
+				'model' => trim((string)($settings['model'] ?? '')),
+				'voice' => trim((string)($options['voice'] ?? ''))
+			];
+		}
+
+		usort($rows, static function(array $a, array $b): int {
+			return strcasecmp((string)$a['name'], (string)$b['name']);
+		});
+
+		return $rows;
+	}
+
 	// ---------------------------------------------------------------------
 	// Settings
 	// ---------------------------------------------------------------------
@@ -642,6 +690,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_provider' => '',
 			'default_lang' => 'auto',
 			'speech_to_text_service' => '',
+			'text_to_speech_service' => '',
 			'base_prompts' => []
 		], $this->agentConfigFormService->getDefaultSettings());
 	}
@@ -669,6 +718,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_provider' => trim((string)($settings['reference_provider'] ?? $defaults['reference_provider'])),
 			'default_lang' => trim((string)($settings['default_lang'] ?? $defaults['default_lang'])),
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($settings['speech_to_text_service'] ?? $defaults['speech_to_text_service'])),
+			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($settings['text_to_speech_service'] ?? $defaults['text_to_speech_service'])),
 			'base_prompts' => $this->normalizeBasePromptsInput($settings['base_prompts'] ?? $defaults['base_prompts'])
 		];
 
@@ -699,6 +749,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_provider' => $settings['reference_provider'],
 			'default_lang' => $settings['default_lang'],
 			'speech_to_text_service' => $settings['speech_to_text_service'],
+			'text_to_speech_service' => $settings['text_to_speech_service'],
 			'base_prompts' => $settings['base_prompts']
 		];
 

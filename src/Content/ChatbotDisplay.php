@@ -49,6 +49,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		$config['service_url'] = $this->buildServiceUrl($config);
 		$config['turn_prepare_url'] = $this->buildTurnPrepareUrl();
 		$config['speech_to_text_session_url'] = $this->buildSpeechToTextSessionUrl($config);
+		$config['text_to_speech_url'] = $this->buildTextToSpeechUrl($config);
 
 		$this->chatbotDisplay->setData($config);
 
@@ -101,7 +102,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 			// Voice config
 			'default_lang' => 'auto',
-			'speech_to_text_service' => ''
+			'speech_to_text_service' => '',
+			'text_to_speech_service' => ''
 		];
 
 		$storedConfig = $this->loadStoredConfig($this->data);
@@ -132,7 +134,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'reference' => is_array($config['reference'] ?? null) ? $config['reference'] : [],
 			'reference_provider' => trim((string) ($config['reference_provider'] ?? $defaults['reference_provider'])),
 			'default_lang' => trim((string) ($config['default_lang'] ?? $defaults['default_lang'])),
-			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''))
+			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? '')),
+			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? ''))
 		];
 	}
 
@@ -211,6 +214,40 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			['name' => 'realtimespeechtotextsession'],
 			['service' => $serviceId]
 		);
+	}
+
+	/** @param array<string,mixed> $config */
+	protected function buildTextToSpeechUrl(array $config): string {
+		if($this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? '')) === '') {
+			return '';
+		}
+
+		$params = $this->getConfigIdentityParams($config);
+		if($params === []) {
+			return '';
+		}
+
+		return $this->linkTargetService->getLink(
+			['name' => 'texttospeech'],
+			$params
+		);
+	}
+
+	/**
+	 * @param array<string,mixed> $config
+	 * @return array<string,string>
+	 */
+	protected function getConfigIdentityParams(array $config): array {
+		$group = trim((string)($config['config_group'] ?? ''));
+		$name = trim((string)($config['config_name'] ?? ''));
+		if($group === '' || $name === '') {
+			return [];
+		}
+
+		return [
+			'config_group' => $group,
+			'config_name' => $name
+		];
 	}
 
 	/** @param array<string,mixed> $config */
@@ -362,6 +399,12 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 				'speech_to_text_service' => [
 					'type' => 'string',
 					'description' => 'Configured realtime speech-to-text service id. Empty uses browser speech recognition.',
+					'default' => ''
+				],
+
+				'text_to_speech_service' => [
+					'type' => 'string',
+					'description' => 'Configured text-to-speech service id. Empty uses browser speech synthesis.',
 					'default' => ''
 				]
 			],

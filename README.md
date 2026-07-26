@@ -94,13 +94,16 @@ The current classic browser implementation is owned by ClientStack as `ClientSta
 
 The preserved classic JavaScript source is maintained in the standalone repository `ClientStack/dev/ClassicChatbot` and deployed to `ClientStack/assets/classicchatbot`.
 
-## Realtime speech input
+## Speech services per chatbot instance
 
-Chatbot owns the browser-facing `realtimespeechtotextsession` output. The output
-accepts the configured speech service id and delegates session creation to
-`AssistantFoundation\Api\IRealtimeSpeechToTextSessionService`. Chatbot therefore
-has no dependency on MissionBay or on a provider-specific connection model.
+`ChatbotConfigDisplay` stores speech selections in the SettingsStore record
+identified by `config_group` and `config_name`. The public `ChatbotDisplay` uses
+the same identity and never exposes provider service ids to the browser.
 
-`ChatbotConfigDisplay` lists enabled `service-stt` records. An empty selection
-keeps browser speech recognition active. A configured service adds its
-short-lived session URL to the active `IChatbotDisplay` configuration.
+The browser-facing `realtimespeechtotextsession` and `texttospeech` outputs load
+the selected service from that chatbot record before delegating to the neutral
+AssistantFoundation speech contracts. Different chatbot instances can therefore
+use different STT and TTS services without a global client-side selection.
+
+An empty STT or TTS selection keeps the corresponding browser speech provider
+active.

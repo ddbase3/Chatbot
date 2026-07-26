@@ -59,7 +59,7 @@ class ChatbotDisplayTest extends TestCase {
 
 		$this->assertSame('service:dummychatbotservice', $config['chatbot_backend'] ?? null);
 		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
-		$this->assertSame('/service/dummychatbotservice', $config['service_url'] ?? null);
+		$this->assertSame('/service/dummychatbotservice?config_group=chatbot&config_name=stored-dummy', $config['service_url'] ?? null);
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 	}
 
@@ -85,7 +85,10 @@ class ChatbotDisplayTest extends TestCase {
 			'use_markdown' => false,
 			'transport_mode' => 'rest',
 			'default_lang' => 'de-DE',
-			'speech_to_text_service' => 'mistral-realtime'
+			'speech_to_text_service' => 'mistral-realtime',
+			'text_to_speech_service' => 'openai-default',
+			'config_group' => 'chatbot-three',
+			'config_name' => 'floating'
 		]);
 
 		$display->getOutput('html');
@@ -93,12 +96,14 @@ class ChatbotDisplayTest extends TestCase {
 
 		$this->assertSame('service:dummychatbotservice', $config['chatbot_backend'] ?? null);
 		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
-		$this->assertSame('/service/dummychatbotservice', $config['service_url'] ?? null);
+		$this->assertSame('/service/dummychatbotservice?config_group=chatbot-three&config_name=floating', $config['service_url'] ?? null);
 		$this->assertFalse($config['use_markdown'] ?? true);
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 		$this->assertSame('de-DE', $config['default_lang'] ?? null);
 		$this->assertSame('mistral-realtime', $config['speech_to_text_service'] ?? null);
-		$this->assertSame('/service/realtimespeechtotextsession', $config['speech_to_text_session_url'] ?? null);
+		$this->assertSame('/service/realtimespeechtotextsession?service=mistral-realtime', $config['speech_to_text_session_url'] ?? null);
+		$this->assertSame('openai-default', $config['text_to_speech_service'] ?? null);
+		$this->assertSame('/service/texttospeech?config_group=chatbot-three&config_name=floating', $config['text_to_speech_url'] ?? null);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
 	}
@@ -113,6 +118,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertArrayHasKey('chatbot_backend', $properties);
 		$this->assertSame('runtime:neuronai', $properties['chatbot_backend']['default'] ?? null);
 		$this->assertSame(['auto', 'sse', 'rest'], $properties['transport_mode']['enum'] ?? null);
+		$this->assertArrayHasKey('text_to_speech_service', $properties);
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
 	}
 
@@ -124,7 +130,10 @@ class ChatbotDisplayTest extends TestCase {
 	): ChatbotDisplay {
 		$linkTargetService = $this->createStub(ILinkTargetService::class);
 		$linkTargetService->method('getLink')->willReturnCallback(
-			static fn(array $target): string => '/service/' . (string)($target['name'] ?? '')
+			static function(array $target, array $params = []): string {
+				$url = '/service/' . (string)($target['name'] ?? '');
+				return $params === [] ? $url : $url . '?' . http_build_query($params);
+			}
 		);
 		$settingsStore = $this->createStub(ISettingsStore::class);
 		$settingsStore->method('get')->willReturn($storedSettings);

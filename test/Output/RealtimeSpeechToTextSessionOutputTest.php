@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 
-	public function testOutputReturnsProviderNeutralSessionPayload(): void {
+	public function testOutputUsesRequestedService(): void {
 		$request = $this->createMock(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
