@@ -48,6 +48,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		$config = $this->getClientConfig();
 		$config['service_url'] = $this->buildServiceUrl($config);
 		$config['turn_prepare_url'] = $this->buildTurnPrepareUrl();
+		$config['speech_to_text_session_url'] = $this->buildSpeechToTextSessionUrl($config);
 
 		$this->chatbotDisplay->setData($config);
 
@@ -99,7 +100,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'reference_provider' => '',
 
 			// Voice config
-			'default_lang' => 'auto'
+			'default_lang' => 'auto',
+			'speech_to_text_service' => ''
 		];
 
 		$storedConfig = $this->loadStoredConfig($this->data);
@@ -129,7 +131,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			),
 			'reference' => is_array($config['reference'] ?? null) ? $config['reference'] : [],
 			'reference_provider' => trim((string) ($config['reference_provider'] ?? $defaults['reference_provider'])),
-			'default_lang' => trim((string) ($config['default_lang'] ?? $defaults['default_lang']))
+			'default_lang' => trim((string) ($config['default_lang'] ?? $defaults['default_lang'])),
+			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''))
 		];
 	}
 
@@ -195,6 +198,19 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		return $this->linkTargetService->getLink([
 			'name' => 'chatbotturnprepare'
 		]);
+	}
+
+	/** @param array<string,mixed> $config */
+	protected function buildSpeechToTextSessionUrl(array $config): string {
+		$serviceId = $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''));
+		if($serviceId === '') {
+			return '';
+		}
+
+		return $this->linkTargetService->getLink(
+			['name' => 'realtimespeechtotextsession'],
+			['service' => $serviceId]
+		);
 	}
 
 	/** @param array<string,mixed> $config */
@@ -341,6 +357,12 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'type' => 'string',
 					'description' => 'Default language for voice control',
 					'default' => 'auto'
+				],
+
+				'speech_to_text_service' => [
+					'type' => 'string',
+					'description' => 'Configured realtime speech-to-text service id. Empty uses browser speech recognition.',
+					'default' => ''
 				]
 			],
 			'required' => ['chatbot_backend']

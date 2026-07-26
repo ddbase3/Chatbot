@@ -93,3 +93,14 @@ GPL-3.0. See `LICENSE`.
 The current classic browser implementation is owned by ClientStack as `ClientStack\Display\ClassicChatbotDisplay`. ClientStack registers that implementation as the default with `IContainer::NOOVERWRITE`, so a project plugin can replace the browser client without changing Chatbot backend or transport code.
 
 The preserved classic JavaScript source is maintained in the standalone repository `ClientStack/dev/ClassicChatbot` and deployed to `ClientStack/assets/classicchatbot`.
+
+## Realtime speech input
+
+Chatbot owns the browser-facing `realtimespeechtotextsession` output. The output
+accepts the configured speech service id and delegates session creation to
+`AssistantFoundation\Api\IRealtimeSpeechToTextSessionService`. Chatbot therefore
+has no dependency on MissionBay or on a provider-specific connection model.
+
+`ChatbotConfigDisplay` lists enabled `service-stt` records. An empty selection
+keeps browser speech recognition active. A configured service adds its
+short-lived session URL to the active `IChatbotDisplay` configuration.

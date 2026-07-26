@@ -106,6 +106,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->view->assign('render_form', $context['render_form']);
 		$this->view->assign('values', $values);
 		$this->view->assign('backend_options', $this->listChatbotBackendOptions($context));
+		$this->view->assign('speech_to_text_services', $this->listSpeechToTextServices());
 		$this->view->assign('messages', $this->messages);
 
 		$runtimeId = $this->getRuntimeIdFromBackend((string)($values['chatbot_backend'] ?? ''));
@@ -344,6 +345,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$settings = [
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
+			'speech_to_text_service' => $this->normalizeTechnicalKey((string)$this->request->request('speech_to_text_service')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
@@ -380,6 +382,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$values = [
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
+			'speech_to_text_service' => $this->normalizeTechnicalKey((string)$this->request->request('speech_to_text_service')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
@@ -560,6 +563,54 @@ class ChatbotConfigDisplay implements IDisplay {
 		return $service instanceof IChatbotService;
 	}
 
+	/**
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function listSpeechToTextServices(): array {
+		try {
+			$group = $this->settingsStore->getGroup('service-stt');
+		}
+		catch(Throwable) {
+			return [];
+		}
+
+		$rows = [];
+		foreach($group as $id => $settings) {
+			if(!is_string($id) || $id === '' || !is_array($settings)) {
+				continue;
+			}
+			if(strtolower(trim((string)($settings['serviceType'] ?? ''))) !== 'stt') {
+				continue;
+			}
+			if(!$this->toBool($settings['enabled'] ?? true)) {
+				continue;
+			}
+
+			$options = is_array($settings['options'] ?? null) ? $settings['options'] : [];
+			if(strtolower(trim((string)($options['mode'] ?? ''))) !== 'realtime') {
+				continue;
+			}
+
+			$technicalId = $this->normalizeTechnicalKey((string)($settings['id'] ?? $id));
+			if($technicalId === '') {
+				continue;
+			}
+
+			$rows[] = [
+				'id' => $technicalId,
+				'name' => trim((string)($settings['name'] ?? $technicalId)) ?: $technicalId,
+				'driver' => trim((string)($settings['driver'] ?? '')),
+				'model' => trim((string)($settings['model'] ?? ''))
+			];
+		}
+
+		usort($rows, static function(array $a, array $b): int {
+			return strcasecmp((string)$a['name'], (string)$b['name']);
+		});
+
+		return $rows;
+	}
+
 	// ---------------------------------------------------------------------
 	// Settings
 	// ---------------------------------------------------------------------
@@ -590,6 +641,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference' => [],
 			'reference_provider' => '',
 			'default_lang' => 'auto',
+			'speech_to_text_service' => '',
 			'base_prompts' => []
 		], $this->agentConfigFormService->getDefaultSettings());
 	}
@@ -616,6 +668,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference' => is_array($settings['reference'] ?? null) ? $settings['reference'] : $defaults['reference'],
 			'reference_provider' => trim((string)($settings['reference_provider'] ?? $defaults['reference_provider'])),
 			'default_lang' => trim((string)($settings['default_lang'] ?? $defaults['default_lang'])),
+			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($settings['speech_to_text_service'] ?? $defaults['speech_to_text_service'])),
 			'base_prompts' => $this->normalizeBasePromptsInput($settings['base_prompts'] ?? $defaults['base_prompts'])
 		];
 
@@ -645,6 +698,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_json' => $this->formatReferenceJson($settings['reference']),
 			'reference_provider' => $settings['reference_provider'],
 			'default_lang' => $settings['default_lang'],
+			'speech_to_text_service' => $settings['speech_to_text_service'],
 			'base_prompts' => $settings['base_prompts']
 		];
 

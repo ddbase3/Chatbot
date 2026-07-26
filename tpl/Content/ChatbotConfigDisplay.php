@@ -2,6 +2,7 @@
 	$values = is_array($this->_['values'] ?? null) ? $this->_['values'] : [];
 	$messages = is_array($this->_['messages'] ?? null) ? $this->_['messages'] : [];
 	$backendOptions = is_array($this->_['backend_options'] ?? null) ? $this->_['backend_options'] : [];
+	$speechToTextServices = is_array($this->_['speech_to_text_services'] ?? null) ? $this->_['speech_to_text_services'] : [];
 	$basePrompts = is_array($values['base_prompts'] ?? null) ? $values['base_prompts'] : [];
 
 	if ($basePrompts === []) {
@@ -38,6 +39,7 @@
 	$useAjax = $saveMode === 'ajax';
 	$currentLang = trim((string)($values['default_lang'] ?? 'auto'));
 	$currentBackend = trim((string)($values['chatbot_backend'] ?? ''));
+	$currentSpeechToTextService = trim((string)($values['speech_to_text_service'] ?? ''));
 	$currentBackendUrl = '';
 	$currentBackendDescription = '';
 	$backendOptionIds = [];
@@ -407,6 +409,25 @@
 					</p>
 				</div>
 			</div>
+
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_speech_to_text_service" class="base3-chatbot-config-label">Speech-to-text service</label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_speech_to_text_service" name="speech_to_text_service" class="form-control">
+						<option value=""<?php echo $selected($currentSpeechToTextService, ''); ?>>Browser speech recognition</option>
+<?php foreach ($speechToTextServices as $speechService) {
+	$speechServiceId = (string)($speechService['id'] ?? '');
+	if ($speechServiceId === '') continue;
+	$speechServiceLabel = trim((string)($speechService['name'] ?? '')) ?: $speechServiceId;
+	$driverLabel = trim((string)($speechService['driver'] ?? ''));
+?>
+						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentSpeechToTextService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($driverLabel !== '' ? ' — ' . $driverLabel : '')); ?></option>
+<?php } ?>
+					</select>
+					<p class="base3-chatbot-config-help">A configured realtime service displays interim transcripts while the user is speaking. Browser speech recognition remains available without a service.</p>
+				</div>
+			</div>
 		</div>
 
 		<details class="base3-chatbot-config-expert">
@@ -687,6 +708,7 @@
 		var map = {
 			chatbot_backend: 'chatbot_backend',
 			default_lang: 'default_lang',
+			speech_to_text_service: 'speech_to_text_service',
 			transport_mode: 'transport_mode',
 			reference_mode: 'reference_mode',
 			reference_json: 'reference',

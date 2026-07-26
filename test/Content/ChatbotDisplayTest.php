@@ -84,7 +84,8 @@ class ChatbotDisplayTest extends TestCase {
 			'chatbot_backend' => 'service:dummychatbotservice',
 			'use_markdown' => false,
 			'transport_mode' => 'rest',
-			'default_lang' => 'de-DE'
+			'default_lang' => 'de-DE',
+			'speech_to_text_service' => 'mistral-realtime'
 		]);
 
 		$display->getOutput('html');
@@ -96,6 +97,8 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertFalse($config['use_markdown'] ?? true);
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 		$this->assertSame('de-DE', $config['default_lang'] ?? null);
+		$this->assertSame('mistral-realtime', $config['speech_to_text_service'] ?? null);
+		$this->assertSame('/service/realtimespeechtotextsession', $config['speech_to_text_session_url'] ?? null);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
 	}
