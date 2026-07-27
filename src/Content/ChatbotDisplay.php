@@ -88,6 +88,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 			// Features
 			'use_markdown' => true,
+			'use_mathjax' => false,
 			'use_icons' => true,
 			'use_voice' => true,
 			'use_threads' => true,
@@ -118,6 +119,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'config_group' => trim((string) ($config['config_group'] ?? $defaults['config_group'])),
 			'config_name' => trim((string) ($config['config_name'] ?? $defaults['config_name'])),
 			'use_markdown' => $this->toBool($config['use_markdown'] ?? $defaults['use_markdown']),
+			'use_mathjax' => $this->toBool($config['use_mathjax'] ?? $defaults['use_mathjax']),
 			'use_icons' => $this->toBool($config['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($config['use_voice'] ?? $defaults['use_voice']),
 			'use_threads' => $this->toBool($config['use_threads'] ?? $defaults['use_threads']),
@@ -349,6 +351,11 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'type' => 'boolean',
 					'description' => 'Enable markdown to HTML conversion',
 					'default' => true
+				],
+				'use_mathjax' => [
+					'type' => 'boolean',
+					'description' => 'Enable MathJax rendering for TeX and MathML formulas',
+					'default' => false
 				],
 				'use_icons' => [
 					'type' => 'boolean',

@@ -349,6 +349,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)$this->request->request('speech_to_text_service')),
 			'text_to_speech_service' => $this->normalizeTechnicalKey((string)$this->request->request('text_to_speech_service')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
+			'use_mathjax' => $this->request->request('use_mathjax') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
 			'use_threads' => $this->request->request('use_threads') !== null,
@@ -387,6 +388,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)$this->request->request('speech_to_text_service')),
 			'text_to_speech_service' => $this->normalizeTechnicalKey((string)$this->request->request('text_to_speech_service')),
 			'use_markdown' => $this->request->request('use_markdown') !== null,
+			'use_mathjax' => $this->request->request('use_mathjax') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
 			'use_threads' => $this->request->request('use_threads') !== null,
@@ -681,6 +683,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		return array_merge([
 			'chatbot_backend' => self::BACKEND_RUNTIME_PREFIX . $runtimeId,
 			'use_markdown' => true,
+			'use_mathjax' => false,
 			'use_icons' => true,
 			'use_voice' => true,
 			'use_threads' => true,
@@ -701,6 +704,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$normalized = [
 			'chatbot_backend' => $backend,
 			'use_markdown' => $this->toBool($settings['use_markdown'] ?? $defaults['use_markdown']),
+			'use_mathjax' => $this->toBool($settings['use_mathjax'] ?? $defaults['use_mathjax']),
 			'use_icons' => $this->toBool($settings['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($settings['use_voice'] ?? $defaults['use_voice']),
 			'use_threads' => $this->toBool($settings['use_threads'] ?? $defaults['use_threads']),
@@ -740,6 +744,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$values = [
 			'chatbot_backend' => $settings['chatbot_backend'],
 			'use_markdown' => $settings['use_markdown'],
+			'use_mathjax' => $settings['use_mathjax'],
 			'use_icons' => $settings['use_icons'],
 			'use_voice' => $settings['use_voice'],
 			'use_threads' => $settings['use_threads'],

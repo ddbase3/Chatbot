@@ -368,6 +368,11 @@
 					</label>
 
 					<label>
+						<input type="checkbox" name="use_mathjax" value="1"<?php echo $checked($values['use_mathjax'] ?? false); ?> />
+						Enable mathematical formula rendering
+					</label>
+
+					<label>
 						<input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
 						Show dialog action icons
 					</label>
@@ -754,7 +759,7 @@
 			renderBasePrompts(values.base_prompts);
 		}
 
-		['use_markdown', 'use_icons', 'use_voice', 'use_threads'].forEach(function(key) {
+		['use_markdown', 'use_mathjax', 'use_icons', 'use_voice', 'use_threads'].forEach(function(key) {
 			var field = root.querySelector('[name="' + key + '"]');
 
 			if (field) {

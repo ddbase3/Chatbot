@@ -33,6 +33,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('/service/chatbotservice', $config['service_url'] ?? null);
 		$this->assertSame('/service/chatbotturnprepare', $config['turn_prepare_url'] ?? null);
 		$this->assertTrue($config['use_markdown'] ?? false);
+		$this->assertFalse($config['use_mathjax'] ?? true);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
 		$this->assertTrue($config['use_threads'] ?? false);
@@ -83,6 +84,7 @@ class ChatbotDisplayTest extends TestCase {
 		$display->setData([
 			'chatbot_backend' => 'service:dummychatbotservice',
 			'use_markdown' => false,
+			'use_mathjax' => true,
 			'transport_mode' => 'rest',
 			'default_lang' => 'de-DE',
 			'speech_to_text_service' => 'mistral-realtime',
@@ -98,6 +100,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
 		$this->assertSame('/service/dummychatbotservice?config_group=chatbot-three&config_name=floating', $config['service_url'] ?? null);
 		$this->assertFalse($config['use_markdown'] ?? true);
+		$this->assertTrue($config['use_mathjax'] ?? false);
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 		$this->assertSame('de-DE', $config['default_lang'] ?? null);
 		$this->assertSame('mistral-realtime', $config['speech_to_text_service'] ?? null);
@@ -118,6 +121,8 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertArrayHasKey('chatbot_backend', $properties);
 		$this->assertSame('runtime:neuronai', $properties['chatbot_backend']['default'] ?? null);
 		$this->assertSame(['auto', 'sse', 'rest'], $properties['transport_mode']['enum'] ?? null);
+		$this->assertArrayHasKey('use_mathjax', $properties);
+		$this->assertFalse($properties['use_mathjax']['default'] ?? true);
 		$this->assertArrayHasKey('text_to_speech_service', $properties);
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
 	}

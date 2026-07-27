@@ -29,6 +29,58 @@ final class ChatbotServiceTest extends TestCase {
 		$this->assertSame('chatbotservice', ChatbotService::getName());
 	}
 
+	public function testMathJaxSystemPromptIsAppendedOnlyWhenEnabled(): void {
+		$service = $this->makeService($this->createRequest([]));
+
+		$this->assertSame(
+			'Configured prompt',
+			$service->getTestSystemPrompt([
+				'system_prompt' => 'Configured prompt',
+				'use_mathjax' => false
+			])
+		);
+
+		$markdownPrompt = $service->getTestSystemPrompt([
+			'system_prompt' => 'Configured prompt',
+			'use_mathjax' => true,
+			'use_markdown' => true
+		]);
+		$this->assertStringStartsWith('Configured prompt', $markdownPrompt);
+		$this->assertStringContainsString(
+			'The Markdown renderer preserves standard MathJax delimiters.',
+			$markdownPrompt
+		);
+		$this->assertStringContainsString('do not double delimiter backslashes for Markdown', $markdownPrompt);
+		$this->assertStringContainsString('Use \( ... \) for inline formulas and \[ ... \] for display formulas.', $markdownPrompt);
+		$this->assertStringContainsString('one transformation per row', $markdownPrompt);
+		$this->assertStringContainsString('Never put a derivation or a long chain of equalities on one line.', $markdownPrompt);
+		$this->assertStringContainsString('including expressions in headings, table cells, option lists, captions, hints, and final summaries', $markdownPrompt);
+		$this->assertStringContainsString('Plain parentheses such as ( ... ) are punctuation, not MathJax delimiters.', $markdownPrompt);
+		$this->assertStringContainsString('Do not substitute Unicode mathematical alphabets', $markdownPrompt);
+		$this->assertStringContainsString('\(\mathcal{O}(1/n)\)', $markdownPrompt);
+		$this->assertStringContainsString('\begin{bmatrix}', $markdownPrompt);
+		$this->assertStringContainsString('\mathbf{a} =', $markdownPrompt);
+		$this->assertStringContainsString('1 & 2 & 3', $markdownPrompt);
+		$this->assertStringContainsString('Never imitate a vector or matrix with spaces, tabs, Unicode glyphs, or plain text lines.', $markdownPrompt);
+
+		$plainPrompt = $service->getTestSystemPrompt([
+			'system_prompt' => 'Configured prompt',
+			'use_mathjax' => true,
+			'use_markdown' => false
+		]);
+		$this->assertStringContainsString('The response is rendered without Markdown.', $plainPrompt);
+		$this->assertStringContainsString('Use \( ... \) for inline formulas and \[ ... \] for display formulas.', $plainPrompt);
+		$this->assertStringContainsString('one transformation per row', $plainPrompt);
+		$this->assertStringContainsString('Never put a derivation or a long chain of equalities on one line.', $plainPrompt);
+		$this->assertStringContainsString('including expressions in headings, table cells, option lists, captions, hints, and final summaries', $plainPrompt);
+		$this->assertStringContainsString('Plain parentheses such as ( ... ) are punctuation, not MathJax delimiters.', $plainPrompt);
+		$this->assertStringContainsString('\(\mathcal{O}(1/n)\)', $plainPrompt);
+		$this->assertStringContainsString('\begin{bmatrix}', $plainPrompt);
+		$this->assertStringContainsString('1 & 2 & 3', $plainPrompt);
+		$this->assertStringContainsString('Do not substitute Unicode mathematical alphabets', $plainPrompt);
+		$this->assertStringContainsString('Never imitate a vector or matrix with spaces, tabs, Unicode glyphs, or plain text lines.', $plainPrompt);
+	}
+
 	public function testGetOutputReturnsEmptyStringWithoutTurn(): void {
 		$request = $this->createRequest([]);
 
@@ -207,6 +259,11 @@ final class ChatbotServiceTest extends TestCase {
 }
 
 final class TestableChatbotService extends ChatbotService {
+
+	/** @param array<string,mixed> $settings */
+	public function getTestSystemPrompt(array $settings): string {
+		return $this->getSystemPrompt($settings);
+	}
 
 	protected function getBasePrompt(): string {
 		return 'Test base prompt';
