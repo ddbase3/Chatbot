@@ -2,12 +2,15 @@
 
 namespace Test\Chatbot\Service;
 
+use AssistantFoundation\Api\IAgentRuntimeSelector;
+use AssistantFoundation\Api\IAgentTextTaskService;
 use AssistantRuntime\Service\CollectingAgentEventSink;
-use Base3\Accesscontrol\Api\IAccesscontrol;
 use Base3\Api\IRequest;
-use Base3\Session\Api\ISession;
+use Base3\Language\Api\ILanguage;
+use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Service\ChatbotConversationContextFactory;
+use Chatbot\Service\ChatbotOpeningMessageService;
+use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\DummyChatbotService;
@@ -26,11 +29,7 @@ final class DummyChatbotServiceTest extends TestCase {
 
 	public function testExecuteTurnReturnsDummyMessageAndEvents(): void {
 		$request = $this->createStub(IRequest::class);
-		$service = new DummyChatbotService(
-			$request,
-			new ChatbotTurnRequestFactory($request, $this->makeConversationContextFactory()),
-			new ChatbotTurnResponder()
-		);
+		$service = $this->createService($request);
 		$sink = new CollectingAgentEventSink();
 
 		$result = $service->executeTurn(
@@ -41,6 +40,27 @@ final class DummyChatbotServiceTest extends TestCase {
 		$this->assertSame('message', $result->getType());
 		$this->assertStringContainsString('Hello', $result->getText());
 		$this->assertNotEmpty($sink->getEvents());
+	}
+
+	public function testBasePromptUsesCanonicalStartMessageSettings(): void {
+		$values = [
+			'baseprompt' => '1',
+			'config_group' => 'chatbot',
+			'config_name' => 'dummy'
+		];
+		$request = $this->createMock(IRequest::class);
+		$request->method('get')->willReturnCallback(
+			static fn(string $key): mixed => $values[$key] ?? null
+		);
+		$request->method('request')->willReturnCallback(
+			static fn(string $key): mixed => $values[$key] ?? null
+		);
+
+		$output = $this->createService($request, [
+			'main_headings' => ['Welcome']
+		])->getOutput('html');
+
+		$this->assertSame('Welcome', $output);
 	}
 
 	public function testGetOutputReturnsJsonInRestMode(): void {
@@ -55,11 +75,7 @@ final class DummyChatbotServiceTest extends TestCase {
 		$request->method('request')->willReturnCallback(
 			static fn(string $key): mixed => $values[$key] ?? null
 		);
-		$service = new DummyChatbotService(
-			$request,
-			new ChatbotTurnRequestFactory($request, $this->makeConversationContextFactory()),
-			new ChatbotTurnResponder()
-		);
+		$service = $this->createService($request);
 
 		$data = json_decode($service->getOutput('json'), true);
 
@@ -67,13 +83,24 @@ final class DummyChatbotServiceTest extends TestCase {
 		$this->assertStringContainsString('Hello', (string)($data['text'] ?? ''));
 	}
 
-	private function makeConversationContextFactory(): ChatbotConversationContextFactory {
-		$accesscontrol = $this->createStub(IAccesscontrol::class);
-		$accesscontrol->method('getUserId')->willReturn(42);
+	private function createService(IRequest $request, array $settings = []): DummyChatbotService {
+		$settingsStore = $this->createStub(ISettingsStore::class);
+		$settingsStore->method('get')->willReturn($settings);
+		$runtimeSelector = $this->createStub(IAgentRuntimeSelector::class);
+		$runtimeSelector->method('getDefaultRuntimeId')->willReturn('missionbay');
+		$settingsService = new ChatbotSettingsService($settingsStore, $runtimeSelector);
 
-		return new ChatbotConversationContextFactory(
-			$accesscontrol,
-			$this->createStub(ISession::class)
+		return new DummyChatbotService(
+			$request,
+			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnResponder(),
+			$settingsService,
+			new ChatbotOpeningMessageService(
+				$this->createStub(IAgentTextTaskService::class),
+				$settingsService,
+				$this->createStub(ILanguage::class)
+			)
 		);
 	}
+
 }

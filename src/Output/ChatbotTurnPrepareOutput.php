@@ -23,7 +23,6 @@ use Base3\LinkTarget\Api\ILinkTargetService;
 use Chatbot\Api\IChatbotTurnRequestStore;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Dto\PendingChatbotTurn;
-use Chatbot\Service\ChatbotConversationContextFactory;
 use Chatbot\Service\ChatbotServiceRegistry;
 use Throwable;
 
@@ -36,7 +35,6 @@ final class ChatbotTurnPrepareOutput implements IOutput {
 		private readonly IRequest $request,
 		private readonly IChatbotTurnRequestStore $turnStore,
 		private readonly ChatbotServiceRegistry $serviceRegistry,
-		private readonly ChatbotConversationContextFactory $conversationContextFactory,
 		private readonly ILinkTargetService $linkTargetService
 	) {}
 
@@ -64,7 +62,7 @@ final class ChatbotTurnPrepareOutput implements IOutput {
 				return $this->encodeError('Unknown chatbot service: ' . $serviceId);
 			}
 
-			$turn = new ChatbotTurnRequest($this->conversationContextFactory->enrich($payload));
+			$turn = new ChatbotTurnRequest($payload);
 			if (!$turn->hasPromptOrResume()) {
 				return $this->encodeError('Chatbot turn requires a prompt or resume payload.');
 			}

@@ -4,15 +4,18 @@ namespace Test\Chatbot\Service;
 
 use AssistantFoundation\Api\IAgentEventSink;
 use AssistantFoundation\Api\IAgentExecutionService;
+use AssistantFoundation\Api\IAgentRuntimeSelector;
+use AssistantFoundation\Api\IAgentTextTaskService;
 use AssistantFoundation\Dto\AgentExecutionRequest;
 use AssistantFoundation\Dto\AgentExecutionResult;
 use AssistantRuntime\Service\CollectingAgentEventSink;
-use Base3\Accesscontrol\Api\IAccesscontrol;
 use Base3\Api\IRequest;
-use Base3\Session\Api\ISession;
+use Base3\Language\Api\ILanguage;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Service\ChatbotConversationContextFactory;
+use Chatbot\Service\ChatbotConversationChannelResolver;
+use Chatbot\Service\ChatbotOpeningMessageService;
+use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotService;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
@@ -158,16 +161,15 @@ final class ChatbotServiceTest extends TestCase {
 	}
 
 	public function testExecuteTurnPassesConversationContext(): void {
-		$ownerKey = str_repeat('a', 64);
 		$executionService = $this->createMock(IAgentExecutionService::class);
 		$executionService->expects($this->once())
 			->method('execute')
 			->with(
-				$this->callback(static function(AgentExecutionRequest $request) use ($ownerKey): bool {
+				$this->callback(static function(AgentExecutionRequest $request): bool {
 					$context = $request->getContext();
 
 					return ($context['conversation_id'] ?? null) === 'conversation-1'
-						&& ($context['conversation_owner_key'] ?? null) === $ownerKey
+						&& ($context['conversation_channel_id'] ?? null) === 'chatbot:' . hash('sha256', "chatbot\0example")
 						&& ($context['chatbot_config_group'] ?? null) === 'chatbot'
 						&& ($context['chatbot_config_name'] ?? null) === 'example';
 				}),
@@ -186,7 +188,7 @@ final class ChatbotServiceTest extends TestCase {
 			new ChatbotTurnRequest([
 				'prompt' => 'Remember this',
 				'conversation_id' => 'conversation-1',
-				'conversation_owner_key' => $ownerKey,
+				'conversation_channel_id' => 'forged-browser-channel',
 				'config_group' => 'chatbot',
 				'config_name' => 'example'
 			]),
@@ -238,24 +240,28 @@ final class ChatbotServiceTest extends TestCase {
 		IRequest $request,
 		?IAgentExecutionService $executionService = null
 	): TestableChatbotService {
+		$settingsStore = $this->createStub(ISettingsStore::class);
+		$runtimeSelector = $this->createStub(IAgentRuntimeSelector::class);
+		$runtimeSelector->method('getDefaultRuntimeId')->willReturn('missionbay');
+		$runtimeSelector->method('selectRuntimeId')->willReturn('missionbay');
+		$settingsService = new ChatbotSettingsService($settingsStore, $runtimeSelector);
+		$openingMessageService = new ChatbotOpeningMessageService(
+			$this->createStub(IAgentTextTaskService::class),
+			$settingsService,
+			$this->createStub(ILanguage::class)
+		);
+
 		return new TestableChatbotService(
 			$request,
-			$this->createStub(ISettingsStore::class),
+			$settingsService,
 			$executionService ?? $this->createStub(IAgentExecutionService::class),
-			new ChatbotTurnRequestFactory($request, $this->makeConversationContextFactory()),
-			new ChatbotTurnResponder()
+			new ChatbotTurnRequestFactory($request),
+			new ChatbotTurnResponder(),
+			new ChatbotConversationChannelResolver(),
+			$openingMessageService
 		);
 	}
 
-	private function makeConversationContextFactory(): ChatbotConversationContextFactory {
-		$accesscontrol = $this->createStub(IAccesscontrol::class);
-		$accesscontrol->method('getUserId')->willReturn(42);
-
-		return new ChatbotConversationContextFactory(
-			$accesscontrol,
-			$this->createStub(ISession::class)
-		);
-	}
 }
 
 final class TestableChatbotService extends ChatbotService {

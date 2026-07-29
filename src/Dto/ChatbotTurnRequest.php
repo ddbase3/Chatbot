@@ -32,8 +32,8 @@ final class ChatbotTurnRequest {
 			(string)($payload['reference_format'] ?? '')
 		);
 		$payload['resume'] = $this->normalizeResume($payload);
-		$payload['conversation_id'] = $this->normalizeConversationId($payload['conversation_id'] ?? null);
-		$payload['conversation_owner_key'] = $this->normalizeOwnerKey($payload['conversation_owner_key'] ?? null);
+		$payload['conversation_id'] = $this->normalizeTechnicalId($payload['conversation_id'] ?? null, 100);
+		unset($payload['conversation_channel_id']);
 		$this->payload = $payload;
 	}
 
@@ -99,31 +99,18 @@ final class ChatbotTurnRequest {
 		return $this->getString('conversation_id');
 	}
 
-	public function getConversationOwnerKey(): string {
-		return $this->getString('conversation_owner_key');
-	}
 
 	/** @return array<string,mixed> */
 	public function getReference(): array {
 		return $this->getArray('reference');
 	}
 
-	private function normalizeOwnerKey(mixed $value): string {
+	private function normalizeTechnicalId(mixed $value, int $maxLength): string {
 		if (!is_scalar($value) && $value !== null) {
 			return '';
 		}
 
-		$value = strtolower(trim((string)$value));
-
-		return preg_match('/^[a-f0-9]{64}$/', $value) === 1 ? $value : '';
-	}
-
-	private function normalizeConversationId(mixed $value): string {
-		if (!is_scalar($value) && $value !== null) {
-			return '';
-		}
-
-		$value = substr(trim((string)$value), 0, 100);
+		$value = substr(trim((string)$value), 0, $maxLength);
 
 		return preg_replace('/[^A-Za-z0-9._:-]+/', '', $value) ?? '';
 	}

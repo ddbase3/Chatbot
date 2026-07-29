@@ -1,13 +1,18 @@
 <?php
 	$values = is_array($this->_['values'] ?? null) ? $this->_['values'] : [];
+	$bricks = is_array($this->_['bricks']['chatbot_configuration'] ?? null) ? $this->_['bricks']['chatbot_configuration'] : [];
 	$messages = is_array($this->_['messages'] ?? null) ? $this->_['messages'] : [];
 	$backendOptions = is_array($this->_['backend_options'] ?? null) ? $this->_['backend_options'] : [];
 	$speechToTextServices = is_array($this->_['speech_to_text_services'] ?? null) ? $this->_['speech_to_text_services'] : [];
 	$textToSpeechServices = is_array($this->_['text_to_speech_services'] ?? null) ? $this->_['text_to_speech_services'] : [];
-	$basePrompts = is_array($values['base_prompts'] ?? null) ? $values['base_prompts'] : [];
+	$mainHeadings = is_array($values['main_headings'] ?? null) ? $values['main_headings'] : [];
+	$firstMessages = is_array($values['first_messages'] ?? null) ? $values['first_messages'] : [];
 
-	if ($basePrompts === []) {
-		$basePrompts = [''];
+	if ($mainHeadings === []) {
+		$mainHeadings = [''];
+	}
+	if ($firstMessages === []) {
+		$firstMessages = [''];
 	}
 
 	$languageOptions = [
@@ -28,6 +33,7 @@
 	];
 
 	$e = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+	$t = static fn(string $key, string $fallback): string => trim((string)($bricks[$key] ?? '')) !== '' ? (string)$bricks[$key] : $fallback;
 	$checked = static fn($value): string => !empty($value) ? ' checked="checked"' : '';
 	$selected = static fn($current, $value): string => (string)$current === (string)$value ? ' selected="selected"' : '';
 
@@ -172,6 +178,39 @@
 		font-weight: bold;
 	}
 
+	.base3-chatbot-config-fieldset {
+		min-width: 0;
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+
+	.base3-chatbot-config-fieldset[hidden] {
+		display: none;
+	}
+
+	.base3-chatbot-config-fieldset > legend {
+		float: left;
+		width: 100%;
+		margin: 0;
+		padding: 7px 0 0;
+		font-size: inherit;
+		font-weight: bold;
+		line-height: inherit;
+	}
+
+	.base3-chatbot-visually-hidden {
+		position: absolute !important;
+		width: 1px !important;
+		height: 1px !important;
+		padding: 0 !important;
+		margin: -1px !important;
+		overflow: hidden !important;
+		clip: rect(0, 0, 0, 0) !important;
+		white-space: nowrap !important;
+		border: 0 !important;
+	}
+
 	.base3-chatbot-config-display input[type="text"],
 	.base3-chatbot-config-display select,
 	.base3-chatbot-config-display textarea {
@@ -222,31 +261,31 @@
 		margin-right: 6px;
 	}
 
-	.base3-chatbot-config-base-prompts {
+	.base3-chatbot-config-message-list {
 		max-width: 760px;
 	}
 
-	.base3-chatbot-config-base-prompt-row {
+	.base3-chatbot-config-message-row {
 		display: flex;
 		gap: 7px;
 		align-items: center;
 		margin: 0 0 7px;
 	}
 
-	.base3-chatbot-config-base-prompt-row input[type="text"] {
+	.base3-chatbot-config-message-row input[type="text"] {
 		max-width: none;
 		flex: 1 1 auto;
 	}
 
-	.base3-chatbot-config-base-prompt-remove,
-	.base3-chatbot-config-base-prompt-add {
+	.base3-chatbot-config-message-remove,
+	.base3-chatbot-config-message-add {
 		min-height: 34px;
 		padding: 6px 10px;
 		cursor: pointer;
 		white-space: nowrap;
 	}
 
-	.base3-chatbot-config-base-prompt-add {
+	.base3-chatbot-config-message-add {
 		margin-top: 1px;
 	}
 
@@ -274,8 +313,11 @@
 			display: block;
 		}
 
-		.base3-chatbot-config-label {
+		.base3-chatbot-config-label,
+		.base3-chatbot-config-fieldset > legend {
 			display: block;
+			float: none;
+			width: auto;
 			padding-top: 0;
 			margin: 0 0 5px;
 		}
@@ -286,11 +328,11 @@
 			max-width: none;
 		}
 
-		.base3-chatbot-config-base-prompt-row {
+		.base3-chatbot-config-message-row {
 			display: block;
 		}
 
-		.base3-chatbot-config-base-prompt-remove {
+		.base3-chatbot-config-message-remove {
 			margin-top: 5px;
 		}
 	}
@@ -333,61 +375,125 @@
 		<input type="hidden" name="chatbot_config_name" value="<?php echo $e($name); ?>" />
 
 		<div class="base3-chatbot-config-section">
-			<h3>Chatbot UI</h3>
+			<h3><?php echo $e($t('ui_section', 'Chatbot UI')); ?></h3>
 
-			<div class="base3-chatbot-config-row">
-				<div class="base3-chatbot-config-label">Base prompts</div>
+			<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
+				<legend><?php echo $e($t('main_headings_label', 'Main headings')); ?></legend>
 				<div>
-					<div class="base3-chatbot-config-base-prompts" data-base3-chatbot-base-prompts>
-						<div data-base3-chatbot-base-prompts-items>
-<?php foreach ($basePrompts as $basePrompt) { ?>
-							<div class="base3-chatbot-config-base-prompt-row">
-								<input type="text" name="base_prompts[]" class="form-control" value="<?php echo $e($basePrompt); ?>" placeholder="Initial greeting prompt" />
-								<button type="button" class="btn btn-default base3-chatbot-config-base-prompt-remove" data-base3-chatbot-base-prompt-remove="1">Remove</button>
+					<div class="base3-chatbot-config-message-list" data-base3-chatbot-message-list="main_headings">
+						<div data-base3-chatbot-message-list-items="main_headings">
+<?php foreach ($mainHeadings as $mainHeadingIndex => $mainHeading) {
+	$mainHeadingId = $formId . '_main_heading_' . $mainHeadingIndex;
+?>
+							<div class="base3-chatbot-config-message-row">
+								<label class="base3-chatbot-visually-hidden" for="<?php echo $e($mainHeadingId); ?>"><?php echo $e($t('main_heading_item_label', 'Main heading')); ?> <?php echo $e((string)($mainHeadingIndex + 1)); ?></label>
+								<input id="<?php echo $e($mainHeadingId); ?>" type="text" name="main_headings[]" class="form-control" value="<?php echo $e($mainHeading); ?>" placeholder="<?php echo $e($t('main_heading_placeholder', 'What can I help you with?')); ?>" />
+								<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="main_headings"><?php echo $e($t('remove', 'Remove')); ?></button>
 							</div>
 <?php } ?>
 						</div>
-
-						<button type="button" class="btn btn-default base3-chatbot-config-base-prompt-add" data-base3-chatbot-base-prompt-add="1">
-							Add base prompt
+						<button type="button" class="btn btn-default base3-chatbot-config-message-add" data-base3-chatbot-message-add="main_headings">
+							<?php echo $e($t('add_main_heading', 'Add main heading')); ?>
 						</button>
-
-						<p class="base3-chatbot-config-help">
-							Initial greeting prompts shown before the user starts chatting. Empty fields are ignored when saving.
-						</p>
+						<p class="base3-chatbot-config-help"><?php echo $e($t('main_headings_help', 'One heading is fixed. With several headings one is selected randomly for each new chat. With no heading this area is omitted. The heading is not part of the conversation and disappears as soon as the chat contains a message.')); ?></p>
 					</div>
+				</div>
+			</fieldset>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_first_message_mode" class="base3-chatbot-config-label"><?php echo $e($t('first_message_mode_label', 'First chat message')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_first_message_mode" name="first_message_mode" class="form-control" aria-describedby="<?php echo $e($formId); ?>_first_message_mode_help">
+						<option value="none"<?php echo $selected($values['first_message_mode'] ?? 'none', 'none'); ?>><?php echo $e($t('first_message_mode_none', 'User starts the chat')); ?></option>
+						<option value="random"<?php echo $selected($values['first_message_mode'] ?? 'none', 'random'); ?>><?php echo $e($t('first_message_mode_random', 'Random first assistant message')); ?></option>
+						<option value="contextual_ai"<?php echo $selected($values['first_message_mode'] ?? 'none', 'contextual_ai'); ?>><?php echo $e($t('first_message_mode_contextual_ai', 'Contextual first AI message')); ?></option>
+					</select>
+					<p id="<?php echo $e($formId); ?>_first_message_mode_help" class="base3-chatbot-config-help"><?php echo $e($t('first_message_mode_help', 'This is a real assistant message stored in the chat. It is independent of the main heading.')); ?></p>
+				</div>
+			</div>
+
+			<fieldset
+				class="base3-chatbot-config-row base3-chatbot-config-fieldset"
+				data-base3-chatbot-first-messages
+				<?php echo (($values['first_message_mode'] ?? 'none') === 'random') ? '' : 'hidden'; ?>
+			>
+				<legend><?php echo $e($t('first_messages_label', 'First assistant messages')); ?></legend>
+				<div>
+					<div class="base3-chatbot-config-message-list" data-base3-chatbot-message-list="first_messages">
+						<div data-base3-chatbot-message-list-items="first_messages">
+<?php foreach ($firstMessages as $firstMessageIndex => $firstMessage) {
+	$firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
+?>
+							<div class="base3-chatbot-config-message-row">
+								<label class="base3-chatbot-visually-hidden" for="<?php echo $e($firstMessageId); ?>"><?php echo $e($t('first_message_item_label', 'First assistant message')); ?> <?php echo $e((string)($firstMessageIndex + 1)); ?></label>
+								<input id="<?php echo $e($firstMessageId); ?>" type="text" name="first_messages[]" class="form-control" value="<?php echo $e($firstMessage); ?>" placeholder="<?php echo $e($t('first_message_placeholder', 'How can I help you?')); ?>" />
+								<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="first_messages"><?php echo $e($t('remove', 'Remove')); ?></button>
+							</div>
+<?php } ?>
+						</div>
+						<button type="button" class="btn btn-default base3-chatbot-config-message-add" data-base3-chatbot-message-add="first_messages">
+							<?php echo $e($t('add_first_message', 'Add first assistant message')); ?>
+						</button>
+						<p class="base3-chatbot-config-help"><?php echo $e($t('first_messages_help', 'Used only for the random first-message mode. Empty fields are ignored.')); ?></p>
+					</div>
+				</div>
+			</fieldset>
+
+			<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
+				<legend><?php echo $e($t('history_label', 'Chat history')); ?></legend>
+				<div class="base3-chatbot-config-checkboxes">
+					<label>
+						<input type="checkbox" name="chat_history_enabled" value="1"<?php echo $checked($values['chat_history_enabled'] ?? false); ?> />
+						<?php echo $e($t('history_enabled', 'Enable multiple chats and the chat list')); ?>
+					</label>
+					<label>
+						<input type="checkbox" name="automatic_chat_titles" value="1"<?php echo $checked($values['automatic_chat_titles'] ?? false); ?> />
+						<?php echo $e($t('automatic_titles', 'Generate chat titles automatically')); ?>
+					</label>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('history_help', 'Conversation history is active only when the selected agent has a conversation memory profile.')); ?></p>
+				</div>
+			</fieldset>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_chat_history_panel_mode" class="base3-chatbot-config-label"><?php echo $e($t('history_panel_mode', 'Chat list display')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_chat_history_panel_mode" name="chat_history_panel_mode" class="form-control">
+						<option value="responsive"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'responsive'); ?>><?php echo $e($t('history_panel_responsive', 'Responsive')); ?></option>
+						<option value="open"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'open'); ?>><?php echo $e($t('history_panel_open', 'Initially open')); ?></option>
+						<option value="closed"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'closed'); ?>><?php echo $e($t('history_panel_closed', 'Initially closed')); ?></option>
+					</select>
 				</div>
 			</div>
 
 			<div class="base3-chatbot-config-row">
-				<div class="base3-chatbot-config-label">Features</div>
+				<label for="<?php echo $e($formId); ?>_ai_notice_text" class="base3-chatbot-config-label"><?php echo $e($t('ai_notice_label', 'AI notice')); ?></label>
+				<div>
+					<textarea id="<?php echo $e($formId); ?>_ai_notice_text" name="ai_notice_text" class="form-control" rows="3" required="required" aria-describedby="<?php echo $e($formId); ?>_ai_notice_help"><?php echo $e($values['ai_notice_text'] ?? ''); ?></textarea>
+					<p id="<?php echo $e($formId); ?>_ai_notice_help" class="base3-chatbot-config-help"><?php echo $e($t('ai_notice_help', 'This visible notice is displayed directly below the message composer.')); ?></p>
+				</div>
+			</div>
+
+			<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
+				<legend><?php echo $e($t('features_label', 'Features')); ?></legend>
 				<div class="base3-chatbot-config-checkboxes">
 					<label>
 						<input type="checkbox" name="use_markdown" value="1"<?php echo $checked($values['use_markdown'] ?? false); ?> />
-						Enable markdown rendering
+						<?php echo $e($t('feature_markdown', 'Enable markdown rendering')); ?>
 					</label>
-
 					<label>
 						<input type="checkbox" name="use_mathjax" value="1"<?php echo $checked($values['use_mathjax'] ?? false); ?> />
-						Enable mathematical formula rendering
+						<?php echo $e($t('feature_mathjax', 'Enable mathematical formula rendering')); ?>
 					</label>
-
 					<label>
 						<input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
-						Show dialog action icons
+						<?php echo $e($t('feature_icons', 'Show dialog action icons')); ?>
 					</label>
-
 					<label>
 						<input type="checkbox" name="use_voice" value="1"<?php echo $checked($values['use_voice'] ?? false); ?> />
-						Enable voice controls
-					</label>
-
-					<label>
-						<input type="checkbox" name="use_threads" value="1"<?php echo $checked($values['use_threads'] ?? false); ?> />
-						Enable chat threads
+						<?php echo $e($t('feature_voice', 'Enable voice controls')); ?>
 					</label>
 				</div>
-			</div>
+			</fieldset>
 
 			<div class="base3-chatbot-config-row">
 				<label for="<?php echo $e($formId); ?>_transport_mode" class="base3-chatbot-config-label">Transport mode</label>
@@ -546,7 +652,7 @@
 
 		<div class="base3-chatbot-config-row base3-chatbot-config-actions">
 			<div>
-				<div class="base3-chatbot-config-messages" data-base3-chatbot-config-messages>
+				<div class="base3-chatbot-config-messages" data-base3-chatbot-config-messages role="status" aria-live="polite" aria-atomic="true">
 <?php foreach ($messages as $message) {
 	$type = preg_replace('/[^a-z]/', '', (string)($message['type'] ?? 'info'));
 	if ($type === '') {
@@ -586,13 +692,34 @@
 	var button = root.querySelector('[data-base3-chatbot-config-save]');
 	var messages = root.querySelector('[data-base3-chatbot-config-messages]');
 	var saveUrl = root.getAttribute('data-save-url') || <?php echo json_encode($saveUrl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-	var basePromptsRoot = root.querySelector('[data-base3-chatbot-base-prompts]');
-	var basePromptsItems = root.querySelector('[data-base3-chatbot-base-prompts-items]');
-	var basePromptsAdd = root.querySelector('[data-base3-chatbot-base-prompt-add]');
 	var backendSelect = root.querySelector('[data-base3-chatbot-backend-select]');
 	var backendDescription = root.querySelector('[data-base3-chatbot-backend-description]');
 	var backendUrl = root.querySelector('[data-base3-chatbot-backend-url]');
 	var agentConfigRoot = root.querySelector('[data-base3-agent-config-root]');
+	var firstMessageMode = root.querySelector('[name="first_message_mode"]');
+	var firstMessagesFieldset = root.querySelector('[data-base3-chatbot-first-messages]');
+	var removeLabel = <?php echo json_encode($t('remove', 'Remove'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+	var saveErrorPrefix = <?php echo json_encode($t('save_error_prefix', 'Settings could not be saved:'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+	var messageLists = {
+		main_headings: {
+			items: root.querySelector('[data-base3-chatbot-message-list-items="main_headings"]'),
+			add: root.querySelector('[data-base3-chatbot-message-add="main_headings"]'),
+			label: <?php echo json_encode($t('main_heading_item_label', 'Main heading'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			placeholder: <?php echo json_encode($t('main_heading_placeholder', 'What can I help you with?'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			idPrefix: <?php echo json_encode($formId . '_main_heading_dynamic_', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+		},
+		first_messages: {
+			items: root.querySelector('[data-base3-chatbot-message-list-items="first_messages"]'),
+			add: root.querySelector('[data-base3-chatbot-message-add="first_messages"]'),
+			label: <?php echo json_encode($t('first_message_item_label', 'First assistant message'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			placeholder: <?php echo json_encode($t('first_message_placeholder', 'How can I help you?'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			idPrefix: <?php echo json_encode($formId . '_first_message_dynamic_', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+		}
+	};
+	Object.keys(messageLists).forEach(function(key) {
+		var config = messageLists[key];
+		config.counter = config.items ? config.items.querySelectorAll('[name="' + key + '[]"]').length : 0;
+	});
 
 	if (!button || !saveUrl) {
 		return;
@@ -610,6 +737,18 @@
 	function getRuntimeIdFromBackend(value) {
 		value = String(value || '');
 		return value.indexOf('runtime:') === 0 ? value.substring(8) : '';
+	}
+
+	function updateFirstMessageFields() {
+		if (!firstMessagesFieldset) {
+			return;
+		}
+
+		var visible = firstMessageMode && firstMessageMode.value === 'random';
+		firstMessagesFieldset.hidden = !visible;
+		firstMessagesFieldset.querySelectorAll('input, button').forEach(function(field) {
+			field.disabled = !visible;
+		});
 	}
 
 	function updateBackend() {
@@ -633,52 +772,62 @@
 		}
 	}
 
-	function createBasePromptRow(value) {
+	function createMessageRow(key, value) {
+		var config = messageLists[key];
+		if (!config) {
+			return document.createDocumentFragment();
+		}
+
 		var row = document.createElement('div');
+		var label = document.createElement('label');
 		var input = document.createElement('input');
 		var remove = document.createElement('button');
+		var inputId = config.idPrefix + config.counter;
+		config.counter += 1;
 
-		row.className = 'base3-chatbot-config-base-prompt-row';
+		row.className = 'base3-chatbot-config-message-row';
+		label.className = 'base3-chatbot-visually-hidden';
+		label.htmlFor = inputId;
+		label.appendChild(document.createTextNode(config.label + ' ' + config.counter));
 
+		input.id = inputId;
 		input.type = 'text';
-		input.name = 'base_prompts[]';
+		input.name = key + '[]';
 		input.className = 'form-control';
 		input.value = value || '';
-		input.placeholder = 'Initial greeting prompt';
+		input.placeholder = config.placeholder;
 
 		remove.type = 'button';
-		remove.className = 'btn btn-default base3-chatbot-config-base-prompt-remove';
-		remove.setAttribute('data-base3-chatbot-base-prompt-remove', '1');
-		remove.appendChild(document.createTextNode('Remove'));
+		remove.className = 'btn btn-default base3-chatbot-config-message-remove';
+		remove.setAttribute('data-base3-chatbot-message-remove', key);
+		remove.appendChild(document.createTextNode(removeLabel));
 		remove.addEventListener('click', function() {
 			if (row.parentNode) {
 				row.parentNode.removeChild(row);
 			}
-
-			if (basePromptsItems && !basePromptsItems.querySelector('[name="base_prompts[]"]')) {
-				basePromptsItems.appendChild(createBasePromptRow(''));
+			if (config.items && !config.items.querySelector('[name="' + key + '[]"]')) {
+				config.items.appendChild(createMessageRow(key, ''));
 			}
 		});
 
+		row.appendChild(label);
 		row.appendChild(input);
 		row.appendChild(remove);
-
 		return row;
 	}
 
-	function renderBasePrompts(items) {
-		if (!basePromptsItems) {
+	function renderMessageList(key, items) {
+		var config = messageLists[key];
+		if (!config || !config.items) {
 			return;
 		}
-
 		if (!Array.isArray(items) || items.length === 0) {
 			items = [''];
 		}
 
-		basePromptsItems.innerHTML = '';
-
+		config.items.innerHTML = '';
 		items.forEach(function(item) {
-			basePromptsItems.appendChild(createBasePromptRow(item));
+			config.items.appendChild(createMessageRow(key, item));
 		});
 	}
 
@@ -734,6 +883,9 @@
 
 		var map = {
 			chatbot_backend: 'chatbot_backend',
+			first_message_mode: 'first_message_mode',
+			chat_history_panel_mode: 'chat_history_panel_mode',
+			ai_notice_text: 'ai_notice_text',
 			default_lang: 'default_lang',
 			speech_to_text_service: 'speech_to_text_service',
 			text_to_speech_service: 'text_to_speech_service',
@@ -755,11 +907,13 @@
 			}
 		});
 
-		if (Object.prototype.hasOwnProperty.call(values, 'base_prompts')) {
-			renderBasePrompts(values.base_prompts);
-		}
+		['main_headings', 'first_messages'].forEach(function(key) {
+			if (Object.prototype.hasOwnProperty.call(values, key)) {
+				renderMessageList(key, values[key]);
+			}
+		});
 
-		['use_markdown', 'use_mathjax', 'use_icons', 'use_voice', 'use_threads'].forEach(function(key) {
+		['use_markdown', 'use_mathjax', 'use_icons', 'use_voice', 'chat_history_enabled', 'automatic_chat_titles'].forEach(function(key) {
 			var field = root.querySelector('[name="' + key + '"]');
 
 			if (field) {
@@ -772,6 +926,7 @@
 		}
 
 		updateBackend();
+		updateFirstMessageFields();
 	}
 
 	function save(event) {
@@ -800,7 +955,7 @@
 				renderMessages([
 					{
 						type: 'danger',
-						text: 'Settings could not be saved: ' + error.message
+						text: saveErrorPrefix + ' ' + error.message
 					}
 				]);
 			})
@@ -809,30 +964,35 @@
 			});
 	}
 
-	if (basePromptsRoot && basePromptsAdd && basePromptsItems) {
-		basePromptsAdd.addEventListener('click', function() {
-			basePromptsItems.appendChild(createBasePromptRow(''));
+	Object.keys(messageLists).forEach(function(key) {
+		var config = messageLists[key];
+		if (!config.items || !config.add) {
+			return;
+		}
+		config.add.addEventListener('click', function() {
+			config.items.appendChild(createMessageRow(key, ''));
 		});
-
-		basePromptsRoot.querySelectorAll('[data-base3-chatbot-base-prompt-remove]').forEach(function(remove) {
+		config.items.querySelectorAll('[data-base3-chatbot-message-remove="' + key + '"]').forEach(function(remove) {
 			remove.addEventListener('click', function() {
-				var row = remove.closest('.base3-chatbot-config-base-prompt-row');
-
+				var row = remove.closest('.base3-chatbot-config-message-row');
 				if (row && row.parentNode) {
 					row.parentNode.removeChild(row);
 				}
-
-				if (!basePromptsItems.querySelector('[name="base_prompts[]"]')) {
-					basePromptsItems.appendChild(createBasePromptRow(''));
+				if (!config.items.querySelector('[name="' + key + '[]"]')) {
+					config.items.appendChild(createMessageRow(key, ''));
 				}
 			});
 		});
-	}
+	});
 
 	if (backendSelect) {
 		backendSelect.addEventListener('change', updateBackend);
 		updateBackend();
 	}
+	if (firstMessageMode) {
+		firstMessageMode.addEventListener('change', updateFirstMessageFields);
+	}
+	updateFirstMessageFields();
 
 	if (root.tagName && root.tagName.toLowerCase() === 'form') {
 		root.addEventListener('submit', save);

@@ -38,6 +38,54 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertSame('default', $context['name'] ?? null);
 	}
 
+	public function testDefaultSettingsUseCanonicalConversationFields(): void {
+		$defaults = $this->createDisplay()->getTestDefaultSettings();
+
+		$this->assertSame([], $defaults['main_headings'] ?? null);
+		$this->assertSame('none', $defaults['first_message_mode'] ?? null);
+		$this->assertSame([], $defaults['first_messages'] ?? null);
+		$this->assertFalse($defaults['chat_history_enabled'] ?? true);
+		$this->assertFalse($defaults['automatic_chat_titles'] ?? true);
+		$this->assertSame('responsive', $defaults['chat_history_panel_mode'] ?? null);
+		$this->assertNotSame('', trim((string)($defaults['ai_notice_text'] ?? '')));
+		$this->assertArrayNotHasKey('base_prompts', $defaults);
+		$this->assertArrayNotHasKey('use_threads', $defaults);
+	}
+
+	public function testNormalizationDoesNotPreserveRemovedUiFields(): void {
+		$settings = $this->createDisplay()->normalizeTestSettings([
+			'chatbot_backend' => 'runtime:missionbay',
+			'base_prompts' => ['Legacy'],
+			'use_threads' => true,
+			'start_mode' => 'fixed',
+			'start_messages' => ['Legacy start'],
+			'main_headings' => ['Headline'],
+			'first_message_mode' => 'random',
+			'first_messages' => ['Hello'],
+			'ai_notice_text' => 'AI can make mistakes.'
+		]);
+
+		$this->assertSame(['Headline'], $settings['main_headings'] ?? null);
+		$this->assertSame('random', $settings['first_message_mode'] ?? null);
+		$this->assertSame(['Hello'], $settings['first_messages'] ?? null);
+		$this->assertArrayNotHasKey('start_mode', $settings);
+		$this->assertArrayNotHasKey('start_messages', $settings);
+		$this->assertArrayNotHasKey('base_prompts', $settings);
+		$this->assertArrayNotHasKey('use_threads', $settings);
+	}
+
+	public function testRemovedFixedFirstMessageModeNormalizesToUserStartsChat(): void {
+		$settings = $this->createDisplay()->normalizeTestSettings([
+			'chatbot_backend' => 'runtime:missionbay',
+			'first_message_mode' => 'fixed',
+			'first_messages' => ['Legacy fixed message'],
+			'ai_notice_text' => 'AI can make mistakes.'
+		]);
+
+		$this->assertSame('none', $settings['first_message_mode'] ?? null);
+		$this->assertSame([], $settings['first_messages'] ?? null);
+	}
+
 	public function testLoadsExistingInstanceSettingsIncludingSpeechServices(): void {
 		$settingsStore = $this->createMock(ISettingsStore::class);
 		$settingsStore
@@ -102,5 +150,15 @@ final class TestableChatbotConfigDisplay extends ChatbotConfigDisplay {
 	 */
 	public function loadTestSettings(array $context): array {
 		return $this->loadSettings($context);
+	}
+
+	/** @return array<string,mixed> */
+	public function getTestDefaultSettings(): array {
+		return $this->getDefaultSettings();
+	}
+
+	/** @param array<string,mixed> $settings @return array<string,mixed> */
+	public function normalizeTestSettings(array $settings): array {
+		return $this->normalizeSettings($settings);
 	}
 }

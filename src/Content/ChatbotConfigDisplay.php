@@ -34,7 +34,7 @@ use Throwable;
  * Class ChatbotConfigDisplay
  *
  * Provides a reusable configuration display for one concrete chatbot instance.
- * Legacy service settings are migrated to one explicit chatbot backend value.
+ * Stores one canonical chatbot configuration dataset.
  */
 class ChatbotConfigDisplay implements IDisplay {
 
@@ -42,6 +42,7 @@ class ChatbotConfigDisplay implements IDisplay {
 	protected const BACKEND_SERVICE_PREFIX = 'service:';
 	protected const BACKEND_RUNTIME_PREFIX = 'runtime:';
 	protected const AGENT_CHATBOT_SERVICE = 'chatbotservice';
+	protected const DEFAULT_AI_NOTICE = 'Du kommunizierst hier mit einem KI-System. KI-generierte Antworten können fehlerhaft sein. Prüfe wichtige Informationen.';
 
 	protected array $data = [];
 
@@ -91,6 +92,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$values = $this->postedValues ?? $this->settingsToViewValues($settings);
 
 		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
+		$this->view->loadBricks('Configuration');
 		$this->view->setTemplate('Content/ChatbotConfigDisplay.php');
 
 		$this->view->assign('title', $context['title']);
@@ -340,9 +342,32 @@ class ChatbotConfigDisplay implements IDisplay {
 			trim((string)$this->request->request('reference')),
 			$errors
 		);
-		$basePrompts = $this->normalizeBasePromptsInput(
-			$this->request->request('base_prompts', [])
+		$mainHeadings = $this->normalizeMessageListInput(
+			$this->request->request('main_headings', [])
 		);
+		$firstMessageMode = $this->normalizeEnum(
+			(string)$this->request->request('first_message_mode'),
+			['none', 'random', 'contextual_ai'],
+			'none'
+		);
+		$firstMessages = $this->normalizeMessageListInput(
+			$this->request->request('first_messages', [])
+		);
+		if ($firstMessageMode !== 'random') {
+			$firstMessages = [];
+		}
+		$aiNoticeText = trim($this->normalizeTextBlock((string)$this->request->request('ai_notice_text')));
+
+		if ($firstMessageMode === 'random' && $firstMessages === []) {
+			$errors[] = 'The selected first-message mode requires at least one message.';
+		}
+		if ($firstMessageMode === 'contextual_ai' && ($backendInfo['type'] ?? '') !== 'runtime') {
+			$errors[] = 'Contextual AI first messages require an agent runtime backend.';
+		}
+		if ($aiNoticeText === '') {
+			$errors[] = 'The AI notice text must not be empty.';
+		}
+
 		$settings = [
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
@@ -352,7 +377,17 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_mathjax' => $this->request->request('use_mathjax') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
-			'use_threads' => $this->request->request('use_threads') !== null,
+			'chat_history_enabled' => $this->request->request('chat_history_enabled') !== null,
+			'chat_history_panel_mode' => $this->normalizeEnum(
+				(string)$this->request->request('chat_history_panel_mode'),
+				['responsive', 'open', 'closed'],
+				'responsive'
+			),
+			'automatic_chat_titles' => $this->request->request('automatic_chat_titles') !== null,
+			'main_headings' => $mainHeadings,
+			'first_message_mode' => $firstMessageMode,
+			'first_messages' => $firstMessages,
+			'ai_notice_text' => $aiNoticeText,
 			'transport_mode' => $this->normalizeEnum(
 				(string)$this->request->request('transport_mode'),
 				['auto', 'sse', 'rest'],
@@ -364,8 +399,7 @@ class ChatbotConfigDisplay implements IDisplay {
 				'url'
 			),
 			'reference' => $reference,
-			'reference_provider' => trim((string)$this->request->request('reference_provider')),
-			'base_prompts' => $basePrompts
+			'reference_provider' => trim((string)$this->request->request('reference_provider'))
 		];
 
 		if (($backendInfo['type'] ?? '') === 'runtime') {
@@ -376,12 +410,25 @@ class ChatbotConfigDisplay implements IDisplay {
 			);
 		}
 
+		if (($settings['chat_history_enabled'] ?? false)
+			&& $this->normalizeTechnicalKey((string)($settings['memory_profile'] ?? '')) === '') {
+			$errors[] = 'Multiple chats require a conversation-memory profile.';
+		}
+
 		return $this->normalizeSettings($settings);
 	}
 
 	protected function getPostedViewValues(): array {
 		$backend = $this->normalizeBackendId((string)$this->request->request('chatbot_backend'));
 		$runtimeId = $this->getRuntimeIdFromBackend($backend);
+		$firstMessageMode = $this->normalizeEnum(
+			(string)$this->request->request('first_message_mode'),
+			['none', 'random', 'contextual_ai'],
+			'none'
+		);
+		$firstMessages = $firstMessageMode === 'random'
+			? $this->normalizeMessageListInput($this->request->request('first_messages', []))
+			: [];
 		$values = [
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
@@ -391,7 +438,17 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_mathjax' => $this->request->request('use_mathjax') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
-			'use_threads' => $this->request->request('use_threads') !== null,
+			'chat_history_enabled' => $this->request->request('chat_history_enabled') !== null,
+			'chat_history_panel_mode' => $this->normalizeEnum(
+				(string)$this->request->request('chat_history_panel_mode'),
+				['responsive', 'open', 'closed'],
+				'responsive'
+			),
+			'automatic_chat_titles' => $this->request->request('automatic_chat_titles') !== null,
+			'main_headings' => $this->normalizeMessageListInput($this->request->request('main_headings', [])),
+			'first_message_mode' => $firstMessageMode,
+			'first_messages' => $firstMessages,
+			'ai_notice_text' => trim($this->normalizeTextBlock((string)$this->request->request('ai_notice_text'))),
 			'transport_mode' => $this->normalizeEnum(
 				(string)$this->request->request('transport_mode'),
 				['auto', 'sse', 'rest'],
@@ -403,8 +460,7 @@ class ChatbotConfigDisplay implements IDisplay {
 				'url'
 			),
 			'reference_json' => (string)$this->request->request('reference'),
-			'reference_provider' => trim((string)$this->request->request('reference_provider')),
-			'base_prompts' => $this->normalizeBasePromptsInput($this->request->request('base_prompts', []))
+			'reference_provider' => trim((string)$this->request->request('reference_provider'))
 		];
 
 		if ($runtimeId !== '' && $this->agentRuntimeRegistry->hasRuntime($runtimeId)) {
@@ -686,28 +742,55 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_mathjax' => false,
 			'use_icons' => true,
 			'use_voice' => true,
-			'use_threads' => true,
+			'chat_history_enabled' => false,
+			'chat_history_panel_mode' => 'responsive',
+			'automatic_chat_titles' => false,
+			'main_headings' => [],
+			'first_message_mode' => 'none',
+			'first_messages' => [],
+			'ai_notice_text' => self::DEFAULT_AI_NOTICE,
 			'transport_mode' => 'auto',
 			'reference_mode' => 'url',
 			'reference' => [],
 			'reference_provider' => '',
 			'default_lang' => 'auto',
 			'speech_to_text_service' => '',
-			'text_to_speech_service' => '',
-			'base_prompts' => []
+			'text_to_speech_service' => ''
 		], $this->agentConfigFormService->getDefaultSettings());
 	}
 
 	protected function normalizeSettings(array $settings): array {
 		$defaults = $this->getDefaultSettings();
 		$backend = $this->resolveBackendFromSettings($settings);
+		$aiNoticeText = trim($this->normalizeTextBlock((string)($settings['ai_notice_text'] ?? $defaults['ai_notice_text'])));
+		if ($aiNoticeText === '') {
+			$aiNoticeText = self::DEFAULT_AI_NOTICE;
+		}
+		$firstMessageMode = $this->normalizeEnum(
+			(string)($settings['first_message_mode'] ?? $defaults['first_message_mode']),
+			['none', 'random', 'contextual_ai'],
+			(string)$defaults['first_message_mode']
+		);
+		$firstMessages = $firstMessageMode === 'random'
+			? $this->normalizeMessageListInput($settings['first_messages'] ?? $defaults['first_messages'])
+			: [];
 		$normalized = [
 			'chatbot_backend' => $backend,
 			'use_markdown' => $this->toBool($settings['use_markdown'] ?? $defaults['use_markdown']),
 			'use_mathjax' => $this->toBool($settings['use_mathjax'] ?? $defaults['use_mathjax']),
 			'use_icons' => $this->toBool($settings['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($settings['use_voice'] ?? $defaults['use_voice']),
-			'use_threads' => $this->toBool($settings['use_threads'] ?? $defaults['use_threads']),
+			'chat_history_enabled' => $this->toBool($settings['chat_history_enabled'] ?? $defaults['chat_history_enabled']),
+			'chat_history_panel_mode' => $this->normalizeEnum(
+				(string)($settings['chat_history_panel_mode'] ?? $defaults['chat_history_panel_mode']),
+				['responsive', 'open', 'closed'],
+				(string)$defaults['chat_history_panel_mode']
+			),
+			'automatic_chat_titles' => $this->toBool($settings['automatic_chat_titles'] ?? $defaults['automatic_chat_titles']),
+			'main_headings' => $this->normalizeMessageListInput($settings['main_headings'] ?? $defaults['main_headings']),
+			'first_message_mode' => $firstMessageMode,
+			'first_messages' => $firstMessages,
+			'ai_notice_text' => $aiNoticeText,
 			'transport_mode' => $this->normalizeEnum(
 				(string)($settings['transport_mode'] ?? $defaults['transport_mode']),
 				['auto', 'sse', 'rest'],
@@ -722,8 +805,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'reference_provider' => trim((string)($settings['reference_provider'] ?? $defaults['reference_provider'])),
 			'default_lang' => trim((string)($settings['default_lang'] ?? $defaults['default_lang'])),
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($settings['speech_to_text_service'] ?? $defaults['speech_to_text_service'])),
-			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($settings['text_to_speech_service'] ?? $defaults['text_to_speech_service'])),
-			'base_prompts' => $this->normalizeBasePromptsInput($settings['base_prompts'] ?? $defaults['base_prompts'])
+			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($settings['text_to_speech_service'] ?? $defaults['text_to_speech_service']))
 		];
 
 		$runtimeId = $this->getRuntimeIdFromBackend($backend);
@@ -747,15 +829,20 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_mathjax' => $settings['use_mathjax'],
 			'use_icons' => $settings['use_icons'],
 			'use_voice' => $settings['use_voice'],
-			'use_threads' => $settings['use_threads'],
+			'chat_history_enabled' => $settings['chat_history_enabled'],
+			'chat_history_panel_mode' => $settings['chat_history_panel_mode'],
+			'automatic_chat_titles' => $settings['automatic_chat_titles'],
+			'main_headings' => $settings['main_headings'],
+			'first_message_mode' => $settings['first_message_mode'],
+			'first_messages' => $settings['first_messages'],
+			'ai_notice_text' => $settings['ai_notice_text'],
 			'transport_mode' => $settings['transport_mode'],
 			'reference_mode' => $settings['reference_mode'],
 			'reference_json' => $this->formatReferenceJson($settings['reference']),
 			'reference_provider' => $settings['reference_provider'],
 			'default_lang' => $settings['default_lang'],
 			'speech_to_text_service' => $settings['speech_to_text_service'],
-			'text_to_speech_service' => $settings['text_to_speech_service'],
-			'base_prompts' => $settings['base_prompts']
+			'text_to_speech_service' => $settings['text_to_speech_service']
 		];
 
 		$runtimeId = $this->getRuntimeIdFromBackend((string)$settings['chatbot_backend']);
@@ -773,11 +860,6 @@ class ChatbotConfigDisplay implements IDisplay {
 		$backend = $this->normalizeBackendId((string)($settings['chatbot_backend'] ?? ''));
 		if ($backend !== '') {
 			return $backend;
-		}
-
-		$legacyService = $this->normalizeTechnicalKey((string)($settings['service'] ?? ''));
-		if ($legacyService !== '' && $legacyService !== self::AGENT_CHATBOT_SERVICE) {
-			return self::BACKEND_SERVICE_PREFIX . $legacyService;
 		}
 
 		$runtimeId = $this->agentRuntimeSelector->selectRuntimeId($settings);
@@ -817,7 +899,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		return substr($backend, strlen(self::BACKEND_SERVICE_PREFIX));
 	}
 
-	protected function normalizeBasePromptsInput(mixed $value): array {
+	protected function normalizeMessageListInput(mixed $value): array {
 		if (is_string($value)) {
 			$value = trim($value);
 
@@ -830,7 +912,7 @@ class ChatbotConfigDisplay implements IDisplay {
 					$decoded = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
 
 					if (is_array($decoded)) {
-						return $this->normalizeBasePromptsInput($decoded);
+						return $this->normalizeMessageListInput($decoded);
 					}
 				}
 				catch (JsonException) {}

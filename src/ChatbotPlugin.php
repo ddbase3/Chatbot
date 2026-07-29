@@ -17,17 +17,26 @@
 
 namespace Chatbot;
 
-use Base3\Accesscontrol\Api\IAccesscontrol;
 use Base3\Api\IClassMap;
 use Base3\Api\IContainer;
 use Base3\Api\IPlugin;
+use AssistantFoundation\Api\IAgentConversationService;
+use AssistantFoundation\Api\IAgentTextTaskService;
+use AssistantFoundation\Api\IAgentRuntimeSelector;
 use Base3\Api\IRequest;
+use Base3\Language\Api\ILanguage;
+use Base3\Logger\Api\ILogger;
+use Base3\Settings\Api\ISettingsStore;
 use Base3\Session\Api\ISession;
 use Chatbot\Api\IChatbotTurnRequestStore;
-use Chatbot\Service\ChatbotConversationContextFactory;
+use Chatbot\Service\ChatbotConversationChannelResolver;
+use Chatbot\Service\ChatbotConversationService;
+use Chatbot\Service\ChatbotOpeningMessageService;
+use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotServiceRegistry;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
+use Chatbot\Service\SessionChatbotConversationDraftStore;
 use Chatbot\Service\SessionChatbotTurnRequestStore;
 
 class ChatbotPlugin implements IPlugin {
@@ -42,19 +51,48 @@ class ChatbotPlugin implements IPlugin {
 		$this->container
 			->set(self::getName(), $this, IContainer::SHARED)
 			->set(
-				ChatbotConversationContextFactory::class,
-				fn($c) => new ChatbotConversationContextFactory(
-					$c->get(IAccesscontrol::class),
-					$c->get(ISession::class)
+				ChatbotConversationChannelResolver::class,
+				fn() => new ChatbotConversationChannelResolver(),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotSettingsService::class,
+				fn($c) => new ChatbotSettingsService(
+					$c->get(ISettingsStore::class),
+					$c->get(IAgentRuntimeSelector::class)
+				),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotOpeningMessageService::class,
+				fn($c) => new ChatbotOpeningMessageService(
+					$c->get(IAgentTextTaskService::class),
+					$c->get(ChatbotSettingsService::class),
+					$c->get(ILanguage::class)
+				),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				SessionChatbotConversationDraftStore::class,
+				fn($c) => new SessionChatbotConversationDraftStore($c->get(ISession::class)),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotConversationService::class,
+				fn($c) => new ChatbotConversationService(
+					$c->get(IAgentConversationService::class),
+					$c->get(IAgentTextTaskService::class),
+					$c->get(ChatbotSettingsService::class),
+					$c->get(ChatbotConversationChannelResolver::class),
+					$c->get(ChatbotOpeningMessageService::class),
+					$c->get(SessionChatbotConversationDraftStore::class),
+					$c->get(ILogger::class)
 				),
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			)
 			->set(
 				ChatbotTurnRequestFactory::class,
-				fn($c) => new ChatbotTurnRequestFactory(
-					$c->get(IRequest::class),
-					$c->get(ChatbotConversationContextFactory::class)
-				),
+				fn($c) => new ChatbotTurnRequestFactory($c->get(IRequest::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			)
 			->set(

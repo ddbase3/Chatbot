@@ -18,7 +18,6 @@
 namespace Chatbot\Service;
 
 use Base3\Api\IRequest;
-use Base3\Settings\Api\ISettingsStore;
 use AssistantFoundation\Api\IAgentExecutionService;
 
 /**
@@ -34,17 +33,20 @@ class ChatbotService extends AbstractChatbotService {
 
 	public function __construct(
 		IRequest $request,
-		ISettingsStore $settingsStore,
+		ChatbotSettingsService $settingsService,
 		IAgentExecutionService $agentExecutionService,
 		ChatbotTurnRequestFactory $turnRequestFactory,
-		ChatbotTurnResponder $turnResponder
+		ChatbotTurnResponder $turnResponder,
+		ChatbotConversationChannelResolver $conversationChannelResolver,
+		private readonly ChatbotOpeningMessageService $openingMessageService
 	) {
 		parent::__construct(
 			$request,
-			$settingsStore,
+			$settingsService,
 			$agentExecutionService,
 			$turnRequestFactory,
-			$turnResponder
+			$turnResponder,
+			$conversationChannelResolver
 		);
 	}
 
@@ -69,44 +71,13 @@ class ChatbotService extends AbstractChatbotService {
 	///////////////////////////////////////////////////////////////////////////////////////
 
 	/**
-	 * Returns a configured base prompt from the SettingsStore.
-	 *
-	 * The SettingsStore value may be stored either as an array or as a JSON string.
-	 * Supporting both forms keeps the temporary textarea-based configuration robust.
+	 * Creates the configured opening message for the current chatbot request.
 	 */
 	protected function getBasePrompt(): string {
-		$prompts = $this->getConfiguredBasePrompts();
+		$turn = $this->turnRequestFactory->fromCurrentRequest();
+		$settings = $this->getChatbotSettings($turn);
 
-		if ($prompts === []) {
-			return $this->getSimpleBasePrompt();
-		}
-
-		return $prompts[array_rand($prompts)];
-	}
-
-	protected function getConfiguredBasePrompts(): array {
-		$settings = $this->getChatbotSettings();
-		$prompts = $this->getArraySetting($settings, 'base_prompts');
-
-		if ($prompts === null) {
-			return [];
-		}
-
-		$result = [];
-
-		foreach ($prompts as $prompt) {
-			if (!is_scalar($prompt) && $prompt !== null) {
-				continue;
-			}
-
-			$prompt = trim((string) $prompt);
-
-			if ($prompt !== '') {
-				$result[] = $prompt;
-			}
-		}
-
-		return $result;
+		return $this->openingMessageService->createHeading($settings, $turn->getReference());
 	}
 
 	///////////////////////////////////////////////////////////////////////////////////////

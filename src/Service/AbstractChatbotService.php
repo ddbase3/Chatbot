@@ -23,7 +23,6 @@ use AssistantFoundation\Dto\AgentExecutionRequest;
 use AssistantFoundation\Dto\AgentExecutionResult;
 use AssistantFoundation\Dto\AgentInteractionRequest;
 use Base3\Api\IRequest;
-use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Dto\ChatbotTurnResult;
@@ -33,10 +32,11 @@ abstract class AbstractChatbotService implements IChatbotService {
 
 	public function __construct(
 		protected readonly IRequest $request,
-		protected readonly ISettingsStore $settingsStore,
+		protected readonly ChatbotSettingsService $settingsService,
 		protected readonly IAgentExecutionService $agentExecutionService,
 		protected readonly ChatbotTurnRequestFactory $turnRequestFactory,
-		protected readonly ChatbotTurnResponder $turnResponder
+		protected readonly ChatbotTurnResponder $turnResponder,
+		protected readonly ChatbotConversationChannelResolver $conversationChannelResolver
 	) {}
 
 	abstract public static function getName(): string;
@@ -85,7 +85,6 @@ abstract class AbstractChatbotService implements IChatbotService {
 			[
 				'config_group' => $request->getConfigGroup(),
 				'config_name' => $request->getConfigName(),
-				'chatbot_key' => $this->buildChatbotKey($request),
 				'prompt_text' => $userPrompt
 			]
 		);
@@ -147,36 +146,26 @@ abstract class AbstractChatbotService implements IChatbotService {
 		}
 
 		try {
-			$settings = $this->settingsStore->get($group, $name, []);
+			return $this->settingsService->get($group, $name, []);
 		}
 		catch (Throwable) {
 			return [];
 		}
-
-		return is_array($settings) ? $settings : [];
 	}
 
 	/** @return array<string,mixed> */
 	protected function getAgentContextVars(ChatbotTurnRequest $turn, array $chatbotSettings): array {
 		return [
 			'reference' => $turn->getReference(),
+			'conversation_channel_id' => $this->conversationChannelResolver->resolve(
+				$turn->getConfigGroup(),
+				$turn->getConfigName()
+			),
 			'conversation_id' => $turn->getConversationId(),
-			'conversation_owner_key' => $turn->getConversationOwnerKey(),
 			'chatbot_config_group' => $turn->getConfigGroup(),
 			'chatbot_config_name' => $turn->getConfigName(),
 			'chatbot_config' => $chatbotSettings
 		];
-	}
-
-	private function buildChatbotKey(ChatbotTurnRequest $turn): string {
-		$group = $turn->getConfigGroup();
-		$name = $turn->getConfigName();
-
-		if ($group !== '' && $name !== '') {
-			return $group . ':' . $name;
-		}
-
-		return $name !== '' ? $name : $group;
 	}
 
 	protected function getChatbotSettingString(array $settings, string $key, string $default = ''): string {
@@ -211,33 +200,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 		return in_array(strtolower(trim((string)$value)), ['1', 'true', 'yes', 'on'], true);
 	}
 
-	protected function getSimpleBasePrompt(): string {
-		$base = [
-			'Hallo! 👋',
-			'Hi! Womit soll ich dir helfen?',
-			'Test-Prompt: Sag mir kurz, was du brauchst.'
-		];
-
-		return $base[array_rand($base)];
-	}
-
-	protected function getBasePromptFile(): string {
-		return '';
-	}
-
-	protected function getBasePrompt(): string {
-		$file = $this->getBasePromptFile();
-		if ($file === '') {
-			return $this->getSimpleBasePrompt();
-		}
-
-		$prompts = @json_decode((string)@file_get_contents($file), true);
-		if (!is_array($prompts) || $prompts === []) {
-			return $this->getSimpleBasePrompt();
-		}
-
-		return (string)$prompts[array_rand($prompts)];
-	}
+	abstract protected function getBasePrompt(): string;
 
 	protected function getSimpleSystemPrompt(): string {
 		return 'You are a helpful assistant.';
@@ -358,16 +321,7 @@ PROMPT;
 
 	/** @param array<string,mixed> $chatbotSettings @return array<string,mixed> */
 	protected function getAgentSettingsForExecution(array $chatbotSettings): array {
-		$settings = $chatbotSettings;
-		if (!array_key_exists('agent_runtime', $settings)) {
-			$backend = strtolower(trim((string)($settings['chatbot_backend'] ?? '')));
-			if (str_starts_with($backend, 'runtime:')) {
-				$runtimeId = preg_replace('/[^a-z0-9._-]+/', '', substr($backend, 8)) ?? '';
-				if ($runtimeId !== '') {
-					$settings['agent_runtime'] = $runtimeId;
-				}
-			}
-		}
+		$settings = $this->settingsService->getAgentConfiguration($chatbotSettings);
 
 		$flowFile = $this->getAgentFlowFile();
 		if ($flowFile !== '') {

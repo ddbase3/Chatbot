@@ -5,10 +5,14 @@ namespace Chatbot\Test;
 use Base3\Api\IContainer;
 use Chatbot\Api\IChatbotTurnRequestStore;
 use Chatbot\ChatbotPlugin;
-use Chatbot\Service\ChatbotConversationContextFactory;
+use Chatbot\Service\ChatbotConversationChannelResolver;
+use Chatbot\Service\ChatbotConversationService;
+use Chatbot\Service\ChatbotOpeningMessageService;
+use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotServiceRegistry;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
+use Chatbot\Service\SessionChatbotConversationDraftStore;
 use Chatbot\Service\SessionChatbotTurnRequestStore;
 use PHPUnit\Framework\TestCase;
 
@@ -25,7 +29,11 @@ class ChatbotPluginTest extends TestCase {
 		$plugin->init();
 
 		$this->assertTrue($container->has(ChatbotPlugin::getName()));
-		$this->assertTrue($container->has(ChatbotConversationContextFactory::class));
+		$this->assertTrue($container->has(ChatbotConversationChannelResolver::class));
+		$this->assertTrue($container->has(ChatbotSettingsService::class));
+		$this->assertTrue($container->has(ChatbotOpeningMessageService::class));
+		$this->assertTrue($container->has(ChatbotConversationService::class));
+		$this->assertTrue($container->has(SessionChatbotConversationDraftStore::class));
 		$this->assertTrue($container->has(ChatbotTurnRequestFactory::class));
 		$this->assertTrue($container->has(ChatbotTurnResponder::class));
 		$this->assertTrue($container->has(SessionChatbotTurnRequestStore::class));

@@ -32,7 +32,9 @@ class DummyChatbotService implements IChatbotService {
 	public function __construct(
 		private readonly IRequest $request,
 		private readonly ChatbotTurnRequestFactory $turnRequestFactory,
-		private readonly ChatbotTurnResponder $turnResponder
+		private readonly ChatbotTurnResponder $turnResponder,
+		private readonly ChatbotSettingsService $settingsService,
+		private readonly ChatbotOpeningMessageService $openingMessageService
 	) {}
 
 	public static function getName(): string {
@@ -99,13 +101,14 @@ class DummyChatbotService implements IChatbotService {
 	}
 
 	protected function getBasePrompt(): string {
-		$base = [
-			'Hallo! 👋',
-			'Hi! Womit soll ich dir helfen?',
-			'Test-Prompt: Sag mir kurz, was du brauchst.'
-		];
+		$turn = $this->turnRequestFactory->fromCurrentRequest();
+		$settings = $this->settingsService->get(
+			$turn->getConfigGroup(),
+			$turn->getConfigName(),
+			[]
+		);
 
-		return $base[array_rand($base)];
+		return $this->openingMessageService->createHeading($settings, $turn->getReference());
 	}
 
 	/** @return array<int,string> */

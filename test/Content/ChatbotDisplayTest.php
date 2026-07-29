@@ -6,6 +6,7 @@ use AssistantFoundation\Api\IAgentRuntimeSelector;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotDisplay;
+use Chatbot\Service\ChatbotSettingsService;
 use PHPUnit\Framework\TestCase;
 use UiFoundation\Api\IChatbotDisplay;
 
@@ -19,6 +20,29 @@ class ChatbotDisplayTest extends TestCase {
 		$display = $this->createDisplay(new FakeChatbotDisplay());
 
 		$this->assertSame('Display a configurable Chatbot widget.', $display->getHelp());
+	}
+
+	public function testGetOutputWithoutStableIdKeepsConversationMemoryOptional(): void {
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay, 'missionbay', [
+			'chatbot_backend' => 'runtime:missionbay',
+			'memory_profile' => ''
+		]);
+		$display->setData([
+			'config_group' => 'chatbot',
+			'config_name' => 'existing-chatbot'
+		]);
+
+		$html = $display->getOutput('html', true);
+		$config = $chatbotDisplay->getData();
+
+		$this->assertArrayNotHasKey('id', $config);
+		$this->assertSame(
+			'/service/chatbotservice?config_group=chatbot&config_name=existing-chatbot',
+			$config['service_url'] ?? null
+		);
+		$this->assertSame('/service/chatbotturnprepare', $config['turn_prepare_url'] ?? null);
+		$this->assertSame('FAKE_CHATBOT_OUTPUT', $html);
 	}
 
 	public function testGetOutputUsesHostDefaultRuntime(): void {
@@ -36,12 +60,49 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertFalse($config['use_mathjax'] ?? true);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
-		$this->assertTrue($config['use_threads'] ?? false);
+		$this->assertFalse($config['use_threads'] ?? true);
+		$this->assertFalse($config['conversation_enabled'] ?? true);
+		$this->assertSame('', $config['conversation_state_url'] ?? null);
 		$this->assertSame('auto', $config['transport_mode'] ?? null);
 		$this->assertSame('auto', $config['default_lang'] ?? null);
 		$this->assertSame('html', $chatbotDisplay->getLastOutputFormat());
 		$this->assertTrue($chatbotDisplay->isLastOutputFinal());
 		$this->assertSame('FAKE_CHATBOT_OUTPUT', $html);
+	}
+
+	public function testConversationMemoryExposesServerSideConversationEndpoints(): void {
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay, 'missionbay', [
+			'chatbot_backend' => 'runtime:missionbay',
+			'memory_profile' => 'database-memory',
+			'chat_history_enabled' => true,
+			'automatic_chat_titles' => true,
+			'ai_notice_text' => 'AI can make mistakes.'
+		]);
+		$display->setData([
+			'config_group' => 'chatbot',
+			'config_name' => 'with-memory'
+		]);
+
+		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
+
+		$this->assertTrue($config['conversation_enabled'] ?? false);
+		$this->assertTrue($config['chat_history_enabled'] ?? false);
+		$this->assertFalse($config['use_threads'] ?? true);
+		$this->assertSame(
+			'/service/chatbotconversationstate?config_group=chatbot&config_name=with-memory',
+			$config['conversation_state_url'] ?? null
+		);
+		$this->assertSame(
+			'/service/chatbotconversationcreate?config_group=chatbot&config_name=with-memory',
+			$config['conversation_create_url'] ?? null
+		);
+		$this->assertSame(
+			'/service/chatbotconversationmaterialize?config_group=chatbot&config_name=with-memory',
+			$config['conversation_materialize_url'] ?? null
+		);
+		$this->assertSame('AI can make mistakes.', $config['ai_notice_text'] ?? null);
 	}
 
 	public function testStoredBackendOverridesHostDefaultRuntime(): void {
@@ -64,19 +125,6 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 	}
 
-	public function testLegacyDirectServiceIsResolvedBeforeDefaultBackend(): void {
-		$chatbotDisplay = new FakeChatbotDisplay();
-		$display = $this->createDisplay($chatbotDisplay, 'missionbay');
-		$display->setData([
-			'service' => 'dummychatbotservice'
-		]);
-
-		$display->getOutput('html');
-		$config = $chatbotDisplay->getData();
-
-		$this->assertSame('service:dummychatbotservice', $config['chatbot_backend'] ?? null);
-		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
-	}
 
 	public function testDirectBackendOverridesAgentRuntime(): void {
 		$chatbotDisplay = new FakeChatbotDisplay();
@@ -118,12 +166,14 @@ class ChatbotDisplayTest extends TestCase {
 
 		$this->assertSame('https://json-schema.org/draft-2020-12/schema', $schema['$schema'] ?? null);
 		$this->assertSame('object', $schema['type'] ?? null);
+		$this->assertArrayNotHasKey('id', $properties);
 		$this->assertArrayHasKey('chatbot_backend', $properties);
 		$this->assertSame('runtime:neuronai', $properties['chatbot_backend']['default'] ?? null);
 		$this->assertSame(['auto', 'sse', 'rest'], $properties['transport_mode']['enum'] ?? null);
 		$this->assertArrayHasKey('use_mathjax', $properties);
 		$this->assertFalse($properties['use_mathjax']['default'] ?? true);
 		$this->assertArrayHasKey('text_to_speech_service', $properties);
+		$this->assertNotContains('id', $schema['required'] ?? []);
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
 	}
 
@@ -148,7 +198,7 @@ class ChatbotDisplayTest extends TestCase {
 		return new ChatbotDisplay(
 			$chatbotDisplay,
 			$linkTargetService,
-			$settingsStore,
+			new ChatbotSettingsService($settingsStore, $runtimeSelector),
 			$runtimeSelector
 		);
 	}

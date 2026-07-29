@@ -1,6 +1,6 @@
 # Chatbot
 
-Chatbot provides a configurable BASE3 chat application that is independent of the concrete agent runtime. It consumes the shared AssistantFoundation contracts and owns its complete REST/SSE transport.
+Chatbot provides a configurable BASE3 chat application that is independent of the concrete agent runtime. It consumes the shared AssistantFoundation contracts and owns its REST/SSE transport, chatbot configuration and server-side conversation endpoints.
 
 ## Runtime boundary
 
@@ -10,6 +10,8 @@ Chatbot provides a configurable BASE3 chat application that is independent of th
 - SSE uses the Chatbot-owned `SseAgentEventSink`.
 - MissionBay and alternative runtimes are selected per chatbot record without changing the chatbot service or UI protocol.
 - Runtime-specific configuration is supplied through the shared `IAgentConfigFormService` contract.
+- Conversation operations use the runtime-neutral `IAgentConversationService` contract.
+- Isolated title and opening-message tasks use `IAgentTextTaskService` and cannot write conversation memory or execute tools.
 
 Chatbot imports neither MissionBay nor NeuronAi contracts.
 
@@ -26,31 +28,116 @@ There is no internal HTTP or cURL request. The session lock is released before t
 
 The session-backed request store is the default implementation. Multi-node installations can replace `IChatbotTurnRequestStore` through DI with a shared store without changing the browser protocol.
 
-## Configuration
+## Canonical chatbot configuration
 
-A chatbot instance stores UI settings, prompts, references, transport mode and runtime-specific agent settings in `ISettingsStore`.
+A chatbot instance stores one named settings dataset in `ISettingsStore`. The dataset contains UI options, runtime configuration, reference configuration and the selected agent profiles.
 
-Supported transport values are:
+The canonical chatbot UI fields are:
 
-- `auto`, resolved as SSE by the browser client
-- `sse`
-- `rest`
+```text
+chatbot_backend
+use_markdown
+use_mathjax
+use_icons
+use_voice
+chat_history_enabled
+chat_history_panel_mode
+automatic_chat_titles
+main_headings
+first_message_mode
+first_messages
+ai_notice_text
+transport_mode
+reference_mode
+reference
+reference_provider
+default_lang
+speech_to_text_service
+text_to_speech_service
+```
 
-The current browser UI, voice integration, threads and canvas events use the same event names for every agent runtime.
+`chat_history_panel_mode` accepts:
+
+```text
+responsive
+open
+closed
+```
+
+`main_headings` and the first chat message are independent scopes.
+
+- `main_headings` contains presentation headings outside the conversation. With one entry the heading is fixed. With several entries one is selected randomly for each new chat. With no entries no heading is shown. The heading disappears as soon as the conversation contains a message.
+- `first_message_mode` accepts `none`, `random`, and `contextual_ai`. This setting controls a real first assistant message stored in the conversation.
+- `first_messages` supplies the pool for the random first assistant message and is ignored for the other modes.
+- `contextual_ai` creates an isolated model response using the current reference, context profile and a non-executable description of the configured tools. The result is stored as the first real assistant message.
+
+The `base_prompts` and persisted `use_threads` fields are not part of the configuration model. The ModularChatbot uses the ConversationPlugin for server-backed conversations. The ClassicChatbot fallback receives `use_threads = false` and does not expose its local thread controls.
+
+`ai_notice_text` is mandatory and is intended for the visible notice beneath the message composer. The configuration display loads its new labels from `lang/Configuration`.
 
 ## Conversation identity
 
-The browser creates one stable `conversation_id` per configured chatbot and
-stores it in `localStorage`. The ID is included in REST turns and in the
-POST-to-ID-to-SSE payload. Before execution, Chatbot replaces any submitted
-owner value with a server-generated hash of the authenticated user or anonymous
-BASE3 session.
+A persisted chatbot is identified by its SettingsStore `config_group` and `config_name`. `ChatbotConversationChannelResolver` derives one stable server-side `conversation_channel_id` from that identity. The browser cannot provide or override the channel ID.
 
-The runtime receives the conversation ID, owner key and chatbot configuration
-identity in `AgentExecutionRequest::context`. Runtimes that support persistent
-memory can use that scope; runtimes that do not support it remain unaffected.
-The current "Start new chat" button creates a new conversation ID and reloads
-the widget.
+A turn may additionally contain a `conversation_id` for one chat inside that channel. The configured conversation-memory backend determines the owner from the authenticated user or active session. No owner or channel value is accepted from the browser.
+
+Different chatbot settings records therefore receive different conversation channels even when they use the same runtime, agent flow and memory profile.
+
+Conversation memory remains optional. A chatbot without a `memory_profile` renders and executes normally, but its conversation endpoint URLs are empty and its history is not retained by a conversation memory.
+
+## Conversation endpoints
+
+The public display provides these URLs when conversation memory is configured:
+
+```text
+chatbotconversationstate
+chatbotconversationcreate
+chatbotconversationactivate
+chatbotconversationrename
+chatbotconversationdelete
+chatbotconversationtitle
+```
+
+All endpoints resolve the chatbot configuration from `config_group` and `config_name`. Mutating operations accept POST. The state endpoint accepts GET and POST.
+
+Responses use this shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "state": {}
+  }
+}
+```
+
+Errors use:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "conversation_error",
+    "message": "..."
+  }
+}
+```
+
+The state contains the conversation list, the active conversation, its messages, the assistant node ID and warnings.
+
+When no conversation exists, the state service creates one canonical conversation and persists its opening message. Deleting the last conversation creates a new empty conversation using the configured main heading and first-message settings.
+
+## Automatic titles
+
+`chatbotconversationtitle` creates a title only when:
+
+- automatic titles are enabled,
+- the active title source is `temporary`,
+- one complete user/assistant turn exists.
+
+The task receives only the first complete turn. It does not include context or tool profiles, cannot execute tools and cannot write memory. Manual titles have source `manual` and are never overwritten.
+
+A title-task failure leaves the temporary title unchanged and is written to the configured logger.
 
 ## Chatbot backend selection
 
@@ -62,15 +149,25 @@ The configuration UI has one backend field. It combines direct chatbot services 
 
 Choosing a runtime activates only that runtime's configuration fields. The chatbot stores `chatbot_backend=runtime:<id>` while Agent Admin stores `agent_runtime=<id>`. Both paths execute through the same AssistantRuntime router.
 
+The Dummy Chatbot Service also uses the canonical opening-message configuration. It no longer owns a separate hard-coded greeting pool.
+
 ## Runtime form data contract
 
-`IAgentConfigFormService::assignViewData()` receives persisted or normalized settings. Host displays must not pass values that were already transformed by `settingsToViewValues()`, because runtime-specific structured values such as the MissionBay `agent_flow` would otherwise be converted twice and lost.
+`IAgentConfigFormService::assignViewData()` receives persisted or normalized settings. Host displays must not pass values that were already transformed by `settingsToViewValues()`, because runtime-specific structured values such as a MissionBay `agent_flow` would otherwise be converted twice and lost.
 
-## Persisted backend resolution
+## Public display
 
-The public `ChatbotDisplay` resolves the backend and UI settings from the same SettingsStore record edited by `ChatbotConfigDisplay`. Page-component data only provides the `config_group` and `config_name` identity. Legacy page components that still contain a direct `service` value remain supported.
+`Chatbot\Content\ChatbotDisplay` remains the stable public BASE3 display. It resolves the chatbot backend, SettingsStore identity, feature configuration and service URLs, then delegates rendering to `UiFoundation\Api\IChatbotDisplay`.
 
-`DummyChatbotService` implements both SSE and REST responses and uses the same `msgid`, `token` and `done` event names as the regular agent-backed service.
+ClientStack owns the browser implementations. The ModularChatbot is the implementation extended by the conversation UI in the next implementation step. ClassicChatbot remains a functional single-chat fallback and is not expanded with a multi-chat interface.
+
+## Speech services per chatbot instance
+
+`ChatbotConfigDisplay` stores speech selections in the SettingsStore record identified by `config_group` and `config_name`. The public `ChatbotDisplay` uses the same identity and never exposes provider service IDs to the browser.
+
+The browser-facing `realtimespeechtotextsession` and `texttospeech` outputs load the selected service from that chatbot record before delegating to the neutral AssistantFoundation speech contracts. Different chatbot instances can therefore use different STT and TTS services without a global client-side selection.
+
+An empty STT or TTS selection keeps the corresponding browser speech provider active.
 
 ## Requirements
 
@@ -79,31 +176,9 @@ The public `ChatbotDisplay` resolves the backend and UI settings from the same S
 - AssistantFoundation
 - AssistantRuntime
 - UiFoundation
-- an `IChatbotDisplay` implementation; ClientStack provides the classic default
+- an `IChatbotDisplay` implementation from ClientStack or the host project
 - an `IAgentExecutionService` implementation for agent-backed backends
 
 ## License
 
 GPL-3.0. See `LICENSE`.
-
-## Replaceable browser display
-
-`Chatbot\Content\ChatbotDisplay` remains the stable public BASE3 display. It resolves the chatbot backend, SettingsStore identity, feature configuration, and service URLs, then delegates rendering to `UiFoundation\Api\IChatbotDisplay`.
-
-The current classic browser implementation is owned by ClientStack as `ClientStack\Display\ClassicChatbotDisplay`. ClientStack registers that implementation as the default with `IContainer::NOOVERWRITE`, so a project plugin can replace the browser client without changing Chatbot backend or transport code.
-
-The preserved classic JavaScript source is maintained in the standalone repository `ClientStack/dev/ClassicChatbot` and deployed to `ClientStack/assets/classicchatbot`.
-
-## Speech services per chatbot instance
-
-`ChatbotConfigDisplay` stores speech selections in the SettingsStore record
-identified by `config_group` and `config_name`. The public `ChatbotDisplay` uses
-the same identity and never exposes provider service ids to the browser.
-
-The browser-facing `realtimespeechtotextsession` and `texttospeech` outputs load
-the selected service from that chatbot record before delegating to the neutral
-AssistantFoundation speech contracts. Different chatbot instances can therefore
-use different STT and TTS services without a global client-side selection.
-
-An empty STT or TTS selection keeps the corresponding browser speech provider
-active.

@@ -17,22 +17,31 @@
 
 namespace Chatbot\Content;
 
+use AssistantFoundation\Api\IAgentRuntimeSelector;
 use Base3\Api\IDisplay;
 use Base3\Api\ISchemaProvider;
 use Base3\LinkTarget\Api\ILinkTargetService;
-use Base3\Settings\Api\ISettingsStore;
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use UiFoundation\Api\IChatbotDisplay;
+use Chatbot\Output\ChatbotConversationActivateOutput;
+use Chatbot\Output\ChatbotConversationCreateOutput;
+use Chatbot\Output\ChatbotConversationDeleteOutput;
+use Chatbot\Output\ChatbotConversationMaterializeOutput;
+use Chatbot\Output\ChatbotConversationRenameOutput;
+use Chatbot\Output\ChatbotConversationStateOutput;
+use Chatbot\Output\ChatbotConversationTitleOutput;
+use Chatbot\Service\ChatbotSettingsService;
 use Throwable;
+use UiFoundation\Api\IChatbotDisplay;
 
 class ChatbotDisplay implements IDisplay, ISchemaProvider {
+
+	private const DEFAULT_AI_NOTICE = 'Du kommunizierst hier mit einem KI-System. KI-generierte Antworten können fehlerhaft sein. Prüfe wichtige Informationen.';
 
 	private array $data = [];
 
 	public function __construct(
 		private readonly IChatbotDisplay $chatbotDisplay,
 		private readonly ILinkTargetService $linkTargetService,
-		private readonly ISettingsStore $settingsStore,
+		private readonly ChatbotSettingsService $settingsService,
 		private readonly IAgentRuntimeSelector $agentRuntimeSelector
 	) {}
 
@@ -40,19 +49,15 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		return 'chatbotdisplay';
 	}
 
-	// ---------------------------------------------------------------------
-	// Render
-	// ---------------------------------------------------------------------
-
 	public function getOutput(string $out = 'html', bool $final = false): string {
 		$config = $this->getClientConfig();
 		$config['service_url'] = $this->buildServiceUrl($config);
 		$config['turn_prepare_url'] = $this->buildTurnPrepareUrl();
 		$config['speech_to_text_session_url'] = $this->buildSpeechToTextSessionUrl($config);
 		$config['text_to_speech_url'] = $this->buildTextToSpeechUrl($config);
+		$config = array_merge($config, $this->buildConversationUrls($config));
 
 		$this->chatbotDisplay->setData($config);
-
 		return $this->chatbotDisplay->getOutput($out, $final);
 	}
 
@@ -61,47 +66,29 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 	}
 
 	public function setData($data) {
-		$this->data = (array) $data;
+		$this->data = (array)$data;
 	}
 
-	// ---------------------------------------------------------------------
-	// Configuration
-	// ---------------------------------------------------------------------
-
-	/**
-	 * Returns the client-side display configuration.
-	 *
-	 * Server-side configuration values, especially system_prompt and later
-	 * agent/tool settings, must not be rendered into the browser. The browser
-	 * only needs to know which chatbot service to call and which SettingsStore
-	 * dataset identifies the current chatbot instance.
-	 */
+	/** @return array<string,mixed> */
 	protected function getClientConfig(): array {
 		$defaultBackend = $this->getDefaultBackend();
 		$defaults = [
 			'chatbot_backend' => $defaultBackend,
 			'service' => '',
-
-			// SettingsStore instance identity.
 			'config_group' => '',
 			'config_name' => '',
-
-			// Features
 			'use_markdown' => true,
 			'use_mathjax' => false,
 			'use_icons' => true,
 			'use_voice' => true,
-			'use_threads' => true,
-
-			// Transport
+			'chat_history_enabled' => false,
+			'chat_history_panel_mode' => 'responsive',
+			'automatic_chat_titles' => false,
+			'ai_notice_text' => self::DEFAULT_AI_NOTICE,
 			'transport_mode' => 'auto',
-
-			// Reference context
 			'reference_mode' => 'url',
 			'reference' => [],
 			'reference_provider' => '',
-
-			// Voice config
 			'default_lang' => 'auto',
 			'speech_to_text_service' => '',
 			'text_to_speech_service' => ''
@@ -110,47 +97,58 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		$storedConfig = $this->loadStoredConfig($this->data);
 		$providedConfig = array_merge($this->data, $storedConfig);
 		$config = array_merge($defaults, $providedConfig);
-
 		$backend = $this->resolveBackend($providedConfig);
+		$group = trim((string)($config['config_group'] ?? ''));
+		$name = trim((string)($config['config_name'] ?? ''));
+		$conversationEnabled = $group !== ''
+			&& $name !== ''
+			&& $this->settingsService->hasConversationMemory($config);
+		$historyEnabled = $conversationEnabled
+			&& $this->toBool($config['chat_history_enabled'] ?? $defaults['chat_history_enabled']);
+		$aiNotice = trim((string)($config['ai_notice_text'] ?? $defaults['ai_notice_text']));
+		if ($aiNotice === '') {
+			$aiNotice = self::DEFAULT_AI_NOTICE;
+		}
 
 		return [
 			'chatbot_backend' => $backend,
 			'service' => $this->getServiceIdFromBackend($backend),
-			'config_group' => trim((string) ($config['config_group'] ?? $defaults['config_group'])),
-			'config_name' => trim((string) ($config['config_name'] ?? $defaults['config_name'])),
+			'config_group' => $group,
+			'config_name' => $name,
 			'use_markdown' => $this->toBool($config['use_markdown'] ?? $defaults['use_markdown']),
 			'use_mathjax' => $this->toBool($config['use_mathjax'] ?? $defaults['use_mathjax']),
 			'use_icons' => $this->toBool($config['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($config['use_voice'] ?? $defaults['use_voice']),
-			'use_threads' => $this->toBool($config['use_threads'] ?? $defaults['use_threads']),
+			'use_threads' => false,
+			'conversation_enabled' => $conversationEnabled,
+			'chat_history_enabled' => $historyEnabled,
+			'chat_history_panel_mode' => $this->normalizeEnum(
+				(string)($config['chat_history_panel_mode'] ?? $defaults['chat_history_panel_mode']),
+				['responsive', 'open', 'closed'],
+				'responsive'
+			),
+			'automatic_chat_titles' => $conversationEnabled
+				&& $this->toBool($config['automatic_chat_titles'] ?? $defaults['automatic_chat_titles']),
+			'ai_notice_text' => $aiNotice,
 			'transport_mode' => $this->normalizeEnum(
-				(string) ($config['transport_mode'] ?? $defaults['transport_mode']),
+				(string)($config['transport_mode'] ?? $defaults['transport_mode']),
 				['auto', 'sse', 'rest'],
 				'auto'
 			),
 			'reference_mode' => $this->normalizeEnum(
-				(string) ($config['reference_mode'] ?? $defaults['reference_mode']),
+				(string)($config['reference_mode'] ?? $defaults['reference_mode']),
 				['none', 'url', 'custom', 'provider'],
 				'url'
 			),
 			'reference' => is_array($config['reference'] ?? null) ? $config['reference'] : [],
-			'reference_provider' => trim((string) ($config['reference_provider'] ?? $defaults['reference_provider'])),
-			'default_lang' => trim((string) ($config['default_lang'] ?? $defaults['default_lang'])),
+			'reference_provider' => trim((string)($config['reference_provider'] ?? '')),
+			'default_lang' => trim((string)($config['default_lang'] ?? 'auto')),
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? '')),
 			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? ''))
 		];
 	}
 
-	/**
-	 * Loads the persisted chatbot settings identified by the page component.
-	 *
-	 * The page component owns only the SettingsStore identity. Backend and UI
-	 * selections are stored by ChatbotConfigDisplay and must be resolved again
-	 * while rendering the public chatbot.
-	 *
-	 * @param array<string,mixed> $config
-	 * @return array<string,mixed>
-	 */
+	/** @param array<string,mixed> $config @return array<string,mixed> */
 	protected function loadStoredConfig(array $config): array {
 		$group = trim((string)($config['config_group'] ?? ''));
 		$name = trim((string)($config['config_name'] ?? ''));
@@ -159,59 +157,36 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		}
 
 		try {
-			$settings = $this->settingsStore->get($group, $name, []);
+			return $this->settingsService->get($group, $name, []);
 		}
 		catch (Throwable) {
 			return [];
 		}
-
-		return is_array($settings) ? $settings : [];
 	}
 
-	/**
-	 * Builds the service URL used by the JavaScript chatbot client.
-	 *
-	 * The configured backend resolves either to a direct chatbot service or to
-	 * the shared agent-backed endpoint. The host system owns URL generation.
-	 */
+	/** @param array<string,mixed> $config */
 	protected function buildServiceUrl(array $config): string {
-		$service = trim((string) ($config['service'] ?? ''));
-
+		$service = trim((string)($config['service'] ?? ''));
 		if ($service === '') {
 			return '';
 		}
 
-		$params = [];
-
-		if (($config['config_group'] ?? '') !== '') {
-			$params['config_group'] = (string) $config['config_group'];
-		}
-
-		if (($config['config_name'] ?? '') !== '') {
-			$params['config_name'] = (string) $config['config_name'];
-		}
-
 		return $this->linkTargetService->getLink(
-			[
-				'name' => $service
-			],
-			$params
+			['name' => $service],
+			$this->getConfigIdentityParams($config)
 		);
 	}
 
 	protected function buildTurnPrepareUrl(): string {
-		return $this->linkTargetService->getLink([
-			'name' => 'chatbotturnprepare'
-		]);
+		return $this->linkTargetService->getLink(['name' => 'chatbotturnprepare']);
 	}
 
 	/** @param array<string,mixed> $config */
 	protected function buildSpeechToTextSessionUrl(array $config): string {
 		$serviceId = $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''));
-		if($serviceId === '') {
+		if ($serviceId === '') {
 			return '';
 		}
-
 		return $this->linkTargetService->getLink(
 			['name' => 'realtimespeechtotextsession'],
 			['service' => $serviceId]
@@ -220,36 +195,54 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	/** @param array<string,mixed> $config */
 	protected function buildTextToSpeechUrl(array $config): string {
-		if($this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? '')) === '') {
+		if ($this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? '')) === '') {
 			return '';
 		}
-
 		$params = $this->getConfigIdentityParams($config);
-		if($params === []) {
+		if ($params === []) {
 			return '';
 		}
-
-		return $this->linkTargetService->getLink(
-			['name' => 'texttospeech'],
-			$params
-		);
+		return $this->linkTargetService->getLink(['name' => 'texttospeech'], $params);
 	}
 
-	/**
-	 * @param array<string,mixed> $config
-	 * @return array<string,string>
-	 */
-	protected function getConfigIdentityParams(array $config): array {
-		$group = trim((string)($config['config_group'] ?? ''));
-		$name = trim((string)($config['config_name'] ?? ''));
-		if($group === '' || $name === '') {
-			return [];
+	/** @param array<string,mixed> $config @return array<string,string> */
+	protected function buildConversationUrls(array $config): array {
+		$empty = [
+			'conversation_state_url' => '',
+			'conversation_create_url' => '',
+			'conversation_materialize_url' => '',
+			'conversation_activate_url' => '',
+			'conversation_rename_url' => '',
+			'conversation_delete_url' => '',
+			'conversation_title_url' => ''
+		];
+		if (empty($config['conversation_enabled'])) {
+			return $empty;
+		}
+		$params = $this->getConfigIdentityParams($config);
+		if ($params === []) {
+			return $empty;
 		}
 
 		return [
-			'config_group' => $group,
-			'config_name' => $name
+			'conversation_state_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationStateOutput::getName()], $params),
+			'conversation_create_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationCreateOutput::getName()], $params),
+			'conversation_materialize_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationMaterializeOutput::getName()], $params),
+			'conversation_activate_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationActivateOutput::getName()], $params),
+			'conversation_rename_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationRenameOutput::getName()], $params),
+			'conversation_delete_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationDeleteOutput::getName()], $params),
+			'conversation_title_url' => $this->linkTargetService->getLink(['name' => ChatbotConversationTitleOutput::getName()], $params)
 		];
+	}
+
+	/** @param array<string,mixed> $config @return array<string,string> */
+	protected function getConfigIdentityParams(array $config): array {
+		$group = trim((string)($config['config_group'] ?? ''));
+		$name = trim((string)($config['config_name'] ?? ''));
+		if ($group === '' || $name === '') {
+			return [];
+		}
+		return ['config_group' => $group, 'config_name' => $name];
 	}
 
 	/** @param array<string,mixed> $config */
@@ -258,12 +251,6 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		if (preg_match('/^(runtime|service):[a-z0-9._-]+$/', $backend) === 1) {
 			return $backend;
 		}
-
-		$legacyService = $this->normalizeTechnicalKey((string)($config['service'] ?? ''));
-		if ($legacyService !== '' && $legacyService !== 'chatbotservice') {
-			return 'service:' . $legacyService;
-		}
-
 		$runtimeId = $this->normalizeTechnicalKey((string)($config['agent_runtime'] ?? ''));
 		return $runtimeId !== '' ? 'runtime:' . $runtimeId : $this->getDefaultBackend();
 	}
@@ -277,7 +264,6 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		}
 		catch (Throwable) {
 		}
-
 		return 'service:dummychatbotservice';
 	}
 
@@ -288,7 +274,6 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		if (str_starts_with($backend, 'runtime:')) {
 			return 'chatbotservice';
 		}
-
 		return '';
 	}
 
@@ -298,7 +283,6 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	protected function normalizeTechnicalKey(string $value): string {
 		$value = strtolower(trim($value));
-
 		return preg_replace('/[^a-z0-9._-]+/', '', $value) ?? '';
 	}
 
@@ -306,114 +290,66 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		if (is_bool($value)) {
 			return $value;
 		}
-
 		if (is_int($value)) {
 			return $value === 1;
 		}
-
-		$value = strtolower(trim((string) $value));
-
-		return in_array($value, ['1', 'true', 'yes', 'on'], true);
+		return in_array(strtolower(trim((string)$value)), ['1', 'true', 'yes', 'on'], true);
 	}
 
-	// ---------------------------------------------------------------------
-	// JSON Schema
-	// ---------------------------------------------------------------------
-
 	public function getSchema(): array {
-		$defaultBackend = $this->getDefaultBackend();
-
 		return [
 			'$schema' => 'https://json-schema.org/draft-2020-12/schema',
 			'type' => 'object',
 			'properties' => [
-
 				'chatbot_backend' => [
 					'type' => 'string',
-					'description' => 'Direct chatbot service or registered agent runtime',
 					'pattern' => '^(service|runtime):[a-z0-9._-]+$',
-					'default' => $defaultBackend
+					'default' => $this->getDefaultBackend()
 				],
-
-				'config_group' => [
+				'config_group' => ['type' => 'string', 'default' => ''],
+				'config_name' => ['type' => 'string', 'default' => ''],
+				'use_markdown' => ['type' => 'boolean', 'default' => true],
+				'use_mathjax' => ['type' => 'boolean', 'default' => false],
+				'use_icons' => ['type' => 'boolean', 'default' => true],
+				'use_voice' => ['type' => 'boolean', 'default' => true],
+				'chat_history_enabled' => ['type' => 'boolean', 'default' => true],
+				'chat_history_panel_mode' => [
 					'type' => 'string',
-					'description' => 'SettingsStore group of the chatbot instance',
-					'default' => ''
+					'enum' => ['responsive', 'open', 'closed'],
+					'default' => 'responsive'
 				],
-
-				'config_name' => [
+				'automatic_chat_titles' => ['type' => 'boolean', 'default' => true],
+				'main_headings' => [
+					'type' => 'array',
+					'items' => ['type' => 'string'],
+					'default' => []
+				],
+				'first_message_mode' => [
 					'type' => 'string',
-					'description' => 'SettingsStore name of the chatbot instance',
-					'default' => ''
+					'enum' => ['none', 'fixed', 'random', 'contextual_ai'],
+					'default' => 'none'
 				],
-
-				'use_markdown' => [
-					'type' => 'boolean',
-					'description' => 'Enable markdown to HTML conversion',
-					'default' => true
+				'first_messages' => [
+					'type' => 'array',
+					'items' => ['type' => 'string'],
+					'default' => []
 				],
-				'use_mathjax' => [
-					'type' => 'boolean',
-					'description' => 'Enable MathJax rendering for TeX and MathML formulas',
-					'default' => false
-				],
-				'use_icons' => [
-					'type' => 'boolean',
-					'description' => 'Show dialog action icons (copy, like, dislike, reload)',
-					'default' => true
-				],
-				'use_voice' => [
-					'type' => 'boolean',
-					'description' => 'Enable voice controls and TTS/STT',
-					'default' => true
-				],
-				'use_threads' => [
-					'type' => 'boolean',
-					'description' => 'Enable multiple chat threads within the widget',
-					'default' => true
-				],
-
+				'ai_notice_text' => ['type' => 'string', 'minLength' => 1, 'default' => self::DEFAULT_AI_NOTICE],
 				'transport_mode' => [
 					'type' => 'string',
 					'enum' => ['auto', 'sse', 'rest'],
-					'description' => 'Transport protocol for streaming responses',
 					'default' => 'auto'
 				],
-
 				'reference_mode' => [
 					'type' => 'string',
 					'enum' => ['none', 'url', 'custom', 'provider'],
-					'description' => 'Defines how client-side context reference is sent with each request',
 					'default' => 'url'
 				],
-				'reference' => [
-					'type' => 'object',
-					'description' => 'Static reference payload for reference_mode=custom',
-					'default' => []
-				],
-				'reference_provider' => [
-					'type' => 'string',
-					'description' => 'Global JavaScript function name for reference_mode=provider',
-					'default' => ''
-				],
-
-				'default_lang' => [
-					'type' => 'string',
-					'description' => 'Default language for voice control',
-					'default' => 'auto'
-				],
-
-				'speech_to_text_service' => [
-					'type' => 'string',
-					'description' => 'Configured realtime speech-to-text service id. Empty uses browser speech recognition.',
-					'default' => ''
-				],
-
-				'text_to_speech_service' => [
-					'type' => 'string',
-					'description' => 'Configured text-to-speech service id. Empty uses browser speech synthesis.',
-					'default' => ''
-				]
+				'reference' => ['type' => 'object', 'default' => []],
+				'reference_provider' => ['type' => 'string', 'default' => ''],
+				'default_lang' => ['type' => 'string', 'default' => 'auto'],
+				'speech_to_text_service' => ['type' => 'string', 'default' => ''],
+				'text_to_speech_service' => ['type' => 'string', 'default' => '']
 			],
 			'required' => ['chatbot_backend']
 		];
