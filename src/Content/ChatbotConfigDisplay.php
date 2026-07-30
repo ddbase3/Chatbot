@@ -353,9 +353,6 @@ class ChatbotConfigDisplay implements IDisplay {
 		$firstMessages = $this->normalizeMessageListInput(
 			$this->request->request('first_messages', [])
 		);
-		if ($firstMessageMode !== 'random') {
-			$firstMessages = [];
-		}
 		$aiNoticeText = trim($this->normalizeTextBlock((string)$this->request->request('ai_notice_text')));
 
 		if ($firstMessageMode === 'random' && $firstMessages === []) {
@@ -426,9 +423,9 @@ class ChatbotConfigDisplay implements IDisplay {
 			['none', 'random', 'contextual_ai'],
 			'none'
 		);
-		$firstMessages = $firstMessageMode === 'random'
-			? $this->normalizeMessageListInput($this->request->request('first_messages', []))
-			: [];
+		$firstMessages = $this->normalizeMessageListInput(
+			$this->request->request('first_messages', [])
+		);
 		$values = [
 			'chatbot_backend' => $backend,
 			'default_lang' => trim((string)$this->request->request('default_lang')),
@@ -771,9 +768,9 @@ class ChatbotConfigDisplay implements IDisplay {
 			['none', 'random', 'contextual_ai'],
 			(string)$defaults['first_message_mode']
 		);
-		$firstMessages = $firstMessageMode === 'random'
-			? $this->normalizeMessageListInput($settings['first_messages'] ?? $defaults['first_messages'])
-			: [];
+		$firstMessages = $this->normalizeMessageListInput(
+			$settings['first_messages'] ?? $defaults['first_messages']
+		);
 		$normalized = [
 			'chatbot_backend' => $backend,
 			'use_markdown' => $this->toBool($settings['use_markdown'] ?? $defaults['use_markdown']),

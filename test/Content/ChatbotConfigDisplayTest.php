@@ -74,7 +74,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertArrayNotHasKey('use_threads', $settings);
 	}
 
-	public function testRemovedFixedFirstMessageModeNormalizesToUserStartsChat(): void {
+	public function testRemovedFixedFirstMessageModeNormalizesToUserStartsChatAndPreservesMessages(): void {
 		$settings = $this->createDisplay()->normalizeTestSettings([
 			'chatbot_backend' => 'runtime:missionbay',
 			'first_message_mode' => 'fixed',
@@ -83,7 +83,23 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		]);
 
 		$this->assertSame('none', $settings['first_message_mode'] ?? null);
-		$this->assertSame([], $settings['first_messages'] ?? null);
+		$this->assertSame(['Legacy fixed message'], $settings['first_messages'] ?? null);
+	}
+
+	public function testNormalizationPreservesPreparedFirstMessagesForInactiveModes(): void {
+		$display = $this->createDisplay();
+
+		$userStarts = $display->normalizeTestSettings([
+			'first_message_mode' => 'none',
+			'first_messages' => ['Prepared greeting']
+		]);
+		$contextual = $display->normalizeTestSettings([
+			'first_message_mode' => 'contextual_ai',
+			'first_messages' => ['Prepared greeting']
+		]);
+
+		$this->assertSame(['Prepared greeting'], $userStarts['first_messages'] ?? null);
+		$this->assertSame(['Prepared greeting'], $contextual['first_messages'] ?? null);
 	}
 
 	public function testLoadsExistingInstanceSettingsIncludingSpeechServices(): void {
