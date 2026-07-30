@@ -3,6 +3,7 @@
 namespace Chatbot\Test\Content;
 
 use AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\Language\Api\ILanguage;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotDisplay;
@@ -194,12 +195,15 @@ class ChatbotDisplayTest extends TestCase {
 		$settingsStore->method('get')->willReturn($storedSettings);
 		$runtimeSelector = $this->createStub(IAgentRuntimeSelector::class);
 		$runtimeSelector->method('getDefaultRuntimeId')->willReturn($defaultRuntime);
+		$language = $this->createStub(ILanguage::class);
+		$language->method('getLanguage')->willReturn('en');
 
 		return new ChatbotDisplay(
 			$chatbotDisplay,
 			$linkTargetService,
 			new ChatbotSettingsService($settingsStore, $runtimeSelector),
-			$runtimeSelector
+			$runtimeSelector,
+			$language
 		);
 	}
 }

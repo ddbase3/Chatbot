@@ -20,6 +20,7 @@ namespace Chatbot\Content;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
 use Base3\Api\IDisplay;
 use Base3\Api\ISchemaProvider;
+use Base3\Language\Api\ILanguage;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Chatbot\Output\ChatbotConversationActivateOutput;
 use Chatbot\Output\ChatbotConversationCreateOutput;
@@ -34,15 +35,18 @@ use UiFoundation\Api\IChatbotDisplay;
 
 class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
-	private const DEFAULT_AI_NOTICE = 'Du kommunizierst hier mit einem KI-System. KI-generierte Antworten können fehlerhaft sein. Prüfe wichtige Informationen.';
+	private const DEFAULT_AI_NOTICE = 'You are communicating with an AI system. AI-generated responses may be incorrect. Verify important information.';
 
 	private array $data = [];
+
+	private ?string $defaultAiNotice = null;
 
 	public function __construct(
 		private readonly IChatbotDisplay $chatbotDisplay,
 		private readonly ILinkTargetService $linkTargetService,
 		private readonly ChatbotSettingsService $settingsService,
-		private readonly IAgentRuntimeSelector $agentRuntimeSelector
+		private readonly IAgentRuntimeSelector $agentRuntimeSelector,
+		private readonly ILanguage $language
 	) {}
 
 	public static function getName(): string {
@@ -84,7 +88,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'chat_history_enabled' => false,
 			'chat_history_panel_mode' => 'responsive',
 			'automatic_chat_titles' => false,
-			'ai_notice_text' => self::DEFAULT_AI_NOTICE,
+			'ai_notice_text' => $this->getDefaultAiNotice(),
 			'transport_mode' => 'auto',
 			'reference_mode' => 'url',
 			'reference' => [],
@@ -107,7 +111,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			&& $this->toBool($config['chat_history_enabled'] ?? $defaults['chat_history_enabled']);
 		$aiNotice = trim((string)($config['ai_notice_text'] ?? $defaults['ai_notice_text']));
 		if ($aiNotice === '') {
-			$aiNotice = self::DEFAULT_AI_NOTICE;
+			$aiNotice = $this->getDefaultAiNotice();
 		}
 
 		return [
@@ -281,6 +285,39 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		return in_array($value, $allowed, true) ? $value : $default;
 	}
 
+	private function getDefaultAiNotice(): string {
+		if ($this->defaultAiNotice !== null) {
+			return $this->defaultAiNotice;
+		}
+
+		$language = strtolower(str_replace('_', '-', trim($this->language->getLanguage())));
+		$language = explode('-', $language)[0] ?? 'en';
+		if (!in_array($language, ['de', 'en', 'fr', 'es', 'ru'], true)) {
+			$language = 'en';
+		}
+
+		$basePath = defined('DIR_PLUGIN') ? DIR_PLUGIN . 'Chatbot/lang/Configuration/' : '';
+		$files = $basePath === ''
+			? []
+			: array_values(array_unique([$basePath . $language . '.ini', $basePath . 'en.ini']));
+
+		foreach ($files as $filename) {
+			if (!is_file($filename) || !is_readable($filename)) {
+				continue;
+			}
+			$data = parse_ini_file($filename, true);
+			$section = is_array($data['chatbot_configuration'] ?? null) ? $data['chatbot_configuration'] : [];
+			$value = $section['default_ai_notice'] ?? null;
+			if (is_scalar($value) && trim((string)$value) !== '') {
+				$this->defaultAiNotice = trim((string)$value);
+				return $this->defaultAiNotice;
+			}
+		}
+
+		$this->defaultAiNotice = self::DEFAULT_AI_NOTICE;
+		return $this->defaultAiNotice;
+	}
+
 	protected function normalizeTechnicalKey(string $value): string {
 		$value = strtolower(trim($value));
 		return preg_replace('/[^a-z0-9._-]+/', '', $value) ?? '';
@@ -334,7 +371,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'items' => ['type' => 'string'],
 					'default' => []
 				],
-				'ai_notice_text' => ['type' => 'string', 'minLength' => 1, 'default' => self::DEFAULT_AI_NOTICE],
+				'ai_notice_text' => ['type' => 'string', 'minLength' => 1, 'default' => $this->getDefaultAiNotice()],
 				'transport_mode' => [
 					'type' => 'string',
 					'enum' => ['auto', 'sse', 'rest'],

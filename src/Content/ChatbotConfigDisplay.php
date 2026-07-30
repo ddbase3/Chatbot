@@ -42,7 +42,7 @@ class ChatbotConfigDisplay implements IDisplay {
 	protected const BACKEND_SERVICE_PREFIX = 'service:';
 	protected const BACKEND_RUNTIME_PREFIX = 'runtime:';
 	protected const AGENT_CHATBOT_SERVICE = 'chatbotservice';
-	protected const DEFAULT_AI_NOTICE = 'Du kommunizierst hier mit einem KI-System. KI-generierte Antworten können fehlerhaft sein. Prüfe wichtige Informationen.';
+	protected const DEFAULT_AI_NOTICE = 'You are communicating with an AI system. AI-generated responses may be incorrect. Verify important information.';
 
 	protected array $data = [];
 
@@ -51,6 +51,9 @@ class ChatbotConfigDisplay implements IDisplay {
 	protected ?array $postedValues = null;
 
 	protected ?array $postedSettings = null;
+
+	/** @var array<string,string> */
+	protected array $translations = [];
 
 	public function __construct(
 		private readonly IMvcView $view,
@@ -73,6 +76,7 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
 		$out = strtolower(trim($out));
+		$this->prepareTranslations();
 
 		if ($out === 'json') {
 			return $this->getJsonOutput($final);
@@ -91,8 +95,6 @@ class ChatbotConfigDisplay implements IDisplay {
 		$settings = $this->loadSettings($context);
 		$values = $this->postedValues ?? $this->settingsToViewValues($settings);
 
-		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
-		$this->view->loadBricks('Configuration');
 		$this->view->setTemplate('Content/ChatbotConfigDisplay.php');
 
 		$this->view->assign('title', $context['title']);
@@ -138,6 +140,21 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->messages = [];
 		$this->postedValues = null;
 		$this->postedSettings = null;
+		$this->translations = [];
+	}
+
+	protected function prepareTranslations(): void {
+		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
+		$this->view->loadBricks('Configuration');
+		$translations = $this->view->getBricks('chatbot_configuration');
+		$this->translations = is_array($translations) ? $translations : [];
+	}
+
+	protected function translate(string $key, string $fallback): string {
+		$value = $this->translations[$key] ?? null;
+		return is_scalar($value) && trim((string)$value) !== ''
+			? trim((string)$value)
+			: $fallback;
 	}
 
 	// ---------------------------------------------------------------------
@@ -156,13 +173,13 @@ class ChatbotConfigDisplay implements IDisplay {
 		}
 
 		if ($action !== self::FORM_ACTION_SAVE) {
-			return $this->jsonError('Unknown action.');
+			return $this->jsonError($this->translate('unknown_action', 'Unknown action.'));
 		}
 
 		$context = $this->getContext(true);
 
 		if (!$this->isSaveRequest($context)) {
-			return $this->jsonError('Configuration identity does not match.');
+			return $this->jsonError($this->translate('identity_mismatch', 'Configuration identity does not match.'));
 		}
 
 		$result = $this->saveSettingsFromRequest($context);
@@ -217,16 +234,16 @@ class ChatbotConfigDisplay implements IDisplay {
 			$name = 'default';
 		}
 
-		$title = trim((string)($this->data['title'] ?? 'Chatbot Configuration'));
+		$title = trim((string)($this->data['title'] ?? $this->translate('title', 'Chatbot Configuration')));
 		if ($title === '') {
-			$title = 'Chatbot Configuration';
+			$title = $this->translate('title', 'Chatbot Configuration');
 		}
 
-		$description = trim((string)($this->data['description'] ?? 'Configure the selected chatbot instance.'));
-		$submitLabel = trim((string)($this->data['submit_label'] ?? 'Save'));
+		$description = trim((string)($this->data['description'] ?? $this->translate('description', 'Configure the selected chatbot instance.')));
+		$submitLabel = trim((string)($this->data['submit_label'] ?? $this->translate('save', 'Save')));
 
 		if ($submitLabel === '') {
-			$submitLabel = 'Save';
+			$submitLabel = $this->translate('save', 'Save');
 		}
 
 		$mode = $this->normalizeEnum(
@@ -320,14 +337,14 @@ class ChatbotConfigDisplay implements IDisplay {
 			$this->settingsStore->save();
 
 			$this->postedValues = $this->settingsToViewValues($settings);
-			$this->addMessage('success', 'Settings saved.');
+			$this->addMessage('success', $this->translate('settings_saved', 'Settings saved.'));
 
 			return [
 				'success' => true
 			];
 		}
 		catch (Throwable $e) {
-			$this->addMessage('danger', 'Settings could not be saved: ' . $e->getMessage());
+			$this->addMessage('danger', sprintf($this->translate('settings_save_error', 'Settings could not be saved: %s'), $e->getMessage()));
 
 			return [
 				'success' => false
@@ -356,13 +373,13 @@ class ChatbotConfigDisplay implements IDisplay {
 		$aiNoticeText = trim($this->normalizeTextBlock((string)$this->request->request('ai_notice_text')));
 
 		if ($firstMessageMode === 'random' && $firstMessages === []) {
-			$errors[] = 'The selected first-message mode requires at least one message.';
+			$errors[] = $this->translate('first_message_required', 'The selected first-message mode requires at least one message.');
 		}
 		if ($firstMessageMode === 'contextual_ai' && ($backendInfo['type'] ?? '') !== 'runtime') {
-			$errors[] = 'Contextual AI first messages require an agent runtime backend.';
+			$errors[] = $this->translate('contextual_requires_runtime', 'Contextual AI first messages require an agent runtime backend.');
 		}
 		if ($aiNoticeText === '') {
-			$errors[] = 'The AI notice text must not be empty.';
+			$errors[] = $this->translate('ai_notice_required', 'The AI notice text must not be empty.');
 		}
 
 		$settings = [
@@ -409,7 +426,7 @@ class ChatbotConfigDisplay implements IDisplay {
 
 		if (($settings['chat_history_enabled'] ?? false)
 			&& $this->normalizeTechnicalKey((string)($settings['memory_profile'] ?? '')) === '') {
-			$errors[] = 'Multiple chats require a conversation-memory profile.';
+			$errors[] = $this->translate('conversation_memory_required', 'Multiple chats require a conversation-memory profile.');
 		}
 
 		return $this->normalizeSettings($settings);
@@ -471,7 +488,7 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	protected function decodeReferenceInput(string $raw, array &$errors): array {
-		return $this->decodeConfigJsonInput($raw, 'Reference', $errors);
+		return $this->decodeConfigJsonInput($raw, $this->translate('reference_label', 'Reference'), $errors);
 	}
 
 	protected function decodeConfigJsonInput(string $raw, string $label, array &$errors): array {
@@ -483,12 +500,12 @@ class ChatbotConfigDisplay implements IDisplay {
 			$decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
 		}
 		catch (JsonException $e) {
-			$errors[] = $label . ' must be valid JSON: ' . $e->getMessage();
+			$errors[] = sprintf($this->translate('json_invalid', '%s must be valid JSON: %s'), $label, $e->getMessage());
 			return [];
 		}
 
 		if (!is_array($decoded)) {
-			$errors[] = $label . ' must decode to a JSON object or array.';
+			$errors[] = sprintf($this->translate('json_object_or_array', '%s must decode to a JSON object or array.'), $label);
 			return [];
 		}
 
@@ -516,7 +533,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			$services = $this->classMap->getInstancesByInterface(IChatbotService::class);
 		}
 		catch (Throwable $e) {
-			$this->addMessage('danger', 'Chatbot services could not be loaded: ' . $e->getMessage());
+			$this->addMessage('danger', sprintf($this->translate('chatbot_services_load_error', 'Chatbot services could not be loaded: %s'), $e->getMessage()));
 			$services = [];
 		}
 
@@ -583,14 +600,14 @@ class ChatbotConfigDisplay implements IDisplay {
 	/** @param array<int,string> $errors @return array{type:string,id:string}|array{} */
 	protected function validateBackend(string $backend, array &$errors): array {
 		if ($backend === '') {
-			$errors[] = 'Please select a chatbot backend.';
+			$errors[] = $this->translate('select_backend_error', 'Please select a chatbot backend.');
 			return [];
 		}
 
 		$runtimeId = $this->getRuntimeIdFromBackend($backend);
 		if ($runtimeId !== '') {
 			if (!$this->agentRuntimeRegistry->hasRuntime($runtimeId)) {
-				$errors[] = 'Selected agent runtime does not exist: ' . $runtimeId;
+				$errors[] = sprintf($this->translate('runtime_missing_error', 'Selected agent runtime does not exist: %s'), $runtimeId);
 				return [];
 			}
 
@@ -599,7 +616,7 @@ class ChatbotConfigDisplay implements IDisplay {
 
 		$serviceId = $this->getServiceIdFromBackend($backend);
 		if ($serviceId === '' || !$this->chatbotServiceExists($serviceId)) {
-			$errors[] = 'Selected chatbot service does not exist: ' . ($serviceId !== '' ? $serviceId : $backend);
+			$errors[] = sprintf($this->translate('service_missing_error', 'Selected chatbot service does not exist: %s'), $serviceId !== '' ? $serviceId : $backend);
 			return [];
 		}
 
@@ -725,7 +742,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			);
 		}
 		catch (Throwable $e) {
-			$this->addMessage('danger', 'Settings could not be loaded: ' . $e->getMessage());
+			$this->addMessage('danger', sprintf($this->translate('settings_load_error', 'Settings could not be loaded: %s'), $e->getMessage()));
 			return $this->getDefaultSettings();
 		}
 	}
@@ -745,7 +762,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'main_headings' => [],
 			'first_message_mode' => 'none',
 			'first_messages' => [],
-			'ai_notice_text' => self::DEFAULT_AI_NOTICE,
+			'ai_notice_text' => $this->translate('default_ai_notice', self::DEFAULT_AI_NOTICE),
 			'transport_mode' => 'auto',
 			'reference_mode' => 'url',
 			'reference' => [],
@@ -761,7 +778,7 @@ class ChatbotConfigDisplay implements IDisplay {
 		$backend = $this->resolveBackendFromSettings($settings);
 		$aiNoticeText = trim($this->normalizeTextBlock((string)($settings['ai_notice_text'] ?? $defaults['ai_notice_text'])));
 		if ($aiNoticeText === '') {
-			$aiNoticeText = self::DEFAULT_AI_NOTICE;
+			$aiNoticeText = $this->translate('default_ai_notice', self::DEFAULT_AI_NOTICE);
 		}
 		$firstMessageMode = $this->normalizeEnum(
 			(string)($settings['first_message_mode'] ?? $defaults['first_message_mode']),

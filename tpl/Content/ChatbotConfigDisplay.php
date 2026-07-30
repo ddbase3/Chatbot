@@ -15,25 +15,25 @@
 		$firstMessages = [''];
 	}
 
-	$languageOptions = [
-		'auto' => 'auto',
-		'de-DE' => 'German (Germany) - de-DE',
-		'de-AT' => 'German (Austria) - de-AT',
-		'de-CH' => 'German (Switzerland) - de-CH',
-		'en-US' => 'English (United States) - en-US',
-		'en-GB' => 'English (United Kingdom) - en-GB',
-		'fr-FR' => 'French (France) - fr-FR',
-		'es-ES' => 'Spanish (Spain) - es-ES',
-		'it-IT' => 'Italian (Italy) - it-IT',
-		'nl-NL' => 'Dutch (Netherlands) - nl-NL',
-		'pl-PL' => 'Polish (Poland) - pl-PL',
-		'pt-PT' => 'Portuguese (Portugal) - pt-PT',
-		'pt-BR' => 'Portuguese (Brazil) - pt-BR',
-		'tr-TR' => 'Turkish (Turkey) - tr-TR'
-	];
-
 	$e = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 	$t = static fn(string $key, string $fallback): string => trim((string)($bricks[$key] ?? '')) !== '' ? (string)$bricks[$key] : $fallback;
+	$languageOptions = [
+		'auto' => $t('voice_language_auto', 'Automatic'),
+		'de-DE' => $t('voice_language_de_de', 'German (Germany) - de-DE'),
+		'de-AT' => $t('voice_language_de_at', 'German (Austria) - de-AT'),
+		'de-CH' => $t('voice_language_de_ch', 'German (Switzerland) - de-CH'),
+		'en-US' => $t('voice_language_en_us', 'English (United States) - en-US'),
+		'en-GB' => $t('voice_language_en_gb', 'English (United Kingdom) - en-GB'),
+		'fr-FR' => $t('voice_language_fr_fr', 'French (France) - fr-FR'),
+		'es-ES' => $t('voice_language_es_es', 'Spanish (Spain) - es-ES'),
+		'ru-RU' => $t('voice_language_ru_ru', 'Russian (Russia) - ru-RU'),
+		'it-IT' => $t('voice_language_it_it', 'Italian (Italy) - it-IT'),
+		'nl-NL' => $t('voice_language_nl_nl', 'Dutch (Netherlands) - nl-NL'),
+		'pl-PL' => $t('voice_language_pl_pl', 'Polish (Poland) - pl-PL'),
+		'pt-PT' => $t('voice_language_pt_pt', 'Portuguese (Portugal) - pt-PT'),
+		'pt-BR' => $t('voice_language_pt_br', 'Portuguese (Brazil) - pt-BR'),
+		'tr-TR' => $t('voice_language_tr_tr', 'Turkish (Türkiye) - tr-TR')
+	];
 	$checked = static fn($value): string => !empty($value) ? ' checked="checked"' : '';
 	$selected = static fn($current, $value): string => (string)$current === (string)$value ? ' selected="selected"' : '';
 
@@ -49,6 +49,10 @@
 	$currentSpeechToTextService = trim((string)($values['speech_to_text_service'] ?? ''));
 	$currentTextToSpeechService = trim((string)($values['text_to_speech_service'] ?? ''));
 	$currentFirstMessageMode = (string)($values['first_message_mode'] ?? 'none');
+	$currentReferenceMode = (string)($values['reference_mode'] ?? 'url');
+	if (!in_array($currentReferenceMode, ['none', 'url', 'custom', 'provider'], true)) {
+		$currentReferenceMode = 'url';
+	}
 	$currentBackendUrl = '';
 	$currentBackendDescription = '';
 	$backendOptionIds = [];
@@ -133,47 +137,19 @@
 		border-left-color: #5bc0de;
 	}
 
-	.base3-chatbot-config-section {
-		margin: 0 0 20px;
+	.base3-chatbot-config-section,
+	.base3-chatbot-config-group {
+		margin: 0 0 18px;
 		padding: 16px;
 		border: 1px solid #ddd;
-		border-radius: 4px;
+		border-radius: 6px;
 		background: #fff;
 	}
 
-	.base3-chatbot-config-section h3 {
+	.base3-chatbot-config-section h3,
+	.base3-chatbot-config-group h3 {
 		margin: 0 0 14px;
 		font-size: 18px;
-	}
-
-	.base3-chatbot-config-group {
-		margin: 0 0 18px;
-		padding: 14px;
-		border: 1px solid #e0e0e0;
-		border-radius: 4px;
-		background: #fafafa;
-	}
-
-	.base3-chatbot-config-group h4 {
-		margin: 0 0 14px;
-		font-size: 15px;
-	}
-
-	.base3-chatbot-config-expert {
-		margin: 0 0 18px;
-		border: 1px solid #d7d7d7;
-		border-radius: 6px;
-		background: #fafafa;
-	}
-
-	.base3-chatbot-config-expert > summary {
-		padding: 12px 14px;
-		cursor: pointer;
-		font-weight: 600;
-	}
-
-	.base3-chatbot-config-expert-body {
-		padding: 0 14px 14px;
 	}
 
 	.base3-chatbot-config-row {
@@ -189,12 +165,12 @@
 
 	.base3-chatbot-config-label {
 		padding-top: 7px;
-		font-weight: bold;
+		font-weight: 600;
 	}
 
 	.base3-chatbot-config-fieldset {
 		min-width: 0;
-		margin: 0;
+		margin: 0 0 14px;
 		padding: 0;
 		border: 0;
 	}
@@ -209,7 +185,7 @@
 		margin: 0;
 		padding: 7px 0 0;
 		font-size: inherit;
-		font-weight: bold;
+		font-weight: 600;
 		line-height: inherit;
 	}
 
@@ -229,7 +205,7 @@
 	.base3-chatbot-config-display select,
 	.base3-chatbot-config-display textarea {
 		width: 100%;
-		max-width: 620px;
+		max-width: 760px;
 		min-height: 34px;
 		padding: 6px 8px;
 		border: 1px solid #bbb;
@@ -250,11 +226,26 @@
 		min-height: 140px;
 	}
 
+	.base3-chatbot-config-reference-field {
+		margin-top: 12px;
+	}
+
+	.base3-chatbot-config-reference-field[hidden] {
+		display: none;
+	}
+
+	.base3-chatbot-config-reference-field > label {
+		display: block;
+		margin: 0 0 5px;
+		font-weight: 600;
+	}
+
 	.base3-chatbot-config-help {
-		max-width: 760px;
+		max-width: 800px;
 		margin: 5px 0 0;
 		color: #666;
 		font-size: 12px;
+		line-height: 1.4;
 	}
 
 	.base3-chatbot-config-service-url {
@@ -319,7 +310,8 @@
 	}
 
 	@media (max-width: 700px) {
-		.base3-chatbot-config-section {
+		.base3-chatbot-config-section,
+		.base3-chatbot-config-group {
 			padding: 12px;
 		}
 
@@ -371,14 +363,14 @@
 		data-save-mode="<?php echo $e($saveMode); ?>"
 	>
 <?php } ?>
-		<h2><?php echo $e($this->_['title'] ?? 'Chatbot Configuration'); ?></h2>
+		<h2><?php echo $e($this->_['title'] ?? $t('title', 'Chatbot Configuration')); ?></h2>
 
 <?php if (!empty($this->_['description'])) { ?>
 		<p class="base3-chatbot-config-description"><?php echo $e($this->_['description']); ?></p>
 <?php } ?>
 
 		<div class="base3-chatbot-config-instance">
-			Instance:
+			<?php echo $e($t('instance_label', 'Instance')); ?>:
 			<code><?php echo $e($group); ?></code>
 			/
 			<code><?php echo $e($name); ?></code>
@@ -388,272 +380,269 @@
 		<input type="hidden" name="chatbot_config_group" value="<?php echo $e($group); ?>" />
 		<input type="hidden" name="chatbot_config_name" value="<?php echo $e($name); ?>" />
 
-		<div class="base3-chatbot-config-section">
-			<h3><?php echo $e($t('ui_section', 'Chatbot UI')); ?></h3>
+		<div class="base3-chatbot-config-group">
+			<h3><?php echo $e($t('start_section', 'Chat start')); ?></h3>
 
-			<div class="base3-chatbot-config-group">
-				<h4><?php echo $e($t('start_section', 'Chat start')); ?></h4>
-
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_first_message_mode" class="base3-chatbot-config-label"><?php echo $e($t('first_message_mode_label', 'Start mode')); ?></label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_first_message_mode" name="first_message_mode" class="form-control" aria-describedby="<?php echo $e($formId); ?>_first_message_mode_help">
-							<option value="none"<?php echo $selected($currentFirstMessageMode, 'none'); ?>><?php echo $e($t('first_message_mode_none', 'User starts the chat')); ?></option>
-							<option value="random"<?php echo $selected($currentFirstMessageMode, 'random'); ?>><?php echo $e($t('first_message_mode_random', 'Random first assistant message')); ?></option>
-							<option value="contextual_ai"<?php echo $selected($currentFirstMessageMode, 'contextual_ai'); ?>><?php echo $e($t('first_message_mode_contextual_ai', 'Contextual first AI message')); ?></option>
-						</select>
-						<p id="<?php echo $e($formId); ?>_first_message_mode_help" class="base3-chatbot-config-help"><?php echo $e($t('first_message_mode_help', 'Defines how a new chat starts. Depending on the selected mode, main headings or prepared first assistant messages can be configured.')); ?></p>
-					</div>
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_first_message_mode" class="base3-chatbot-config-label"><?php echo $e($t('first_message_mode_label', 'Start mode')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_first_message_mode" name="first_message_mode" class="form-control" aria-describedby="<?php echo $e($formId); ?>_first_message_mode_help">
+						<option value="none"<?php echo $selected($currentFirstMessageMode, 'none'); ?>><?php echo $e($t('first_message_mode_none', 'The user starts the chat')); ?></option>
+						<option value="random"<?php echo $selected($currentFirstMessageMode, 'random'); ?>><?php echo $e($t('first_message_mode_random', 'Random first assistant message')); ?></option>
+						<option value="contextual_ai"<?php echo $selected($currentFirstMessageMode, 'contextual_ai'); ?>><?php echo $e($t('first_message_mode_contextual_ai', 'Contextual first AI message')); ?></option>
+					</select>
+					<p id="<?php echo $e($formId); ?>_first_message_mode_help" class="base3-chatbot-config-help"><?php echo $e($t('first_message_mode_help', 'Defines how a new chat starts. Depending on the selected mode, main headings or prepared first assistant messages can be configured.')); ?></p>
 				</div>
+			</div>
 
-				<fieldset
-					class="base3-chatbot-config-row base3-chatbot-config-fieldset"
-					data-base3-chatbot-main-headings
-					<?php echo $currentFirstMessageMode === 'none' ? '' : 'hidden'; ?>
-				>
-					<legend><?php echo $e($t('main_headings_label', 'Main headings')); ?></legend>
-					<div>
-						<div class="base3-chatbot-config-message-list" data-base3-chatbot-message-list="main_headings">
-							<div data-base3-chatbot-message-list-items="main_headings">
+			<fieldset
+				class="base3-chatbot-config-row base3-chatbot-config-fieldset"
+				data-base3-chatbot-main-headings
+				<?php echo $currentFirstMessageMode === 'none' ? '' : 'hidden'; ?>
+			>
+				<legend><?php echo $e($t('main_headings_label', 'Main headings')); ?></legend>
+				<div>
+					<div class="base3-chatbot-config-message-list" data-base3-chatbot-message-list="main_headings">
+						<div data-base3-chatbot-message-list-items="main_headings">
 <?php foreach ($mainHeadings as $mainHeadingIndex => $mainHeading) {
-	$mainHeadingId = $formId . '_main_heading_' . $mainHeadingIndex;
+$mainHeadingId = $formId . '_main_heading_' . $mainHeadingIndex;
 ?>
-								<div class="base3-chatbot-config-message-row">
-									<label class="base3-chatbot-visually-hidden" for="<?php echo $e($mainHeadingId); ?>"><?php echo $e($t('main_heading_item_label', 'Main heading')); ?> <?php echo $e((string)($mainHeadingIndex + 1)); ?></label>
-									<input id="<?php echo $e($mainHeadingId); ?>" type="text" name="main_headings[]" class="form-control" value="<?php echo $e($mainHeading); ?>" placeholder="<?php echo $e($t('main_heading_placeholder', 'What can I help you with?')); ?>" />
-									<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="main_headings"><?php echo $e($t('remove', 'Remove')); ?></button>
-								</div>
-<?php } ?>
+							<div class="base3-chatbot-config-message-row">
+								<label class="base3-chatbot-visually-hidden" for="<?php echo $e($mainHeadingId); ?>"><?php echo $e($t('main_heading_item_label', 'Main heading')); ?> <?php echo $e((string)($mainHeadingIndex + 1)); ?></label>
+								<input id="<?php echo $e($mainHeadingId); ?>" type="text" name="main_headings[]" class="form-control" value="<?php echo $e($mainHeading); ?>" placeholder="<?php echo $e($t('main_heading_placeholder', 'What can I help you with?')); ?>" />
+								<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="main_headings"><?php echo $e($t('remove', 'Remove')); ?></button>
 							</div>
-							<button type="button" class="btn btn-default base3-chatbot-config-message-add" data-base3-chatbot-message-add="main_headings">
-								<?php echo $e($t('add_main_heading', 'Add main heading')); ?>
-							</button>
-							<p class="base3-chatbot-config-help"><?php echo $e($t('main_headings_help', 'One heading is fixed. With several headings one is selected randomly for each new chat. With no heading this area is omitted. The heading is not part of the conversation and disappears as soon as the chat contains a message.')); ?></p>
+<?php } ?>
 						</div>
+						<button type="button" class="btn btn-default base3-chatbot-config-message-add" data-base3-chatbot-message-add="main_headings">
+							<?php echo $e($t('add_main_heading', 'Add main heading')); ?>
+						</button>
+						<p class="base3-chatbot-config-help"><?php echo $e($t('main_headings_help', 'One heading is fixed. With several headings one is selected randomly for each new chat. With no heading this area is omitted. The heading is not part of the conversation and disappears as soon as the chat contains a message.')); ?></p>
 					</div>
-				</fieldset>
+				</div>
+			</fieldset>
 
-				<fieldset
-					class="base3-chatbot-config-row base3-chatbot-config-fieldset"
-					data-base3-chatbot-first-messages
-					<?php echo $currentFirstMessageMode === 'random' ? '' : 'hidden'; ?>
-				>
-					<legend><?php echo $e($t('first_messages_label', 'First assistant messages')); ?></legend>
-					<div>
-						<div class="base3-chatbot-config-message-list" data-base3-chatbot-message-list="first_messages">
-							<div data-base3-chatbot-message-list-items="first_messages">
+			<fieldset
+				class="base3-chatbot-config-row base3-chatbot-config-fieldset"
+				data-base3-chatbot-first-messages
+				<?php echo $currentFirstMessageMode === 'random' ? '' : 'hidden'; ?>
+			>
+				<legend><?php echo $e($t('first_messages_label', 'First assistant messages')); ?></legend>
+				<div>
+					<div class="base3-chatbot-config-message-list" data-base3-chatbot-message-list="first_messages">
+						<div data-base3-chatbot-message-list-items="first_messages">
 <?php foreach ($firstMessages as $firstMessageIndex => $firstMessage) {
-	$firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
+$firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
 ?>
-								<div class="base3-chatbot-config-message-row">
-									<label class="base3-chatbot-visually-hidden" for="<?php echo $e($firstMessageId); ?>"><?php echo $e($t('first_message_item_label', 'First assistant message')); ?> <?php echo $e((string)($firstMessageIndex + 1)); ?></label>
-									<input id="<?php echo $e($firstMessageId); ?>" type="text" name="first_messages[]" class="form-control" value="<?php echo $e($firstMessage); ?>" placeholder="<?php echo $e($t('first_message_placeholder', 'How can I help you?')); ?>" />
-									<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="first_messages"><?php echo $e($t('remove', 'Remove')); ?></button>
-								</div>
-<?php } ?>
+							<div class="base3-chatbot-config-message-row">
+								<label class="base3-chatbot-visually-hidden" for="<?php echo $e($firstMessageId); ?>"><?php echo $e($t('first_message_item_label', 'First assistant message')); ?> <?php echo $e((string)($firstMessageIndex + 1)); ?></label>
+								<input id="<?php echo $e($firstMessageId); ?>" type="text" name="first_messages[]" class="form-control" value="<?php echo $e($firstMessage); ?>" placeholder="<?php echo $e($t('first_message_placeholder', 'How can I help you?')); ?>" />
+								<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="first_messages"><?php echo $e($t('remove', 'Remove')); ?></button>
 							</div>
-							<button type="button" class="btn btn-default base3-chatbot-config-message-add" data-base3-chatbot-message-add="first_messages">
-								<?php echo $e($t('add_first_message', 'Add first assistant message')); ?>
-							</button>
-							<p class="base3-chatbot-config-help"><?php echo $e($t('first_messages_help', 'Used only for the random first-message mode. Empty fields are ignored.')); ?></p>
+<?php } ?>
 						</div>
-					</div>
-				</fieldset>
-			</div>
-
-
-			<div class="base3-chatbot-config-group">
-				<h4><?php echo $e($t('history_section', 'Chat history')); ?></h4>
-
-				<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
-					<legend><?php echo $e($t('history_label', 'Chat history')); ?></legend>
-					<div class="base3-chatbot-config-checkboxes">
-						<label>
-							<input type="checkbox" name="chat_history_enabled" value="1"<?php echo $checked($values['chat_history_enabled'] ?? false); ?> />
-							<?php echo $e($t('history_enabled', 'Enable multiple chats and the chat list')); ?>
-						</label>
-						<label>
-							<input type="checkbox" name="automatic_chat_titles" value="1"<?php echo $checked($values['automatic_chat_titles'] ?? false); ?> />
-							<?php echo $e($t('automatic_titles', 'Generate chat titles automatically')); ?>
-						</label>
-						<p class="base3-chatbot-config-help"><?php echo $e($t('history_help', 'Conversation history is active only when the selected agent has a conversation memory profile.')); ?></p>
-					</div>
-				</fieldset>
-
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_chat_history_panel_mode" class="base3-chatbot-config-label"><?php echo $e($t('history_panel_mode', 'Chat list display')); ?></label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_chat_history_panel_mode" name="chat_history_panel_mode" class="form-control">
-							<option value="responsive"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'responsive'); ?>><?php echo $e($t('history_panel_responsive', 'Responsive')); ?></option>
-							<option value="open"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'open'); ?>><?php echo $e($t('history_panel_open', 'Initially open')); ?></option>
-							<option value="closed"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'closed'); ?>><?php echo $e($t('history_panel_closed', 'Initially closed')); ?></option>
-						</select>
+						<button type="button" class="btn btn-default base3-chatbot-config-message-add" data-base3-chatbot-message-add="first_messages">
+							<?php echo $e($t('add_first_message', 'Add first assistant message')); ?>
+						</button>
+						<p class="base3-chatbot-config-help"><?php echo $e($t('first_messages_help', 'Used only for the random first-message mode. Empty fields are ignored.')); ?></p>
 					</div>
 				</div>
-			</div>
+			</fieldset>
+		</div>
 
-			<div class="base3-chatbot-config-group">
-				<h4><?php echo $e($t('features_transport_section', 'Features and transport')); ?></h4>
 
-				<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
-					<legend><?php echo $e($t('features_label', 'Features')); ?></legend>
-					<div class="base3-chatbot-config-checkboxes">
-						<label>
-							<input type="checkbox" name="use_markdown" value="1"<?php echo $checked($values['use_markdown'] ?? false); ?> />
-							<?php echo $e($t('feature_markdown', 'Enable markdown rendering')); ?>
-						</label>
-						<label>
-							<input type="checkbox" name="use_mathjax" value="1"<?php echo $checked($values['use_mathjax'] ?? false); ?> />
-							<?php echo $e($t('feature_mathjax', 'Enable mathematical formula rendering')); ?>
-						</label>
-						<label>
-							<input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
-							<?php echo $e($t('feature_icons', 'Show dialog action icons')); ?>
-						</label>
-					</div>
-				</fieldset>
+		<div class="base3-chatbot-config-group">
+			<h3><?php echo $e($t('history_section', 'Chat history')); ?></h3>
 
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_transport_mode" class="base3-chatbot-config-label"><?php echo $e($t('transport_mode_label', 'Transport mode')); ?></label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_transport_mode" name="transport_mode" class="form-control">
-							<option value="auto"<?php echo $selected($values['transport_mode'] ?? 'auto', 'auto'); ?>>auto</option>
-							<option value="sse"<?php echo $selected($values['transport_mode'] ?? 'auto', 'sse'); ?>>sse</option>
-							<option value="rest"<?php echo $selected($values['transport_mode'] ?? 'auto', 'rest'); ?>>rest</option>
-						</select>
-					</div>
+			<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
+				<legend><?php echo $e($t('history_label', 'Chat history')); ?></legend>
+				<div class="base3-chatbot-config-checkboxes">
+					<label>
+						<input type="checkbox" name="chat_history_enabled" value="1"<?php echo $checked($values['chat_history_enabled'] ?? false); ?> />
+						<?php echo $e($t('history_enabled', 'Enable multiple chats and the chat list')); ?>
+					</label>
+					<label>
+						<input type="checkbox" name="automatic_chat_titles" value="1"<?php echo $checked($values['automatic_chat_titles'] ?? false); ?> />
+						<?php echo $e($t('automatic_titles', 'Generate chat titles automatically')); ?>
+					</label>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('history_help', 'Conversation history is active only when the selected agent has a conversation memory profile.')); ?></p>
 				</div>
+			</fieldset>
 
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_ai_notice_text" class="base3-chatbot-config-label"><?php echo $e($t('ai_notice_label', 'AI notice')); ?></label>
-					<div>
-						<textarea id="<?php echo $e($formId); ?>_ai_notice_text" name="ai_notice_text" class="form-control" rows="3" required="required" aria-describedby="<?php echo $e($formId); ?>_ai_notice_help"><?php echo $e($values['ai_notice_text'] ?? ''); ?></textarea>
-						<p id="<?php echo $e($formId); ?>_ai_notice_help" class="base3-chatbot-config-help"><?php echo $e($t('ai_notice_help', 'This visible notice is displayed directly below the message composer.')); ?></p>
-					</div>
-				</div>
-			</div>
-
-			<div class="base3-chatbot-config-group">
-				<h4><?php echo $e($t('voice_section', 'Voice control')); ?></h4>
-
-				<div class="base3-chatbot-config-row">
-					<div class="base3-chatbot-config-label"><?php echo $e($t('voice_enabled_label', 'Activation')); ?></div>
-					<div class="base3-chatbot-config-checkboxes">
-						<label>
-							<input type="checkbox" name="use_voice" value="1"<?php echo $checked($values['use_voice'] ?? false); ?> />
-							<?php echo $e($t('feature_voice', 'Enable voice controls')); ?>
-						</label>
-					</div>
-				</div>
-
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_default_lang" class="base3-chatbot-config-label"><?php echo $e($t('voice_language_label', 'Voice language')); ?></label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_default_lang" name="default_lang" class="form-control">
-<?php foreach ($languageOptions as $languageValue => $languageLabel) { ?>
-							<option value="<?php echo $e($languageValue); ?>"<?php echo $selected($currentLang, $languageValue); ?>><?php echo $e($languageLabel); ?></option>
-<?php } ?>
-<?php if (!array_key_exists($currentLang, $languageOptions)) { ?>
-							<option value="<?php echo $e($currentLang); ?>" selected="selected"><?php echo $e($t('current_custom_value', 'Current custom value')); ?>: <?php echo $e($currentLang); ?></option>
-<?php } ?>
-						</select>
-						<p class="base3-chatbot-config-help"><?php echo $e($t('voice_language_help', 'Language hint for browser text-to-speech output. Use auto unless the integration should force a specific speech language.')); ?></p>
-					</div>
-				</div>
-
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_speech_to_text_service" class="base3-chatbot-config-label"><?php echo $e($t('speech_to_text_label', 'Speech-to-text service')); ?></label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_speech_to_text_service" name="speech_to_text_service" class="form-control">
-							<option value=""<?php echo $selected($currentSpeechToTextService, ''); ?>><?php echo $e($t('speech_to_text_browser', 'Browser speech recognition')); ?></option>
-<?php foreach ($speechToTextServices as $speechService) {
-	$speechServiceId = (string)($speechService['id'] ?? '');
-	if ($speechServiceId === '') continue;
-	$speechServiceLabel = trim((string)($speechService['name'] ?? '')) ?: $speechServiceId;
-	$driverLabel = trim((string)($speechService['driver'] ?? ''));
-?>
-							<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentSpeechToTextService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($driverLabel !== '' ? ' — ' . $driverLabel : '')); ?></option>
-<?php } ?>
-						</select>
-						<p class="base3-chatbot-config-help"><?php echo $e($t('speech_to_text_help', 'A configured realtime service displays interim transcripts while the user is speaking. Browser speech recognition remains available without a service.')); ?></p>
-					</div>
-				</div>
-
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_text_to_speech_service" class="base3-chatbot-config-label"><?php echo $e($t('text_to_speech_label', 'Text-to-speech service')); ?></label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_text_to_speech_service" name="text_to_speech_service" class="form-control">
-							<option value=""<?php echo $selected($currentTextToSpeechService, ''); ?>><?php echo $e($t('text_to_speech_browser', 'Browser speech synthesis')); ?></option>
-<?php foreach ($textToSpeechServices as $speechService) {
-	$speechServiceId = (string)($speechService['id'] ?? '');
-	if ($speechServiceId === '') continue;
-	$speechServiceLabel = trim((string)($speechService['name'] ?? '')) ?: $speechServiceId;
-	$driverLabel = trim((string)($speechService['driver'] ?? ''));
-	$voiceLabel = trim((string)($speechService['voice'] ?? ''));
-	$details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($value): bool => $value !== ''));
-?>
-							<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentTextToSpeechService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($details !== [] ? ' — ' . implode(' / ', $details) : '')); ?></option>
-<?php } ?>
-						</select>
-						<p class="base3-chatbot-config-help"><?php echo $e($t('text_to_speech_help', 'A configured service generates assistant speech through the server. Browser speech synthesis remains available without a service.')); ?></p>
-					</div>
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_chat_history_panel_mode" class="base3-chatbot-config-label"><?php echo $e($t('history_panel_mode', 'Chat list display')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_chat_history_panel_mode" name="chat_history_panel_mode" class="form-control">
+						<option value="responsive"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'responsive'); ?>><?php echo $e($t('history_panel_responsive', 'Responsive')); ?></option>
+						<option value="open"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'open'); ?>><?php echo $e($t('history_panel_open', 'Initially open')); ?></option>
+						<option value="closed"<?php echo $selected($values['chat_history_panel_mode'] ?? 'responsive', 'closed'); ?>><?php echo $e($t('history_panel_closed', 'Initially closed')); ?></option>
+					</select>
 				</div>
 			</div>
 		</div>
 
-		<details class="base3-chatbot-config-expert">
-			<summary>Reference context</summary>
-			<div class="base3-chatbot-config-expert-body">
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_reference_mode" class="base3-chatbot-config-label">Reference mode</label>
-					<div>
-						<select id="<?php echo $e($formId); ?>_reference_mode" name="reference_mode" class="form-control">
-							<option value="none"<?php echo $selected($values['reference_mode'] ?? 'url', 'none'); ?>>none</option>
-							<option value="url"<?php echo $selected($values['reference_mode'] ?? 'url', 'url'); ?>>url</option>
-							<option value="custom"<?php echo $selected($values['reference_mode'] ?? 'url', 'custom'); ?>>custom</option>
-							<option value="provider"<?php echo $selected($values['reference_mode'] ?? 'url', 'provider'); ?>>provider</option>
-						</select>
-						<p class="base3-chatbot-config-help">
-							Controls which contextual reference is sent with requests. The service can store this in the agent context.
-						</p>
-					</div>
-				</div>
+		<div class="base3-chatbot-config-group">
+			<h3><?php echo $e($t('features_transport_section', 'Features and transport')); ?></h3>
 
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_reference" class="base3-chatbot-config-label">Static reference JSON</label>
-					<div>
-						<textarea id="<?php echo $e($formId); ?>_reference" name="reference" class="form-control base3-chatbot-config-json"><?php echo $e($values['reference_json'] ?? '{}'); ?></textarea>
-						<p class="base3-chatbot-config-help">
-							Only used for custom reference mode. Must be valid JSON.
-						</p>
-					</div>
+			<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
+				<legend><?php echo $e($t('features_label', 'Features')); ?></legend>
+				<div class="base3-chatbot-config-checkboxes">
+					<label>
+						<input type="checkbox" name="use_markdown" value="1"<?php echo $checked($values['use_markdown'] ?? false); ?> />
+						<?php echo $e($t('feature_markdown', 'Enable markdown rendering')); ?>
+					</label>
+					<label>
+						<input type="checkbox" name="use_mathjax" value="1"<?php echo $checked($values['use_mathjax'] ?? false); ?> />
+						<?php echo $e($t('feature_mathjax', 'Enable mathematical formula rendering')); ?>
+					</label>
+					<label>
+						<input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
+						<?php echo $e($t('feature_icons', 'Show dialog action icons')); ?>
+					</label>
 				</div>
-
-				<div class="base3-chatbot-config-row">
-					<label for="<?php echo $e($formId); ?>_reference_provider" class="base3-chatbot-config-label">Reference provider</label>
-					<div>
-						<input type="text" id="<?php echo $e($formId); ?>_reference_provider" name="reference_provider" class="form-control" value="<?php echo $e($values['reference_provider'] ?? ''); ?>" />
-						<p class="base3-chatbot-config-help">
-							Global JavaScript function name used by provider reference mode.
-						</p>
-					</div>
-				</div>
-			</div>
-		</details>
-
-		<div class="base3-chatbot-config-section">
-			<h3>Chatbot backend</h3>
+			</fieldset>
 
 			<div class="base3-chatbot-config-row">
-				<label for="<?php echo $e($formId); ?>_backend" class="base3-chatbot-config-label">Backend</label>
+				<label for="<?php echo $e($formId); ?>_transport_mode" class="base3-chatbot-config-label"><?php echo $e($t('transport_mode_label', 'Response delivery')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_transport_mode" name="transport_mode" class="form-control" aria-describedby="<?php echo $e($formId); ?>_transport_mode_help">
+						<option value="auto"<?php echo $selected($values['transport_mode'] ?? 'auto', 'auto'); ?>><?php echo $e($t('transport_option_auto', 'Automatic (recommended)')); ?></option>
+						<option value="sse"<?php echo $selected($values['transport_mode'] ?? 'auto', 'sse'); ?>><?php echo $e($t('transport_option_sse', 'Show while generated (SSE)')); ?></option>
+						<option value="rest"<?php echo $selected($values['transport_mode'] ?? 'auto', 'rest'); ?>><?php echo $e($t('transport_option_rest', 'Show when complete (REST)')); ?></option>
+					</select>
+					<p id="<?php echo $e($formId); ?>_transport_mode_help" class="base3-chatbot-config-help"><?php echo $e($t('transport_mode_help', 'Automatic selects the best available mode. Live delivery shows the answer while it is being generated. Complete delivery waits until the full answer is ready.')); ?></p>
+				</div>
+			</div>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_ai_notice_text" class="base3-chatbot-config-label"><?php echo $e($t('ai_notice_label', 'AI notice')); ?></label>
+				<div>
+					<textarea id="<?php echo $e($formId); ?>_ai_notice_text" name="ai_notice_text" class="form-control" rows="3" required="required" aria-describedby="<?php echo $e($formId); ?>_ai_notice_help"><?php echo $e($values['ai_notice_text'] ?? ''); ?></textarea>
+					<p id="<?php echo $e($formId); ?>_ai_notice_help" class="base3-chatbot-config-help"><?php echo $e($t('ai_notice_help', 'This visible notice is displayed directly below the message composer.')); ?></p>
+				</div>
+			</div>
+
+			<fieldset class="base3-chatbot-config-row base3-chatbot-config-fieldset">
+				<legend><?php echo $e($t('reference_section', 'Reference context')); ?></legend>
+				<div>
+					<label for="<?php echo $e($formId); ?>_reference_mode" class="base3-chatbot-visually-hidden"><?php echo $e($t('reference_mode_label', 'Reference mode')); ?></label>
+					<select id="<?php echo $e($formId); ?>_reference_mode" name="reference_mode" class="form-control" aria-describedby="<?php echo $e($formId); ?>_reference_mode_help">
+						<option value="none"<?php echo $selected($currentReferenceMode, 'none'); ?>><?php echo $e($t('reference_option_none', 'None')); ?></option>
+						<option value="url"<?php echo $selected($currentReferenceMode, 'url'); ?>><?php echo $e($t('reference_option_url', 'Current URL')); ?></option>
+						<option value="custom"<?php echo $selected($currentReferenceMode, 'custom'); ?>><?php echo $e($t('reference_option_custom', 'Custom JSON')); ?></option>
+						<option value="provider"<?php echo $selected($currentReferenceMode, 'provider'); ?>><?php echo $e($t('reference_option_provider', 'Provider')); ?></option>
+					</select>
+					<p id="<?php echo $e($formId); ?>_reference_mode_help" class="base3-chatbot-config-help">
+						<?php echo $e($t('reference_mode_help', 'Controls which contextual reference is sent with requests. The service can store this in the agent context.')); ?>
+					</p>
+
+					<div
+						class="base3-chatbot-config-reference-field"
+						data-base3-chatbot-reference-custom
+						<?php echo $currentReferenceMode === 'custom' ? '' : 'hidden'; ?>
+					>
+						<label for="<?php echo $e($formId); ?>_reference"><?php echo $e($t('static_reference_label', 'Static reference JSON')); ?></label>
+						<textarea id="<?php echo $e($formId); ?>_reference" name="reference" class="form-control base3-chatbot-config-json"><?php echo $e($values['reference_json'] ?? '{}'); ?></textarea>
+						<p class="base3-chatbot-config-help">
+							<?php echo $e($t('static_reference_help', 'Used only for custom reference mode. Must be valid JSON.')); ?>
+						</p>
+					</div>
+
+					<div
+						class="base3-chatbot-config-reference-field"
+						data-base3-chatbot-reference-provider
+						<?php echo $currentReferenceMode === 'provider' ? '' : 'hidden'; ?>
+					>
+						<label for="<?php echo $e($formId); ?>_reference_provider"><?php echo $e($t('reference_provider_label', 'Reference provider')); ?></label>
+						<input type="text" id="<?php echo $e($formId); ?>_reference_provider" name="reference_provider" class="form-control" value="<?php echo $e($values['reference_provider'] ?? ''); ?>" />
+						<p class="base3-chatbot-config-help">
+							<?php echo $e($t('reference_provider_help', 'Global JavaScript function name used by provider reference mode.')); ?>
+						</p>
+					</div>
+				</div>
+			</fieldset>
+		</div>
+
+		<div class="base3-chatbot-config-group">
+			<h3><?php echo $e($t('voice_section', 'Voice control')); ?></h3>
+
+			<div class="base3-chatbot-config-row">
+				<div class="base3-chatbot-config-label"><?php echo $e($t('voice_enabled_label', 'Activation')); ?></div>
+				<div class="base3-chatbot-config-checkboxes">
+					<label>
+						<input type="checkbox" name="use_voice" value="1"<?php echo $checked($values['use_voice'] ?? false); ?> />
+						<?php echo $e($t('feature_voice', 'Enable voice controls')); ?>
+					</label>
+				</div>
+			</div>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_default_lang" class="base3-chatbot-config-label"><?php echo $e($t('voice_language_label', 'Voice language')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_default_lang" name="default_lang" class="form-control">
+<?php foreach ($languageOptions as $languageValue => $languageLabel) { ?>
+						<option value="<?php echo $e($languageValue); ?>"<?php echo $selected($currentLang, $languageValue); ?>><?php echo $e($languageLabel); ?></option>
+<?php } ?>
+<?php if (!array_key_exists($currentLang, $languageOptions)) { ?>
+						<option value="<?php echo $e($currentLang); ?>" selected="selected"><?php echo $e($t('current_custom_value', 'Current custom value')); ?>: <?php echo $e($currentLang); ?></option>
+<?php } ?>
+					</select>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('voice_language_help', 'Language hint for browser text-to-speech output. Use auto unless the integration should force a specific speech language.')); ?></p>
+				</div>
+			</div>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_speech_to_text_service" class="base3-chatbot-config-label"><?php echo $e($t('speech_to_text_label', 'Speech-to-text service')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_speech_to_text_service" name="speech_to_text_service" class="form-control">
+						<option value=""<?php echo $selected($currentSpeechToTextService, ''); ?>><?php echo $e($t('speech_to_text_browser', 'Browser speech recognition')); ?></option>
+<?php foreach ($speechToTextServices as $speechService) {
+$speechServiceId = (string)($speechService['id'] ?? '');
+if ($speechServiceId === '') continue;
+$speechServiceLabel = trim((string)($speechService['name'] ?? '')) ?: $speechServiceId;
+$driverLabel = trim((string)($speechService['driver'] ?? ''));
+?>
+						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentSpeechToTextService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($driverLabel !== '' ? ' — ' . $driverLabel : '')); ?></option>
+<?php } ?>
+					</select>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('speech_to_text_help', 'A configured realtime service displays interim transcripts while the user is speaking. Browser speech recognition remains available without a service.')); ?></p>
+				</div>
+			</div>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_text_to_speech_service" class="base3-chatbot-config-label"><?php echo $e($t('text_to_speech_label', 'Text-to-speech service')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_text_to_speech_service" name="text_to_speech_service" class="form-control">
+						<option value=""<?php echo $selected($currentTextToSpeechService, ''); ?>><?php echo $e($t('text_to_speech_browser', 'Browser speech synthesis')); ?></option>
+<?php foreach ($textToSpeechServices as $speechService) {
+$speechServiceId = (string)($speechService['id'] ?? '');
+if ($speechServiceId === '') continue;
+$speechServiceLabel = trim((string)($speechService['name'] ?? '')) ?: $speechServiceId;
+$driverLabel = trim((string)($speechService['driver'] ?? ''));
+$voiceLabel = trim((string)($speechService['voice'] ?? ''));
+$details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($value): bool => $value !== ''));
+?>
+						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentTextToSpeechService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($details !== [] ? ' — ' . implode(' / ', $details) : '')); ?></option>
+<?php } ?>
+					</select>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('text_to_speech_help', 'A configured service generates assistant speech through the server. Browser speech synthesis remains available without a service.')); ?></p>
+				</div>
+			</div>
+		</div>
+
+		<div class="base3-chatbot-config-section">
+			<h3><?php echo $e($t('backend_section', 'Chatbot backend')); ?></h3>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_backend" class="base3-chatbot-config-label"><?php echo $e($t('backend_label', 'Backend')); ?></label>
 				<div>
 					<select id="<?php echo $e($formId); ?>_backend" name="chatbot_backend" class="form-control" data-base3-chatbot-backend-select="1">
 <?php if ($backendOptions === []) { ?>
-						<option value="">No chatbot backends found</option>
+						<option value=""><?php echo $e($t('backend_none', 'No chatbot backends found')); ?></option>
 <?php } else { ?>
-						<option value="">Select chatbot backend</option>
+						<option value=""><?php echo $e($t('backend_select', 'Select chatbot backend')); ?></option>
 <?php if ($currentBackend !== '' && !isset($backendOptionIds[$currentBackend])) { ?>
-						<option value="<?php echo $e($currentBackend); ?>" selected="selected" disabled="disabled">Unknown backend: <?php echo $e($currentBackend); ?></option>
+						<option value="<?php echo $e($currentBackend); ?>" selected="selected" disabled="disabled"><?php echo $e($t('backend_unknown_prefix', 'Unknown backend:')); ?> <?php echo $e($currentBackend); ?></option>
 <?php } ?>
 <?php foreach ($backendOptions as $backendOption) {
 	$backendId = (string)($backendOption['id'] ?? '');
@@ -670,12 +659,12 @@
 					</select>
 
 					<p class="base3-chatbot-config-help" data-base3-chatbot-backend-description>
-						<?php echo $e($currentBackendDescription !== '' ? $currentBackendDescription : 'Select the direct dummy service or one of the registered agent runtimes.'); ?>
+						<?php echo $e($currentBackendDescription !== '' ? $currentBackendDescription : $t('backend_description_default', 'Select the direct dummy service or one of the registered agent runtimes.')); ?>
 					</p>
 
 					<p class="base3-chatbot-config-help">
-						Generated endpoint:
-						<code class="base3-chatbot-config-service-url" data-base3-chatbot-backend-url><?php echo $e($currentBackendUrl !== '' ? $currentBackendUrl : 'No endpoint generated.'); ?></code>
+						<?php echo $e($t('generated_endpoint_label', 'Generated endpoint:')); ?>
+						<code class="base3-chatbot-config-service-url" data-base3-chatbot-backend-url><?php echo $e($currentBackendUrl !== '' ? $currentBackendUrl : $t('no_endpoint', 'No endpoint generated.')); ?></code>
 					</p>
 				</div>
 			</div>
@@ -704,7 +693,7 @@
 				</div>
 
 				<button type="<?php echo $renderForm ? 'submit' : 'button'; ?>" class="btn btn-primary base3-chatbot-config-submit" data-base3-chatbot-config-save="1">
-					<?php echo $e($this->_['submit_label'] ?? 'Save'); ?>
+					<?php echo $e($this->_['submit_label'] ?? $t('save', 'Save')); ?>
 				</button>
 			</div>
 		</div>
@@ -735,10 +724,15 @@
 	var backendUrl = root.querySelector('[data-base3-chatbot-backend-url]');
 	var agentConfigRoot = root.querySelector('[data-base3-agent-config-root]');
 	var firstMessageMode = root.querySelector('[name="first_message_mode"]');
+	var referenceMode = root.querySelector('[name="reference_mode"]');
+	var referenceCustomField = root.querySelector('[data-base3-chatbot-reference-custom]');
+	var referenceProviderField = root.querySelector('[data-base3-chatbot-reference-provider]');
 	var mainHeadingsFieldset = root.querySelector('[data-base3-chatbot-main-headings]');
 	var firstMessagesFieldset = root.querySelector('[data-base3-chatbot-first-messages]');
 	var removeLabel = <?php echo json_encode($t('remove', 'Remove'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 	var saveErrorPrefix = <?php echo json_encode($t('save_error_prefix', 'Settings could not be saved:'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+	var backendDescriptionFallback = <?php echo json_encode($t('backend_description_default', 'Select the direct dummy service or one of the registered agent runtimes.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+	var noEndpointLabel = <?php echo json_encode($t('no_endpoint', 'No endpoint generated.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 	var messageLists = {
 		main_headings: {
 			items: root.querySelector('[data-base3-chatbot-message-list-items="main_headings"]'),
@@ -789,6 +783,17 @@
 		}
 	}
 
+	function updateReferenceFields() {
+		var mode = referenceMode ? referenceMode.value : 'url';
+
+		if (referenceCustomField) {
+			referenceCustomField.hidden = mode !== 'custom';
+		}
+		if (referenceProviderField) {
+			referenceProviderField.hidden = mode !== 'provider';
+		}
+	}
+
 	function updateBackend() {
 		if (!backendSelect) {
 			return;
@@ -800,10 +805,10 @@
 		var runtimeId = getRuntimeIdFromBackend(backendSelect.value);
 
 		if (backendDescription) {
-			backendDescription.textContent = description || 'Select the direct dummy service or one of the registered agent runtimes.';
+			backendDescription.textContent = description || backendDescriptionFallback;
 		}
 		if (backendUrl) {
-			backendUrl.textContent = url || 'No endpoint generated.';
+			backendUrl.textContent = url || noEndpointLabel;
 		}
 		if (agentConfigRoot && typeof agentConfigRoot.__base3AgentConfigSelectRuntime === 'function') {
 			agentConfigRoot.__base3AgentConfigSelectRuntime(runtimeId, runtimeId !== '');
@@ -965,6 +970,7 @@
 
 		updateBackend();
 		updateStartModeFields();
+		updateReferenceFields();
 	}
 
 	function save(event) {
@@ -1030,7 +1036,11 @@
 	if (firstMessageMode) {
 		firstMessageMode.addEventListener('change', updateStartModeFields);
 	}
+	if (referenceMode) {
+		referenceMode.addEventListener('change', updateReferenceFields);
+	}
 	updateStartModeFields();
+	updateReferenceFields();
 
 	if (root.tagName && root.tagName.toLowerCase() === 'form') {
 		root.addEventListener('submit', save);
