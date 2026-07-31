@@ -492,10 +492,6 @@ $firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
 						<?php echo $e($t('feature_markdown', 'Enable markdown rendering')); ?>
 					</label>
 					<label>
-						<input type="checkbox" name="use_mathjax" value="1"<?php echo $checked($values['use_mathjax'] ?? false); ?> />
-						<?php echo $e($t('feature_mathjax', 'Enable mathematical formula rendering')); ?>
-					</label>
-					<label>
 						<input type="checkbox" name="use_icons" value="1"<?php echo $checked($values['use_icons'] ?? false); ?> />
 						<?php echo $e($t('feature_icons', 'Show dialog action icons')); ?>
 					</label>
@@ -956,7 +952,7 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 			}
 		});
 
-		['use_markdown', 'use_mathjax', 'use_icons', 'use_voice', 'chat_history_enabled', 'automatic_chat_titles'].forEach(function(key) {
+		['use_markdown', 'use_icons', 'use_voice', 'chat_history_enabled', 'automatic_chat_titles'].forEach(function(key) {
 			var field = root.querySelector('[name="' + key + '"]');
 
 			if (field) {

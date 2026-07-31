@@ -29,6 +29,7 @@ use Chatbot\Output\ChatbotConversationMaterializeOutput;
 use Chatbot\Output\ChatbotConversationRenameOutput;
 use Chatbot\Output\ChatbotConversationStateOutput;
 use Chatbot\Output\ChatbotConversationTitleOutput;
+use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotSettingsService;
 use Throwable;
 use UiFoundation\Api\IChatbotDisplay;
@@ -45,6 +46,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		private readonly IChatbotDisplay $chatbotDisplay,
 		private readonly ILinkTargetService $linkTargetService,
 		private readonly ChatbotSettingsService $settingsService,
+		private readonly ChatbotExtensionService $extensionService,
 		private readonly IAgentRuntimeSelector $agentRuntimeSelector,
 		private readonly ILanguage $language
 	) {}
@@ -82,7 +84,6 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'config_group' => '',
 			'config_name' => '',
 			'use_markdown' => true,
-			'use_mathjax' => false,
 			'use_icons' => true,
 			'use_voice' => true,
 			'chat_history_enabled' => false,
@@ -114,13 +115,21 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			$aiNotice = $this->getDefaultAiNotice();
 		}
 
+		$useMarkdown = $this->toBool($config['use_markdown'] ?? $defaults['use_markdown']);
+		$extensionConfig = $this->extensionService->getClientConfiguration([
+			'use_markdown' => $useMarkdown,
+			'chatbot_config_group' => $group,
+			'chatbot_config_name' => $name
+		]);
+
 		return [
 			'chatbot_backend' => $backend,
 			'service' => $this->getServiceIdFromBackend($backend),
 			'config_group' => $group,
 			'config_name' => $name,
-			'use_markdown' => $this->toBool($config['use_markdown'] ?? $defaults['use_markdown']),
-			'use_mathjax' => $this->toBool($config['use_mathjax'] ?? $defaults['use_mathjax']),
+			'use_markdown' => $useMarkdown,
+			'extensions' => $extensionConfig['plugins'],
+			'extension_plugin_options' => $extensionConfig['plugin_options'],
 			'use_icons' => $this->toBool($config['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($config['use_voice'] ?? $defaults['use_voice']),
 			'use_threads' => false,
@@ -346,7 +355,6 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 				'config_group' => ['type' => 'string', 'default' => ''],
 				'config_name' => ['type' => 'string', 'default' => ''],
 				'use_markdown' => ['type' => 'boolean', 'default' => true],
-				'use_mathjax' => ['type' => 'boolean', 'default' => false],
 				'use_icons' => ['type' => 'boolean', 'default' => true],
 				'use_voice' => ['type' => 'boolean', 'default' => true],
 				'chat_history_enabled' => ['type' => 'boolean', 'default' => true],

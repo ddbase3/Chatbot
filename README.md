@@ -37,7 +37,6 @@ The canonical chatbot UI fields are:
 ```text
 chatbot_backend
 use_markdown
-use_mathjax
 use_icons
 use_voice
 chat_history_enabled
@@ -71,7 +70,7 @@ closed
 - `first_messages` supplies the pool for the random first assistant message and is ignored for the other modes.
 - `contextual_ai` creates an isolated model response using the current reference, context profile and a non-executable description of the configured tools. The result is stored as the first real assistant message.
 
-The `base_prompts` and persisted `use_threads` fields are not part of the configuration model. The ModularChatbot uses the ConversationPlugin for server-backed conversations. The ClassicChatbot fallback receives `use_threads = false` and does not expose its local thread controls.
+The `base_prompts` and persisted `use_threads` fields are not part of the configuration model. The ModularChatbot uses the ConversationPlugin for server-backed conversations.
 
 `ai_notice_text` is mandatory and is intended for the visible notice beneath the message composer. The configuration display loads its new labels from `lang/Configuration`.
 
@@ -159,7 +158,7 @@ The Dummy Chatbot Service also uses the canonical opening-message configuration.
 
 `Chatbot\Content\ChatbotDisplay` remains the stable public BASE3 display. It resolves the chatbot backend, SettingsStore identity, feature configuration and service URLs, then delegates rendering to `UiFoundation\Api\IChatbotDisplay`.
 
-ClientStack owns the browser implementations. The ModularChatbot is the implementation extended by the conversation UI in the next implementation step. ClassicChatbot remains a functional single-chat fallback and is not expanded with a multi-chat interface.
+ClientStack owns the browser implementation. The ModularChatbot is the active implementation and receives optional response extensions through the generic extension configuration supplied by Chatbot.
 
 ## Speech services per chatbot instance
 

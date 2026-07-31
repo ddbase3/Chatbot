@@ -6,14 +6,19 @@ use AssistantFoundation\Api\IAgentEventSink;
 use AssistantFoundation\Api\IAgentExecutionService;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
 use AssistantFoundation\Api\IAgentTextTaskService;
+use AssistantFoundation\Api\IAssistantResponseExtension;
 use AssistantFoundation\Dto\AgentExecutionRequest;
 use AssistantFoundation\Dto\AgentExecutionResult;
+use AssistantFoundation\Dto\AssistantResponseClientPlugin;
 use AssistantRuntime\Service\CollectingAgentEventSink;
+use Base3\Api\IClassMap;
 use Base3\Api\IRequest;
 use Base3\Language\Api\ILanguage;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Service\ChatbotConversationChannelResolver;
+use Chatbot\Service\ChatbotExtensionRegistry;
+use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotOpeningMessageService;
 use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotService;
@@ -32,56 +37,28 @@ final class ChatbotServiceTest extends TestCase {
 		$this->assertSame('chatbotservice', ChatbotService::getName());
 	}
 
-	public function testMathJaxSystemPromptIsAppendedOnlyWhenEnabled(): void {
-		$service = $this->makeService($this->createRequest([]));
-
+	public function testEnabledResponseExtensionContributesSystemPrompt(): void {
+		$disabled = $this->makeService($this->createRequest([]));
 		$this->assertSame(
 			'Configured prompt',
-			$service->getTestSystemPrompt([
+			$disabled->getTestSystemPrompt([
 				'system_prompt' => 'Configured prompt',
-				'use_mathjax' => false
+				'use_markdown' => true
 			])
 		);
 
-		$markdownPrompt = $service->getTestSystemPrompt([
+		$enabled = $this->makeService(
+			$this->createRequest([]),
+			null,
+			$this->createExtensionService(true)
+		);
+		$prompt = $enabled->getTestSystemPrompt([
 			'system_prompt' => 'Configured prompt',
-			'use_mathjax' => true,
 			'use_markdown' => true
 		]);
-		$this->assertStringStartsWith('Configured prompt', $markdownPrompt);
-		$this->assertStringContainsString(
-			'The Markdown renderer preserves standard MathJax delimiters.',
-			$markdownPrompt
-		);
-		$this->assertStringContainsString('do not double delimiter backslashes for Markdown', $markdownPrompt);
-		$this->assertStringContainsString('Use \( ... \) for inline formulas and \[ ... \] for display formulas.', $markdownPrompt);
-		$this->assertStringContainsString('one transformation per row', $markdownPrompt);
-		$this->assertStringContainsString('Never put a derivation or a long chain of equalities on one line.', $markdownPrompt);
-		$this->assertStringContainsString('including expressions in headings, table cells, option lists, captions, hints, and final summaries', $markdownPrompt);
-		$this->assertStringContainsString('Plain parentheses such as ( ... ) are punctuation, not MathJax delimiters.', $markdownPrompt);
-		$this->assertStringContainsString('Do not substitute Unicode mathematical alphabets', $markdownPrompt);
-		$this->assertStringContainsString('\(\mathcal{O}(1/n)\)', $markdownPrompt);
-		$this->assertStringContainsString('\begin{bmatrix}', $markdownPrompt);
-		$this->assertStringContainsString('\mathbf{a} =', $markdownPrompt);
-		$this->assertStringContainsString('1 & 2 & 3', $markdownPrompt);
-		$this->assertStringContainsString('Never imitate a vector or matrix with spaces, tabs, Unicode glyphs, or plain text lines.', $markdownPrompt);
 
-		$plainPrompt = $service->getTestSystemPrompt([
-			'system_prompt' => 'Configured prompt',
-			'use_mathjax' => true,
-			'use_markdown' => false
-		]);
-		$this->assertStringContainsString('The response is rendered without Markdown.', $plainPrompt);
-		$this->assertStringContainsString('Use \( ... \) for inline formulas and \[ ... \] for display formulas.', $plainPrompt);
-		$this->assertStringContainsString('one transformation per row', $plainPrompt);
-		$this->assertStringContainsString('Never put a derivation or a long chain of equalities on one line.', $plainPrompt);
-		$this->assertStringContainsString('including expressions in headings, table cells, option lists, captions, hints, and final summaries', $plainPrompt);
-		$this->assertStringContainsString('Plain parentheses such as ( ... ) are punctuation, not MathJax delimiters.', $plainPrompt);
-		$this->assertStringContainsString('\(\mathcal{O}(1/n)\)', $plainPrompt);
-		$this->assertStringContainsString('\begin{bmatrix}', $plainPrompt);
-		$this->assertStringContainsString('1 & 2 & 3', $plainPrompt);
-		$this->assertStringContainsString('Do not substitute Unicode mathematical alphabets', $plainPrompt);
-		$this->assertStringContainsString('Never imitate a vector or matrix with spaces, tabs, Unicode glyphs, or plain text lines.', $plainPrompt);
+		$this->assertStringStartsWith('Configured prompt', $prompt);
+		$this->assertStringContainsString('Test response extension prompt.', $prompt);
 	}
 
 	public function testGetOutputReturnsEmptyStringWithoutTurn(): void {
@@ -238,7 +215,8 @@ final class ChatbotServiceTest extends TestCase {
 
 	private function makeService(
 		IRequest $request,
-		?IAgentExecutionService $executionService = null
+		?IAgentExecutionService $executionService = null,
+		?ChatbotExtensionService $extensionService = null
 	): TestableChatbotService {
 		$settingsStore = $this->createStub(ISettingsStore::class);
 		$runtimeSelector = $this->createStub(IAgentRuntimeSelector::class);
@@ -258,7 +236,22 @@ final class ChatbotServiceTest extends TestCase {
 			new ChatbotTurnRequestFactory($request),
 			new ChatbotTurnResponder(),
 			new ChatbotConversationChannelResolver(),
+			$extensionService ?? $this->createExtensionService(false),
 			$openingMessageService
+		);
+	}
+
+	private function createExtensionService(bool $enabled): ChatbotExtensionService {
+		$classMap = $this->createStub(IClassMap::class);
+		$classMap->method('getInstancesByInterface')->willReturn([new TestResponseExtension()]);
+		$settingsStore = $this->createStub(ISettingsStore::class);
+		$settingsStore->method('get')->willReturn([
+			'enabled' => ['test-response' => $enabled]
+		]);
+
+		return new ChatbotExtensionService(
+			new ChatbotExtensionRegistry($classMap),
+			$settingsStore
 		);
 	}
 
@@ -283,5 +276,48 @@ final class TestableChatbotService extends ChatbotService {
 			]],
 			'connections' => []
 		];
+	}
+}
+
+final class TestResponseExtension implements IAssistantResponseExtension {
+
+	public static function getName(): string {
+		return 'testresponseextension';
+	}
+
+	public function id(): string {
+		return 'test-response';
+	}
+
+	public function getLabel(): string {
+		return 'Test response';
+	}
+
+	public function getDescription(): string {
+		return 'Test response extension.';
+	}
+
+	public function getPriority(): int {
+		return 100;
+	}
+
+	public function isEnabledByDefault(): bool {
+		return false;
+	}
+
+	public function getRequirements(): array {
+		return [];
+	}
+
+	public function getSystemPrompt(array $context): string {
+		return 'Test response extension prompt.';
+	}
+
+	public function getClientPlugin(array $context): ?AssistantResponseClientPlugin {
+		return null;
+	}
+
+	public function getClientPluginOptions(array $context): array {
+		return [];
 	}
 }

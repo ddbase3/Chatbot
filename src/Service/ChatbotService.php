@@ -38,6 +38,7 @@ class ChatbotService extends AbstractChatbotService {
 		ChatbotTurnRequestFactory $turnRequestFactory,
 		ChatbotTurnResponder $turnResponder,
 		ChatbotConversationChannelResolver $conversationChannelResolver,
+		ChatbotExtensionService $extensionService,
 		private readonly ChatbotOpeningMessageService $openingMessageService
 	) {
 		parent::__construct(
@@ -46,7 +47,8 @@ class ChatbotService extends AbstractChatbotService {
 			$agentExecutionService,
 			$turnRequestFactory,
 			$turnResponder,
-			$conversationChannelResolver
+			$conversationChannelResolver,
+			$extensionService
 		);
 	}
 

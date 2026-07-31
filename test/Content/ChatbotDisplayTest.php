@@ -3,10 +3,13 @@
 namespace Chatbot\Test\Content;
 
 use AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\Api\IClassMap;
 use Base3\Language\Api\ILanguage;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotDisplay;
+use Chatbot\Service\ChatbotExtensionRegistry;
+use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotSettingsService;
 use PHPUnit\Framework\TestCase;
 use UiFoundation\Api\IChatbotDisplay;
@@ -58,7 +61,8 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('/service/chatbotservice', $config['service_url'] ?? null);
 		$this->assertSame('/service/chatbotturnprepare', $config['turn_prepare_url'] ?? null);
 		$this->assertTrue($config['use_markdown'] ?? false);
-		$this->assertFalse($config['use_mathjax'] ?? true);
+		$this->assertSame([], $config['extensions'] ?? null);
+		$this->assertSame([], $config['extension_plugin_options'] ?? null);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
 		$this->assertFalse($config['use_threads'] ?? true);
@@ -133,7 +137,6 @@ class ChatbotDisplayTest extends TestCase {
 		$display->setData([
 			'chatbot_backend' => 'service:dummychatbotservice',
 			'use_markdown' => false,
-			'use_mathjax' => true,
 			'transport_mode' => 'rest',
 			'default_lang' => 'de-DE',
 			'speech_to_text_service' => 'mistral-realtime',
@@ -149,7 +152,6 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('dummychatbotservice', $config['service'] ?? null);
 		$this->assertSame('/service/dummychatbotservice?config_group=chatbot-three&config_name=floating', $config['service_url'] ?? null);
 		$this->assertFalse($config['use_markdown'] ?? true);
-		$this->assertTrue($config['use_mathjax'] ?? false);
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 		$this->assertSame('de-DE', $config['default_lang'] ?? null);
 		$this->assertSame('mistral-realtime', $config['speech_to_text_service'] ?? null);
@@ -171,8 +173,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertArrayHasKey('chatbot_backend', $properties);
 		$this->assertSame('runtime:neuronai', $properties['chatbot_backend']['default'] ?? null);
 		$this->assertSame(['auto', 'sse', 'rest'], $properties['transport_mode']['enum'] ?? null);
-		$this->assertArrayHasKey('use_mathjax', $properties);
-		$this->assertFalse($properties['use_mathjax']['default'] ?? true);
+		$this->assertArrayNotHasKey('use_mathjax', $properties);
 		$this->assertArrayHasKey('text_to_speech_service', $properties);
 		$this->assertNotContains('id', $schema['required'] ?? []);
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
@@ -198,10 +199,17 @@ class ChatbotDisplayTest extends TestCase {
 		$language = $this->createStub(ILanguage::class);
 		$language->method('getLanguage')->willReturn('en');
 
+		$classMap = $this->createStub(IClassMap::class);
+		$classMap->method('getInstancesByInterface')->willReturn([]);
+
 		return new ChatbotDisplay(
 			$chatbotDisplay,
 			$linkTargetService,
 			new ChatbotSettingsService($settingsStore, $runtimeSelector),
+			new ChatbotExtensionService(
+				new ChatbotExtensionRegistry($classMap),
+				$settingsStore
+			),
 			$runtimeSelector,
 			$language
 		);

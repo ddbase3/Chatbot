@@ -31,6 +31,8 @@ use Base3\Session\Api\ISession;
 use Chatbot\Api\IChatbotTurnRequestStore;
 use Chatbot\Service\ChatbotConversationChannelResolver;
 use Chatbot\Service\ChatbotConversationService;
+use Chatbot\Service\ChatbotExtensionRegistry;
+use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotOpeningMessageService;
 use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotServiceRegistry;
@@ -113,6 +115,19 @@ class ChatbotPlugin implements IPlugin {
 			->set(
 				ChatbotServiceRegistry::class,
 				fn($c) => new ChatbotServiceRegistry($c->get(IClassMap::class)),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotExtensionRegistry::class,
+				fn($c) => new ChatbotExtensionRegistry($c->get(IClassMap::class)),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
+				ChatbotExtensionService::class,
+				fn($c) => new ChatbotExtensionService(
+					$c->get(ChatbotExtensionRegistry::class),
+					$c->get(ISettingsStore::class)
+				),
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			);
 	}
