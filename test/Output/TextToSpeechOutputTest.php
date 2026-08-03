@@ -3,6 +3,7 @@
 namespace Chatbot\Test\Output;
 
 use AssistantFoundation\Api\ITextToSpeechService;
+use AssistantFoundation\Api\ITextToSpeechStream;
 use AssistantFoundation\Dto\TextToSpeechRequest;
 use AssistantFoundation\Dto\TextToSpeechResult;
 use Base3\Api\IRequest;
@@ -36,9 +37,16 @@ final class TextToSpeechOutputTest extends TestCase {
 		$service = new class implements ITextToSpeechService {
 			public ?TextToSpeechRequest $request = null;
 
-			public function synthesize(TextToSpeechRequest $request): TextToSpeechResult {
+			public function synthesize(
+				TextToSpeechRequest $request,
+				ITextToSpeechStream $stream
+			): TextToSpeechResult {
 				$this->request = $request;
-				return new TextToSpeechResult('audio-data', 'audio/mpeg');
+				$stream->start('audio/mpeg', ['provider' => 'test']);
+				$stream->write('audio-');
+				$stream->write('data');
+
+				return new TextToSpeechResult('audio/mpeg', ['provider' => 'test']);
 			}
 		};
 		$output = new TextToSpeechOutput($request, $settingsStore, $service);

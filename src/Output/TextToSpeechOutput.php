@@ -22,11 +22,12 @@ use AssistantFoundation\Dto\TextToSpeechRequest;
 use Base3\Api\IOutput;
 use Base3\Api\IRequest;
 use Base3\Settings\Api\ISettingsStore;
+use Chatbot\Service\HttpTextToSpeechStream;
 use RuntimeException;
 use Throwable;
 
 /**
- * Generates one audio response through the service selected for a chatbot instance.
+ * Streams one audio response through the service selected for a chatbot instance.
  */
 final class TextToSpeechOutput implements IOutput {
 
@@ -41,6 +42,8 @@ final class TextToSpeechOutput implements IOutput {
 	}
 
 	public function getOutput(string $out = 'audio', bool $final = false): string {
+		$stream = new HttpTextToSpeechStream($final);
+
 		try {
 			$data = $this->request->getJsonBody();
 			$serviceId = $this->getConfiguredServiceId();
@@ -52,38 +55,36 @@ final class TextToSpeechOutput implements IOutput {
 				return $this->error('Missing text-to-speech input.', 400, $final);
 			}
 
-			$result = $this->textToSpeechService->synthesize(
-				new TextToSpeechRequest($serviceId, $text, $language, $options)
+			$this->textToSpeechService->synthesize(
+				new TextToSpeechRequest($serviceId, $text, $language, $options),
+				$stream
 			);
 
-			if($final && !headers_sent()) {
-				header('Content-Type: ' . $result->getMimeType());
-				header('Content-Length: ' . strlen($result->getAudio()));
-				header('Cache-Control: no-store, private');
-				header('X-Content-Type-Options: nosniff');
-			}
-
-			return $result->getAudio();
+			return $stream->getOutput();
 		}
 		catch(Throwable $exception) {
+			if($final && $stream->hasStarted()) {
+				return '';
+			}
+
 			return $this->error($exception->getMessage(), 500, $final);
 		}
 	}
 
 	public function getHelp(): string {
-		return 'Generates audio through the text-to-speech service selected for one chatbot instance.';
+		return 'Streams audio through the text-to-speech service selected for one chatbot instance.';
 	}
 
 	private function getConfiguredServiceId(): string {
 		$group = trim((string)$this->request->request('config_group', ''));
 		$name = trim((string)$this->request->request('config_name', ''));
-		if ($group === '' || $name === '') {
+		if($group === '' || $name === '') {
 			throw new RuntimeException('Missing chatbot configuration identity.');
 		}
 
 		$settings = $this->settingsStore->get($group, $name, []);
 		$serviceId = $this->normalizeTechnicalKey((string)($settings['text_to_speech_service'] ?? ''));
-		if ($serviceId === '') {
+		if($serviceId === '') {
 			throw new RuntimeException('No text-to-speech service is configured for this chatbot.');
 		}
 
