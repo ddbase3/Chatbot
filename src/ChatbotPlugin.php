@@ -23,6 +23,7 @@ use Base3\Api\IPlugin;
 use AssistantFoundation\Api\IAgentConversationService;
 use AssistantFoundation\Api\IAgentTextTaskService;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
+use AssistantFoundation\Api\IAgentSuspensionRepository;
 use Base3\Api\IRequest;
 use Base3\Language\Api\ILanguage;
 use Base3\Logger\Api\ILogger;
@@ -84,6 +85,7 @@ class ChatbotPlugin implements IPlugin {
 				fn($c) => new ChatbotConversationService(
 					$c->get(IAgentConversationService::class),
 					$c->get(IAgentTextTaskService::class),
+					$c->get(IAgentSuspensionRepository::class),
 					$c->get(ChatbotSettingsService::class),
 					$c->get(ChatbotConversationChannelResolver::class),
 					$c->get(ChatbotOpeningMessageService::class),

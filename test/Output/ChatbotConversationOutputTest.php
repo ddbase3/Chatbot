@@ -5,6 +5,7 @@ namespace Chatbot\Test\Output;
 use AssistantFoundation\Api\IAgentConversationService;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
 use AssistantFoundation\Api\IAgentTextTaskService;
+use AssistantFoundation\Api\IAgentSuspensionRepository;
 use AssistantFoundation\Dto\AgentConversation;
 use AssistantFoundation\Dto\AgentConversationRequest;
 use AssistantFoundation\Dto\AgentConversationState;
@@ -130,6 +131,7 @@ final class ChatbotConversationOutputTest extends TestCase {
 		return new ChatbotConversationService(
 			$conversationRuntime,
 			$textTaskService,
+			$this->createStub(IAgentSuspensionRepository::class),
 			$settingsService,
 			new ChatbotConversationChannelResolver(),
 			new ChatbotOpeningMessageService($textTaskService, $settingsService, $language),

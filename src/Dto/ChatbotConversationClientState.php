@@ -18,6 +18,7 @@
 namespace Chatbot\Dto;
 
 use AssistantFoundation\Dto\AgentConversationState;
+use AssistantFoundation\Dto\AgentSuspensionState;
 
 /**
  * Client-facing conversation state with an optional unsaved draft.
@@ -26,7 +27,8 @@ final class ChatbotConversationClientState {
 
 	public function __construct(
 		private readonly AgentConversationState $state,
-		private readonly ?ChatbotConversationDraft $draft = null
+		private readonly ?ChatbotConversationDraft $draft = null,
+		private readonly ?AgentSuspensionState $pendingSuspension = null
 	) {}
 
 	public function getState(): AgentConversationState {
@@ -37,11 +39,28 @@ final class ChatbotConversationClientState {
 		return $this->draft;
 	}
 
+	public function getPendingSuspension(): ?AgentSuspensionState {
+		return $this->pendingSuspension;
+	}
+
 	/** @return array<string,mixed> */
 	public function toArray(): array {
+		$pending = null;
+		if ($this->pendingSuspension instanceof AgentSuspensionState) {
+			$suspensionState = $this->pendingSuspension->toArray();
+			$pending = [
+				'status' => $suspensionState['status'],
+				'resume_handle' => $suspensionState['resume_handle'],
+				'interaction_requests' => $suspensionState['interaction_requests']
+			];
+		}
+
 		return array_replace(
 			$this->state->toArray(),
-			['draft' => $this->draft?->toClientArray()]
+			[
+				'draft' => $this->draft?->toClientArray(),
+				'pending_interaction' => $pending
+			]
 		);
 	}
 }

@@ -5,9 +5,13 @@ namespace Chatbot\Test\Service;
 use AssistantFoundation\Api\IAgentConversationService;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
 use AssistantFoundation\Api\IAgentTextTaskService;
+use AssistantFoundation\Api\IAgentSuspensionRepository;
 use AssistantFoundation\Dto\AgentConversation;
 use AssistantFoundation\Dto\AgentConversationRequest;
 use AssistantFoundation\Dto\AgentConversationState;
+use AssistantFoundation\Dto\AgentExecutionStatus;
+use AssistantFoundation\Dto\AgentSuspensionScope;
+use AssistantFoundation\Dto\AgentSuspensionState;
 use Base3\Language\Api\ILanguage;
 use Base3\Logger\Api\ILogger;
 use Base3\Session\Api\ISession;
@@ -141,6 +145,39 @@ final class ChatbotConversationServiceTest extends TestCase {
 		$this->assertNull($result->getDraft());
 	}
 
+
+	public function testExistingConversationProjectsPendingSuspensionFromCanonicalRepositoryState(): void {
+		$conversation = $this->conversation('conversation-1');
+		$conversationRuntime = $this->createMock(IAgentConversationService::class);
+		$conversationRuntime->expects($this->once())
+			->method('getState')
+			->willReturn($this->state($conversation));
+		$suspensionRepository = $this->createMock(IAgentSuspensionRepository::class);
+		$suspensionRepository->expects($this->once())
+			->method('findPending')
+			->with(AgentSuspensionScope::forConversation(
+				'chatbot:' . hash('sha256', "chatbot\0example"),
+				'conversation-1'
+			))
+			->willReturn(new AgentSuspensionState(
+				true,
+				AgentExecutionStatus::AWAITING_APPROVAL,
+				[['id' => 'request-1', 'kind' => 'approval']],
+				'scope.resume'
+			));
+
+		$result = $this->createService($conversationRuntime, [], $suspensionRepository)
+			->getState('chatbot', 'example')
+			->toArray();
+
+		$this->assertSame('scope.resume', $result['pending_interaction']['resume_handle'] ?? null);
+		$this->assertSame(
+			AgentExecutionStatus::AWAITING_APPROVAL,
+			$result['pending_interaction']['status'] ?? null
+		);
+		$this->assertSame('request-1', $result['pending_interaction']['interaction_requests'][0]['id'] ?? null);
+	}
+
 	public function testManualRenameUsesManualTitleSource(): void {
 		$conversationRuntime = $this->createMock(IAgentConversationService::class);
 		$conversationRuntime->expects($this->once())
@@ -170,7 +207,8 @@ final class ChatbotConversationServiceTest extends TestCase {
 	/** @param array<string,mixed> $overrides */
 	private function createService(
 		IAgentConversationService $conversationRuntime,
-		array $overrides = []
+		array $overrides = [],
+		?IAgentSuspensionRepository $suspensionRepository = null
 	): ChatbotConversationService {
 		$settings = array_merge([
 			'chatbot_backend' => 'runtime:missionbay',
@@ -200,6 +238,7 @@ final class ChatbotConversationServiceTest extends TestCase {
 		return new ChatbotConversationService(
 			$conversationRuntime,
 			$textTaskService,
+			$suspensionRepository ?? $this->createStub(IAgentSuspensionRepository::class),
 			$settingsService,
 			new ChatbotConversationChannelResolver(),
 			$openingMessageService,

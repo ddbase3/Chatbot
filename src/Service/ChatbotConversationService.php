@@ -19,10 +19,12 @@ namespace Chatbot\Service;
 
 use AssistantFoundation\Api\IAgentConversationService;
 use AssistantFoundation\Api\IAgentTextTaskService;
+use AssistantFoundation\Api\IAgentSuspensionRepository;
 use AssistantFoundation\Dto\AgentConversation;
 use AssistantFoundation\Dto\AgentConversationRequest;
 use AssistantFoundation\Dto\AgentConversationState;
 use AssistantFoundation\Dto\AgentTextTaskRequest;
+use AssistantFoundation\Dto\AgentSuspensionScope;
 use Base3\Logger\Api\ILogger;
 use Chatbot\Dto\ChatbotConversationClientState;
 use Chatbot\Dto\ChatbotConversationDraft;
@@ -36,6 +38,7 @@ final class ChatbotConversationService {
 	public function __construct(
 		private readonly IAgentConversationService $conversationService,
 		private readonly IAgentTextTaskService $textTaskService,
+		private readonly IAgentSuspensionRepository $suspensionRepository,
 		private readonly ChatbotSettingsService $settingsService,
 		private readonly ChatbotConversationChannelResolver $channelResolver,
 		private readonly ChatbotOpeningMessageService $openingMessageService,
@@ -68,7 +71,7 @@ final class ChatbotConversationService {
 		[$settings, $request, $channelId] = $this->createRequest($group, $name, $reference);
 		$state = $this->conversationService->getState($request, $conversationId);
 		if ($state->getActiveConversation() instanceof AgentConversation) {
-			return new ChatbotConversationClientState($state);
+			return $this->clientState($state, $channelId);
 		}
 
 		$draft = $this->draftStore->getLatest($channelId)
@@ -134,7 +137,7 @@ final class ChatbotConversationService {
 
 		$this->draftStore->remove($channelId, $draft->getId());
 
-		return new ChatbotConversationClientState($state);
+		return $this->clientState($state, $channelId);
 	}
 
 	/** @param array<string,mixed> $reference */
@@ -144,12 +147,13 @@ final class ChatbotConversationService {
 		string $conversationId,
 		array $reference = []
 	): ChatbotConversationClientState {
-		[, $request] = $this->createRequest($group, $name, $reference);
-		return new ChatbotConversationClientState(
+		[, $request, $channelId] = $this->createRequest($group, $name, $reference);
+		return $this->clientState(
 			$this->conversationService->activateConversation(
 				$request,
 				$this->requireConversationId($conversationId)
-			)
+			),
+			$channelId
 		);
 	}
 
@@ -190,7 +194,7 @@ final class ChatbotConversationService {
 			$this->requireConversationId($conversationId)
 		);
 		if ($state->getActiveConversation() instanceof AgentConversation) {
-			return new ChatbotConversationClientState($state);
+			return $this->clientState($state, $channelId);
 		}
 
 		return $this->draftClientState(
@@ -297,6 +301,18 @@ final class ChatbotConversationService {
 			],
 			$nodeId
 		), $channelId];
+	}
+
+	private function clientState(AgentConversationState $state, string $channelId): ChatbotConversationClientState {
+		$active = $state->getActiveConversation();
+		if (!$active instanceof AgentConversation) {
+			return new ChatbotConversationClientState($state);
+		}
+
+		$scopeId = AgentSuspensionScope::forConversation($channelId, $active->getId());
+		$pending = $scopeId !== '' ? $this->suspensionRepository->findPending($scopeId) : null;
+
+		return new ChatbotConversationClientState($state, null, $pending);
 	}
 
 	/** @param array<string,mixed> $settings @param array<string,mixed> $reference */
