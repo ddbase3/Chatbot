@@ -21,15 +21,19 @@ use AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
 use AssistantFoundation\Dto\RealtimeSpeechToTextSessionRequest;
 use Base3\Api\IOutput;
 use Base3\Api\IRequest;
+use Base3\Settings\Api\ISettingsStore;
+use RuntimeException;
 use Throwable;
 
 /**
- * Creates one short-lived browser session for realtime speech transcription.
+ * Creates one short-lived browser session for the speech-to-text service
+ * selected for a chatbot instance.
  */
 final class RealtimeSpeechToTextSessionOutput implements IOutput {
 
 	public function __construct(
 		private readonly IRequest $request,
+		private readonly ISettingsStore $settingsStore,
 		private readonly IRealtimeSpeechToTextSessionService $sessionService
 	) {}
 
@@ -38,14 +42,15 @@ final class RealtimeSpeechToTextSessionOutput implements IOutput {
 	}
 
 	public function getOutput(string $out = 'json', bool $final = false): string {
-		if ($final && !headers_sent()) {
+		if($final && !headers_sent()) {
 			header('Content-Type: application/json; charset=UTF-8');
+			header('Cache-Control: no-store, private');
 		}
 
-		$serviceId = trim((string)$this->request->request('service', ''));
 		$language = trim((string)$this->request->request('language', ''));
 
 		try {
+			$serviceId = $this->getConfiguredServiceId();
 			$session = $this->sessionService->createSession(
 				new RealtimeSpeechToTextSessionRequest($serviceId, $language)
 			);
@@ -57,7 +62,7 @@ final class RealtimeSpeechToTextSessionOutput implements IOutput {
 				]
 			]);
 		}
-		catch (Throwable $exception) {
+		catch(Throwable $exception) {
 			return $this->encode([
 				'status' => 'error',
 				'message' => $exception->getMessage()
@@ -66,12 +71,31 @@ final class RealtimeSpeechToTextSessionOutput implements IOutput {
 	}
 
 	public function getHelp(): string {
-		return 'Creates a short-lived realtime speech-to-text browser session.';
+		return 'Creates a short-lived realtime speech-to-text browser session for one chatbot instance.';
 	}
 
-	/**
-	 * @param array<string,mixed> $payload
-	 */
+	private function getConfiguredServiceId(): string {
+		$group = trim((string)$this->request->request('config_group', ''));
+		$name = trim((string)$this->request->request('config_name', ''));
+		if($group === '' || $name === '') {
+			throw new RuntimeException('Missing chatbot configuration identity.');
+		}
+
+		$settings = $this->settingsStore->get($group, $name, []);
+		$serviceId = $this->normalizeTechnicalKey((string)($settings['speech_to_text_service'] ?? ''));
+		if($serviceId === '') {
+			throw new RuntimeException('No speech-to-text service is configured for this chatbot.');
+		}
+
+		return $serviceId;
+	}
+
+	private function normalizeTechnicalKey(string $value): string {
+		$value = strtolower(trim($value));
+		return preg_replace('/[^a-z0-9._-]+/', '', $value) ?? '';
+	}
+
+	/** @param array<string,mixed> $payload */
 	private function encode(array $payload): string {
 		$json = json_encode(
 			$payload,

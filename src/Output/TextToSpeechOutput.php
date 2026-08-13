@@ -55,7 +55,7 @@ final class TextToSpeechOutput implements IOutput {
 				return $this->error('Missing text-to-speech input.', 400, $final);
 			}
 
-			$this->textToSpeechService->synthesize(
+			$this->textToSpeechService->stream(
 				new TextToSpeechRequest($serviceId, $text, $language, $options),
 				$stream
 			);

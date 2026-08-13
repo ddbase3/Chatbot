@@ -601,7 +601,7 @@ $driverLabel = trim((string)($speechService['driver'] ?? ''));
 						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentSpeechToTextService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($driverLabel !== '' ? ' — ' . $driverLabel : '')); ?></option>
 <?php } ?>
 					</select>
-					<p class="base3-chatbot-config-help"><?php echo $e($t('speech_to_text_help', 'A configured realtime service displays interim transcripts while the user is speaking. Browser speech recognition remains available without a service.')); ?></p>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('speech_to_text_help', 'A configured speech-to-text service is used for realtime voice input and displays interim transcripts while the user is speaking. Browser speech recognition remains available without a service.')); ?></p>
 				</div>
 			</div>
 
@@ -621,7 +621,7 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentTextToSpeechService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($details !== [] ? ' — ' . implode(' / ', $details) : '')); ?></option>
 <?php } ?>
 					</select>
-					<p class="base3-chatbot-config-help"><?php echo $e($t('text_to_speech_help', 'A configured service generates assistant speech through the server. Browser speech synthesis remains available without a service.')); ?></p>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('text_to_speech_help', 'A configured text-to-speech service streams assistant speech through the server. Browser speech synthesis remains available without a service.')); ?></p>
 				</div>
 			</div>
 		</div>

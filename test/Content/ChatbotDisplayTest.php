@@ -139,7 +139,7 @@ class ChatbotDisplayTest extends TestCase {
 			'use_markdown' => false,
 			'transport_mode' => 'rest',
 			'default_lang' => 'de-DE',
-			'speech_to_text_service' => 'mistral-realtime',
+			'speech_to_text_service' => 'mistral-default',
 			'text_to_speech_service' => 'openai-default',
 			'config_group' => 'chatbot-three',
 			'config_name' => 'floating'
@@ -154,8 +154,8 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertFalse($config['use_markdown'] ?? true);
 		$this->assertSame('rest', $config['transport_mode'] ?? null);
 		$this->assertSame('de-DE', $config['default_lang'] ?? null);
-		$this->assertSame('mistral-realtime', $config['speech_to_text_service'] ?? null);
-		$this->assertSame('/service/realtimespeechtotextsession?service=mistral-realtime', $config['speech_to_text_session_url'] ?? null);
+		$this->assertSame('mistral-default', $config['speech_to_text_service'] ?? null);
+		$this->assertSame('/service/realtimespeechtotextsession?config_group=chatbot-three&config_name=floating', $config['speech_to_text_session_url'] ?? null);
 		$this->assertSame('openai-default', $config['text_to_speech_service'] ?? null);
 		$this->assertSame('/service/texttospeech?config_group=chatbot-three&config_name=floating', $config['text_to_speech_url'] ?? null);
 		$this->assertTrue($config['use_icons'] ?? false);

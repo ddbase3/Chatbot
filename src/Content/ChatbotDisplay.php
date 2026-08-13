@@ -196,14 +196,14 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	/** @param array<string,mixed> $config */
 	protected function buildSpeechToTextSessionUrl(array $config): string {
-		$serviceId = $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''));
-		if ($serviceId === '') {
+		if ($this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? '')) === '') {
 			return '';
 		}
-		return $this->linkTargetService->getLink(
-			['name' => 'realtimespeechtotextsession'],
-			['service' => $serviceId]
-		);
+		$params = $this->getConfigIdentityParams($config);
+		if ($params === []) {
+			return '';
+		}
+		return $this->linkTargetService->getLink(['name' => 'realtimespeechtotextsession'], $params);
 	}
 
 	/** @param array<string,mixed> $config */

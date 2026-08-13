@@ -110,7 +110,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 			->with('uihk-chatbot', 'default', $this->isType('array'))
 			->willReturn([
 				'chatbot_backend' => 'service:dummychatbotservice',
-				'speech_to_text_service' => 'mistral-realtime',
+				'speech_to_text_service' => 'mistral-default',
 				'text_to_speech_service' => 'openai-default',
 				'use_voice' => true
 			]);
@@ -122,7 +122,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		]);
 
 		$this->assertSame('service:dummychatbotservice', $settings['chatbot_backend'] ?? null);
-		$this->assertSame('mistral-realtime', $settings['speech_to_text_service'] ?? null);
+		$this->assertSame('mistral-default', $settings['speech_to_text_service'] ?? null);
 		$this->assertSame('openai-default', $settings['text_to_speech_service'] ?? null);
 		$this->assertTrue($settings['use_voice'] ?? false);
 	}

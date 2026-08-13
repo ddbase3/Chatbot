@@ -659,10 +659,6 @@ class ChatbotConfigDisplay implements IDisplay {
 				continue;
 			}
 
-			$options = is_array($settings['options'] ?? null) ? $settings['options'] : [];
-			if(strtolower(trim((string)($options['mode'] ?? ''))) !== 'realtime') {
-				continue;
-			}
 
 			$technicalId = $this->normalizeTechnicalKey((string)($settings['id'] ?? $id));
 			if($technicalId === '') {

@@ -164,7 +164,7 @@ ClientStack owns the browser implementation. The ModularChatbot is the active im
 
 `ChatbotConfigDisplay` stores speech selections in the SettingsStore record identified by `config_group` and `config_name`. The public `ChatbotDisplay` uses the same identity and never exposes provider service IDs to the browser.
 
-The browser-facing `realtimespeechtotextsession` and `texttospeech` outputs load the selected service from that chatbot record before delegating to the neutral AssistantFoundation speech contracts. Different chatbot instances can therefore use different STT and TTS services without a global client-side selection.
+The browser-facing `realtimespeechtotextsession` and `texttospeech` outputs load the selected service from that chatbot record before delegating to the neutral AssistantFoundation speech contracts. Different chatbot instances can therefore use different STT and TTS services without a global client-side selection. The chatbot uses realtime sessions for speech input and the streaming TTS operation for assistant speech; the service settings themselves do not store a streaming mode.
 
 An empty STT or TTS selection keeps the corresponding browser speech provider active.
 
