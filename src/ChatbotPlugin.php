@@ -29,6 +29,7 @@ use Base3\Language\Api\ILanguage;
 use Base3\Logger\Api\ILogger;
 use Base3\Settings\Api\ISettingsStore;
 use Base3\Session\Api\ISession;
+use Chatbot\Api\IChatbotAppearanceProvider;
 use Chatbot\Api\IChatbotTurnRequestStore;
 use Chatbot\Service\ChatbotConversationChannelResolver;
 use Chatbot\Service\ChatbotConversationService;
@@ -41,6 +42,7 @@ use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\SessionChatbotConversationDraftStore;
 use Chatbot\Service\SessionChatbotTurnRequestStore;
+use Chatbot\Service\StaticChatbotAppearanceProvider;
 
 class ChatbotPlugin implements IPlugin {
 
@@ -53,6 +55,11 @@ class ChatbotPlugin implements IPlugin {
 	public function init() {
 		$this->container
 			->set(self::getName(), $this, IContainer::SHARED)
+			->set(
+				IChatbotAppearanceProvider::class,
+				fn() => new StaticChatbotAppearanceProvider(),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
 			->set(
 				ChatbotConversationChannelResolver::class,
 				fn() => new ChatbotConversationChannelResolver(),

@@ -514,7 +514,18 @@ $firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
 				<label for="<?php echo $e($formId); ?>_ai_notice_text" class="base3-chatbot-config-label"><?php echo $e($t('ai_notice_label', 'AI notice')); ?></label>
 				<div>
 					<textarea id="<?php echo $e($formId); ?>_ai_notice_text" name="ai_notice_text" class="form-control" rows="3" required="required" aria-describedby="<?php echo $e($formId); ?>_ai_notice_help"><?php echo $e($values['ai_notice_text'] ?? ''); ?></textarea>
-					<p id="<?php echo $e($formId); ?>_ai_notice_help" class="base3-chatbot-config-help"><?php echo $e($t('ai_notice_help', 'This visible notice is displayed directly below the message composer.')); ?></p>
+					<p id="<?php echo $e($formId); ?>_ai_notice_help" class="base3-chatbot-config-help"><?php echo $e($t('ai_notice_text_help', 'Visible notice shown next to the message composer.')); ?></p>
+				</div>
+			</div>
+
+			<div class="base3-chatbot-config-row">
+				<label for="<?php echo $e($formId); ?>_ai_notice_position" class="base3-chatbot-config-label"><?php echo $e($t('ai_notice_position_label', 'AI notice position')); ?></label>
+				<div>
+					<select id="<?php echo $e($formId); ?>_ai_notice_position" name="ai_notice_position" class="form-control" aria-describedby="<?php echo $e($formId); ?>_ai_notice_position_help">
+						<option value="above_composer"<?php echo $selected($values['ai_notice_position'] ?? 'above_composer', 'above_composer'); ?>><?php echo $e($t('ai_notice_position_above', 'Between chat history and message composer')); ?></option>
+						<option value="below_composer"<?php echo $selected($values['ai_notice_position'] ?? 'above_composer', 'below_composer'); ?>><?php echo $e($t('ai_notice_position_below', 'Below message composer')); ?></option>
+					</select>
+					<p id="<?php echo $e($formId); ?>_ai_notice_position_help" class="base3-chatbot-config-help"><?php echo $e($t('ai_notice_position_help', 'Controls whether the AI notice is shown before or after the message composer.')); ?></p>
 				</div>
 			</div>
 
@@ -925,6 +936,7 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 			first_message_mode: 'first_message_mode',
 			chat_history_panel_mode: 'chat_history_panel_mode',
 			ai_notice_text: 'ai_notice_text',
+			ai_notice_position: 'ai_notice_position',
 			default_lang: 'default_lang',
 			speech_to_text_service: 'speech_to_text_service',
 			text_to_speech_service: 'text_to_speech_service',

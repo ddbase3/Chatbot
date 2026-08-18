@@ -46,6 +46,7 @@ main_headings
 first_message_mode
 first_messages
 ai_notice_text
+ai_notice_position
 transport_mode
 reference_mode
 reference
@@ -72,7 +73,7 @@ closed
 
 The `base_prompts` and persisted `use_threads` fields are not part of the configuration model. The ModularChatbot uses the ConversationPlugin for server-backed conversations.
 
-`ai_notice_text` is mandatory and is intended for the visible notice beneath the message composer. The configuration display loads its new labels from `lang/Configuration`.
+`ai_notice_text` is mandatory. `ai_notice_position` accepts `above_composer` and `below_composer`; the default is `above_composer`. The configuration display loads its labels from `lang/Configuration`.
 
 ## Conversation identity
 

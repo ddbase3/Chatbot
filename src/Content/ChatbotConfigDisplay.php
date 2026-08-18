@@ -401,6 +401,11 @@ class ChatbotConfigDisplay implements IDisplay {
 			'first_message_mode' => $firstMessageMode,
 			'first_messages' => $firstMessages,
 			'ai_notice_text' => $aiNoticeText,
+			'ai_notice_position' => $this->normalizeEnum(
+				(string)$this->request->request('ai_notice_position'),
+				['above_composer', 'below_composer'],
+				'above_composer'
+			),
 			'transport_mode' => $this->normalizeEnum(
 				(string)$this->request->request('transport_mode'),
 				['auto', 'sse', 'rest'],
@@ -461,6 +466,11 @@ class ChatbotConfigDisplay implements IDisplay {
 			'first_message_mode' => $firstMessageMode,
 			'first_messages' => $firstMessages,
 			'ai_notice_text' => trim($this->normalizeTextBlock((string)$this->request->request('ai_notice_text'))),
+			'ai_notice_position' => $this->normalizeEnum(
+				(string)$this->request->request('ai_notice_position'),
+				['above_composer', 'below_composer'],
+				'above_composer'
+			),
 			'transport_mode' => $this->normalizeEnum(
 				(string)$this->request->request('transport_mode'),
 				['auto', 'sse', 'rest'],
@@ -756,6 +766,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'first_message_mode' => 'none',
 			'first_messages' => [],
 			'ai_notice_text' => $this->translate('default_ai_notice', self::DEFAULT_AI_NOTICE),
+			'ai_notice_position' => 'above_composer',
 			'transport_mode' => 'auto',
 			'reference_mode' => 'url',
 			'reference' => [],
@@ -797,6 +808,11 @@ class ChatbotConfigDisplay implements IDisplay {
 			'first_message_mode' => $firstMessageMode,
 			'first_messages' => $firstMessages,
 			'ai_notice_text' => $aiNoticeText,
+			'ai_notice_position' => $this->normalizeEnum(
+				(string)($settings['ai_notice_position'] ?? $defaults['ai_notice_position']),
+				['above_composer', 'below_composer'],
+				(string)$defaults['ai_notice_position']
+			),
 			'transport_mode' => $this->normalizeEnum(
 				(string)($settings['transport_mode'] ?? $defaults['transport_mode']),
 				['auto', 'sse', 'rest'],
@@ -841,6 +857,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'first_message_mode' => $settings['first_message_mode'],
 			'first_messages' => $settings['first_messages'],
 			'ai_notice_text' => $settings['ai_notice_text'],
+			'ai_notice_position' => $settings['ai_notice_position'],
 			'transport_mode' => $settings['transport_mode'],
 			'reference_mode' => $settings['reference_mode'],
 			'reference_json' => $this->formatReferenceJson($settings['reference']),

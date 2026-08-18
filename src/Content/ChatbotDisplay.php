@@ -22,6 +22,7 @@ use Base3\Api\IDisplay;
 use Base3\Api\ISchemaProvider;
 use Base3\Language\Api\ILanguage;
 use Base3\LinkTarget\Api\ILinkTargetService;
+use Chatbot\Api\IChatbotAppearanceProvider;
 use Chatbot\Output\ChatbotConversationActivateOutput;
 use Chatbot\Output\ChatbotConversationCreateOutput;
 use Chatbot\Output\ChatbotConversationDeleteOutput;
@@ -48,7 +49,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		private readonly ChatbotSettingsService $settingsService,
 		private readonly ChatbotExtensionService $extensionService,
 		private readonly IAgentRuntimeSelector $agentRuntimeSelector,
-		private readonly ILanguage $language
+		private readonly ILanguage $language,
+		private readonly IChatbotAppearanceProvider $appearanceProvider
 	) {}
 
 	public static function getName(): string {
@@ -89,7 +91,9 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'chat_history_enabled' => false,
 			'chat_history_panel_mode' => 'responsive',
 			'automatic_chat_titles' => false,
+			'first_message_mode' => 'none',
 			'ai_notice_text' => $this->getDefaultAiNotice(),
+			'ai_notice_position' => 'above_composer',
 			'transport_mode' => 'auto',
 			'reference_mode' => 'url',
 			'reference' => [],
@@ -142,7 +146,17 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			),
 			'automatic_chat_titles' => $conversationEnabled
 				&& $this->toBool($config['automatic_chat_titles'] ?? $defaults['automatic_chat_titles']),
+			'first_message_mode' => $this->normalizeEnum(
+				(string)($config['first_message_mode'] ?? $defaults['first_message_mode']),
+				['none', 'random', 'contextual_ai'],
+				'none'
+			),
 			'ai_notice_text' => $aiNotice,
+			'ai_notice_position' => $this->normalizeEnum(
+				(string)($config['ai_notice_position'] ?? $defaults['ai_notice_position']),
+				['above_composer', 'below_composer'],
+				'above_composer'
+			),
 			'transport_mode' => $this->normalizeEnum(
 				(string)($config['transport_mode'] ?? $defaults['transport_mode']),
 				['auto', 'sse', 'rest'],
@@ -157,7 +171,14 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'reference_provider' => trim((string)($config['reference_provider'] ?? '')),
 			'default_lang' => trim((string)($config['default_lang'] ?? 'auto')),
 			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? '')),
-			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? ''))
+			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? '')),
+			'additional_stylesheet' => trim($this->appearanceProvider->getStylesheet()),
+			'message_icons' => [
+				'user' => trim($this->appearanceProvider->getUserMessageIcon()),
+				'assistant' => trim($this->appearanceProvider->getAssistantMessageIcon()),
+				'thinking' => trim($this->appearanceProvider->getThinkingIcon()),
+				'opening' => trim($this->appearanceProvider->getOpeningMessageIcon())
+			]
 		];
 	}
 
@@ -380,6 +401,11 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 					'default' => []
 				],
 				'ai_notice_text' => ['type' => 'string', 'minLength' => 1, 'default' => $this->getDefaultAiNotice()],
+				'ai_notice_position' => [
+					'type' => 'string',
+					'enum' => ['above_composer', 'below_composer'],
+					'default' => 'above_composer'
+				],
 				'transport_mode' => [
 					'type' => 'string',
 					'enum' => ['auto', 'sse', 'rest'],

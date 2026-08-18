@@ -8,6 +8,7 @@ use Base3\Language\Api\ILanguage;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotDisplay;
+use Chatbot\Service\StaticChatbotAppearanceProvider;
 use Chatbot\Service\ChatbotExtensionRegistry;
 use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotSettingsService;
@@ -67,7 +68,14 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertTrue($config['use_voice'] ?? false);
 		$this->assertFalse($config['use_threads'] ?? true);
 		$this->assertFalse($config['conversation_enabled'] ?? true);
+		$this->assertSame('none', $config['first_message_mode'] ?? null);
 		$this->assertSame('', $config['conversation_state_url'] ?? null);
+		$this->assertSame('above_composer', $config['ai_notice_position'] ?? null);
+		$this->assertSame('plugin/Customer/assets/css/chatbot.css', $config['additional_stylesheet'] ?? null);
+		$this->assertSame('', $config['message_icons']['user'] ?? null);
+		$this->assertSame('', $config['message_icons']['assistant'] ?? null);
+		$this->assertSame('plugin/Customer/assets/icons/thinking.svg', $config['message_icons']['thinking'] ?? null);
+		$this->assertSame('plugin/Customer/assets/icons/opening.svg', $config['message_icons']['opening'] ?? null);
 		$this->assertSame('auto', $config['transport_mode'] ?? null);
 		$this->assertSame('auto', $config['default_lang'] ?? null);
 		$this->assertSame('html', $chatbotDisplay->getLastOutputFormat());
@@ -82,6 +90,7 @@ class ChatbotDisplayTest extends TestCase {
 			'memory_profile' => 'database-memory',
 			'chat_history_enabled' => true,
 			'automatic_chat_titles' => true,
+			'first_message_mode' => 'contextual_ai',
 			'ai_notice_text' => 'AI can make mistakes.'
 		]);
 		$display->setData([
@@ -95,6 +104,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertTrue($config['conversation_enabled'] ?? false);
 		$this->assertTrue($config['chat_history_enabled'] ?? false);
 		$this->assertFalse($config['use_threads'] ?? true);
+		$this->assertSame('contextual_ai', $config['first_message_mode'] ?? null);
 		$this->assertSame(
 			'/service/chatbotconversationstate?config_group=chatbot&config_name=with-memory',
 			$config['conversation_state_url'] ?? null
@@ -108,6 +118,7 @@ class ChatbotDisplayTest extends TestCase {
 			$config['conversation_materialize_url'] ?? null
 		);
 		$this->assertSame('AI can make mistakes.', $config['ai_notice_text'] ?? null);
+		$this->assertSame('above_composer', $config['ai_notice_position'] ?? null);
 	}
 
 	public function testStoredBackendOverridesHostDefaultRuntime(): void {
@@ -211,7 +222,14 @@ class ChatbotDisplayTest extends TestCase {
 				$settingsStore
 			),
 			$runtimeSelector,
-			$language
+			$language,
+			new StaticChatbotAppearanceProvider(
+				'plugin/Customer/assets/css/chatbot.css',
+				'',
+				'',
+				'plugin/Customer/assets/icons/thinking.svg',
+				'plugin/Customer/assets/icons/opening.svg'
+			)
 		);
 	}
 }

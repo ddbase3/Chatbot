@@ -48,6 +48,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertFalse($defaults['automatic_chat_titles'] ?? true);
 		$this->assertSame('responsive', $defaults['chat_history_panel_mode'] ?? null);
 		$this->assertNotSame('', trim((string)($defaults['ai_notice_text'] ?? '')));
+		$this->assertSame('above_composer', $defaults['ai_notice_position'] ?? null);
 		$this->assertArrayNotHasKey('base_prompts', $defaults);
 		$this->assertArrayNotHasKey('use_threads', $defaults);
 	}
@@ -68,6 +69,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertSame(['Headline'], $settings['main_headings'] ?? null);
 		$this->assertSame('random', $settings['first_message_mode'] ?? null);
 		$this->assertSame(['Hello'], $settings['first_messages'] ?? null);
+		$this->assertSame('above_composer', $settings['ai_notice_position'] ?? null);
 		$this->assertArrayNotHasKey('start_mode', $settings);
 		$this->assertArrayNotHasKey('start_messages', $settings);
 		$this->assertArrayNotHasKey('base_prompts', $settings);
