@@ -82,7 +82,7 @@ final class ChatbotTurnStreamOutput implements IOutput {
 				'The chat stream could not be started.'
 			)
 		]));
-		$sink->emit(new AgentExecutionEvent('done', ['status' => 'error']));
+		$sink->finish('error');
 
 		return '';
 	}

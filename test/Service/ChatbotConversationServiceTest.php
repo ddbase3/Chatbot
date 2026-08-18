@@ -162,7 +162,10 @@ final class ChatbotConversationServiceTest extends TestCase {
 			->willReturn(new AgentSuspensionState(
 				true,
 				AgentExecutionStatus::AWAITING_APPROVAL,
-				[['id' => 'request-1', 'kind' => 'approval']],
+				[
+					['id' => 'request-1', 'kind' => 'approval'],
+					['id' => 'request-2', 'kind' => 'approval']
+				],
 				'scope.resume'
 			));
 
@@ -175,7 +178,9 @@ final class ChatbotConversationServiceTest extends TestCase {
 			AgentExecutionStatus::AWAITING_APPROVAL,
 			$result['pending_interaction']['status'] ?? null
 		);
+		$this->assertSame(2, count($result['pending_interaction']['interaction_requests'] ?? []));
 		$this->assertSame('request-1', $result['pending_interaction']['interaction_requests'][0]['id'] ?? null);
+		$this->assertSame('request-2', $result['pending_interaction']['interaction_requests'][1]['id'] ?? null);
 	}
 
 	public function testManualRenameUsesManualTitleSource(): void {

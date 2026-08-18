@@ -88,9 +88,7 @@ final class ChatbotTurnResponder {
 					'code' => $exception->getCode()
 				]));
 			}
-			if (!$sink->hasEmitted('done')) {
-				$sink->emit(new AgentExecutionEvent('done', ['status' => 'error']));
-			}
+			$sink->finish('error');
 		}
 
 		return '';
@@ -144,10 +142,20 @@ final class ChatbotTurnResponder {
 			]));
 		}
 
-		if (!$sink->hasEmitted('done')) {
-			$sink->emit(new AgentExecutionEvent('done', [
-				'status' => $result->getType() === 'error' ? 'error' : 'completed'
-			]));
+		$sink->finish($this->resolveTerminalStatus($result, $payload));
+	}
+
+	/** @param array<string,mixed> $payload */
+	private function resolveTerminalStatus(ChatbotTurnResult $result, array $payload): ?string {
+		if ($result->getType() === 'error') {
+			return 'error';
 		}
+
+		if ($result->getType() === 'interaction_required') {
+			$status = trim((string)($payload['status'] ?? ''));
+			return $status !== '' ? $status : 'interaction_required';
+		}
+
+		return null;
 	}
 }

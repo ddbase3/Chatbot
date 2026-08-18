@@ -22,10 +22,18 @@ use AssistantFoundation\Dto\AgentExecutionEvent;
 
 /**
  * Chatbot-owned Server-Sent Events sink.
+ *
+ * Runtime done events are held until ChatbotTurnResponder commits the final
+ * chatbot result. This keeps transport completion behind the boundary that
+ * knows whether the turn completed, failed, or suspended for interaction.
  */
 final class SseAgentEventSink implements IAgentEventSink {
 
 	private bool $started = false;
+	private bool $finished = false;
+
+	/** @var array<string,mixed> */
+	private array $pendingTerminalPayload = [];
 
 	/** @var array<string,bool> */
 	private array $emittedEvents = [];
@@ -64,19 +72,57 @@ final class SseAgentEventSink implements IAgentEventSink {
 	}
 
 	public function emit(AgentExecutionEvent $event): void {
-		if ($this->isCancelled()) {
+		if ($this->isCancelled() || $this->finished) {
 			return;
 		}
-		$this->start();
 
 		$name = trim($event->getName());
+		if ($name === 'done') {
+			$this->pendingTerminalPayload = $event->getPayload();
+			return;
+		}
+
+		$this->writeEvent($name, $event->getPayload());
+	}
+
+	public function finish(?string $status = null): void {
+		if ($this->isCancelled() || $this->finished) {
+			return;
+		}
+
+		$this->finished = true;
+		$payload = $this->pendingTerminalPayload;
+		$terminalStatus = trim((string)$status);
+		if ($terminalStatus !== '') {
+			$payload['status'] = $terminalStatus;
+		}
+		elseif (trim((string)($payload['status'] ?? '')) === '') {
+			$payload['status'] = 'completed';
+		}
+		$this->writeEvent('done', $payload);
+		$this->pendingTerminalPayload = [];
+	}
+
+	public function isCancelled(): bool {
+		return connection_aborted() === 1;
+	}
+
+	public function hasEmitted(string $eventName): bool {
+		return isset($this->emittedEvents[$eventName]);
+	}
+
+	/** @param array<string,mixed> $payload */
+	private function writeEvent(string $name, array $payload): void {
+		$this->start();
+
+		$name = trim($name);
 		if ($name === '') {
 			$name = 'message';
 		}
 		$this->emittedEvents[$name] = true;
 
 		$json = json_encode(
-			$event->getPayload(),
+			$payload,
 			JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
 		);
 		if (!is_string($json)) {
@@ -86,13 +132,5 @@ final class SseAgentEventSink implements IAgentEventSink {
 		echo 'event: ' . $name . "\n";
 		echo 'data: ' . $json . "\n\n";
 		@flush();
-	}
-
-	public function isCancelled(): bool {
-		return connection_aborted() === 1;
-	}
-
-	public function hasEmitted(string $eventName): bool {
-		return isset($this->emittedEvents[$eventName]);
 	}
 }
