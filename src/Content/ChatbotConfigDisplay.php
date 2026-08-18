@@ -557,10 +557,14 @@ class ChatbotConfigDisplay implements IDisplay {
 			}
 
 			$label = trim((string)$class::getServiceLabel()) ?: $serviceId;
+			$description = trim((string)$class::getServiceDescription());
 			$rows[] = [
 				'id' => self::BACKEND_SERVICE_PREFIX . $serviceId,
-				'label' => $label,
-				'description' => trim((string)$class::getServiceDescription()),
+				'label' => $this->translate('backend_service_' . $serviceId . '_label', $label),
+				'description' => $this->translate(
+					'backend_service_' . $serviceId . '_description',
+					$description
+				),
 				'url' => $this->buildServiceUrl($serviceId, $context)
 			];
 		}

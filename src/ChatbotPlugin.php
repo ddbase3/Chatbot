@@ -108,7 +108,7 @@ class ChatbotPlugin implements IPlugin {
 			)
 			->set(
 				ChatbotTurnResponder::class,
-				fn() => new ChatbotTurnResponder(),
+				fn($c) => new ChatbotTurnResponder($c->get(ILanguage::class)),
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			)
 			->set(

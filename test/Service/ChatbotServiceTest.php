@@ -234,7 +234,7 @@ final class ChatbotServiceTest extends TestCase {
 			$settingsService,
 			$executionService ?? $this->createStub(IAgentExecutionService::class),
 			new ChatbotTurnRequestFactory($request),
-			new ChatbotTurnResponder(),
+			new ChatbotTurnResponder($this->createStub(ILanguage::class)),
 			new ChatbotConversationChannelResolver(),
 			$extensionService ?? $this->createExtensionService(false),
 			$openingMessageService

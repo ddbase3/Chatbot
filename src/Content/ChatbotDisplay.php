@@ -123,7 +123,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		$extensionConfig = $this->extensionService->getClientConfiguration([
 			'use_markdown' => $useMarkdown,
 			'chatbot_config_group' => $group,
-			'chatbot_config_name' => $name
+			'chatbot_config_name' => $name,
+			'language' => $this->getCurrentLanguage()
 		]);
 
 		return [
@@ -320,11 +321,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			return $this->defaultAiNotice;
 		}
 
-		$language = strtolower(str_replace('_', '-', trim($this->language->getLanguage())));
-		$language = explode('-', $language)[0] ?? 'en';
-		if (!in_array($language, ['de', 'en', 'fr', 'es', 'ru'], true)) {
-			$language = 'en';
-		}
+		$language = $this->getCurrentLanguage();
 
 		$basePath = defined('DIR_PLUGIN') ? DIR_PLUGIN . 'Chatbot/lang/Configuration/' : '';
 		$files = $basePath === ''
@@ -346,6 +343,15 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 		$this->defaultAiNotice = self::DEFAULT_AI_NOTICE;
 		return $this->defaultAiNotice;
+	}
+
+
+	private function getCurrentLanguage(): string {
+		$language = strtolower(str_replace('_', '-', trim($this->language->getLanguage())));
+		$language = explode('-', $language)[0] ?? 'en';
+		return in_array($language, ['ar', 'bg', 'de', 'en', 'es', 'fr', 'hi', 'it', 'pl', 'pt', 'ru', 'zh'], true)
+			? $language
+			: 'en';
 	}
 
 	protected function normalizeTechnicalKey(string $value): string {

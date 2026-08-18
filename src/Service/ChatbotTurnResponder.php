@@ -19,6 +19,7 @@ namespace Chatbot\Service;
 
 use AssistantFoundation\Dto\AgentExecutionEvent;
 use AssistantRuntime\Service\CollectingAgentEventSink;
+use Base3\Language\Api\ILanguage;
 use Chatbot\Api\IChatbotService;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Dto\ChatbotTurnResult;
@@ -28,6 +29,10 @@ use Throwable;
  * Shared REST and SSE response handling for every chatbot backend.
  */
 final class ChatbotTurnResponder {
+
+	public function __construct(
+		private readonly ILanguage $language
+	) {}
 
 	public static function getName(): string {
 		return 'chatbotturnresponder';
@@ -68,7 +73,10 @@ final class ChatbotTurnResponder {
 			$this->emitTerminalFallbacks($sink, $result);
 		}
 		catch (Throwable $exception) {
-			$userMessage = 'Es ist ein technischer Fehler aufgetreten. Die Anfrage konnte nicht vollständig abgeschlossen werden.';
+			$userMessage = $this->getUserMessage(
+				'runtime_error',
+				'A technical error occurred. The request could not be completed.'
+			);
 			if (!$sink->hasEmitted('token')) {
 				$sink->emit(new AgentExecutionEvent('token', ['text' => $userMessage]));
 			}
@@ -86,6 +94,33 @@ final class ChatbotTurnResponder {
 		}
 
 		return '';
+	}
+
+	public function getUserMessage(string $key, string $fallback): string {
+		$language = strtolower(str_replace('_', '-', trim($this->language->getLanguage())));
+		$language = explode('-', $language)[0] ?? 'en';
+		if (!in_array($language, ['ar', 'bg', 'de', 'en', 'es', 'fr', 'hi', 'it', 'pl', 'pt', 'ru', 'zh'], true)) {
+			$language = 'en';
+		}
+
+		$basePath = defined('DIR_PLUGIN') ? DIR_PLUGIN . 'Chatbot/lang/Configuration/' : '';
+		$files = $basePath === ''
+			? []
+			: array_values(array_unique([$basePath . $language . '.ini', $basePath . 'en.ini']));
+
+		foreach ($files as $filename) {
+			if (!is_file($filename) || !is_readable($filename)) {
+				continue;
+			}
+			$data = parse_ini_file($filename, true);
+			$section = is_array($data['chatbot_configuration'] ?? null) ? $data['chatbot_configuration'] : [];
+			$value = $section[$key] ?? null;
+			if (is_scalar($value) && trim((string)$value) !== '') {
+				return trim((string)$value);
+			}
+		}
+
+		return $fallback;
 	}
 
 	private function emitTerminalFallbacks(SseAgentEventSink $sink, ChatbotTurnResult $result): void {

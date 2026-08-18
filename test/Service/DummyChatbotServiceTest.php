@@ -93,7 +93,7 @@ final class DummyChatbotServiceTest extends TestCase {
 		return new DummyChatbotService(
 			$request,
 			new ChatbotTurnRequestFactory($request),
-			new ChatbotTurnResponder(),
+			new ChatbotTurnResponder($this->createStub(ILanguage::class)),
 			$settingsService,
 			new ChatbotOpeningMessageService(
 				$this->createStub(IAgentTextTaskService::class),
