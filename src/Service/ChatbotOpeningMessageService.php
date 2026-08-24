@@ -86,7 +86,7 @@ final class ChatbotOpeningMessageService {
 			return $this->createContextualMessage($settings, $reference);
 		}
 
-		$messages = $this->normalizeMessages($settings['first_messages'] ?? []);
+		$messages = $this->normalizeConfiguredMessages($settings['first_messages'] ?? []);
 		if ($messages === []) {
 			throw new \RuntimeException('Random first-message mode requires at least one message.');
 		}
@@ -150,6 +150,28 @@ final class ChatbotOpeningMessageService {
 	}
 
 	/** @return array<int,string> */
+	private function normalizeConfiguredMessages(mixed $value): array {
+		if (is_string($value)) {
+			$value = [$value];
+		}
+		if (!is_array($value)) {
+			return [];
+		}
+
+		$result = [];
+		foreach ($value as $message) {
+			if (!is_scalar($message) && $message !== null) {
+				continue;
+			}
+			$message = $this->normalizeConfiguredPlainText((string)$message);
+			if ($message !== '') {
+				$result[] = $message;
+			}
+		}
+		return array_values($result);
+	}
+
+	/** @return array<int,string> */
 	private function normalizeMessages(mixed $value): array {
 		if (is_string($value)) {
 			$value = [$value];
@@ -169,6 +191,13 @@ final class ChatbotOpeningMessageService {
 			}
 		}
 		return array_values($result);
+	}
+
+	private function normalizeConfiguredPlainText(string $value): string {
+		$value = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+		$value = preg_replace('/[`*_#>~]+/u', '', $value) ?? $value;
+		$value = str_replace(["\r\n", "\r"], "\n", $value);
+		return trim($value);
 	}
 
 	private function normalizePlainText(string $value, int $maxLength): string {

@@ -277,9 +277,16 @@
 		margin: 0 0 7px;
 	}
 
-	.base3-chatbot-config-message-row input[type="text"] {
+	.base3-chatbot-config-message-row input[type="text"],
+	.base3-chatbot-config-message-row textarea {
 		max-width: none;
 		flex: 1 1 auto;
+	}
+
+	.base3-chatbot-config-message-row textarea {
+		min-height: 54px;
+		font-family: inherit;
+		resize: vertical;
 	}
 
 	.base3-chatbot-config-message-remove,
@@ -436,7 +443,7 @@ $firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
 ?>
 							<div class="base3-chatbot-config-message-row">
 								<label class="base3-chatbot-visually-hidden" for="<?php echo $e($firstMessageId); ?>"><?php echo $e($t('first_message_item_label', 'First assistant message')); ?> <?php echo $e((string)($firstMessageIndex + 1)); ?></label>
-								<input id="<?php echo $e($firstMessageId); ?>" type="text" name="first_messages[]" class="form-control" value="<?php echo $e($firstMessage); ?>" placeholder="<?php echo $e($t('first_message_placeholder', 'How can I help you?')); ?>" />
+								<textarea id="<?php echo $e($firstMessageId); ?>" name="first_messages[]" class="form-control" rows="2" placeholder="<?php echo $e($t('first_message_placeholder', 'How can I help you?')); ?>"><?php echo $e($firstMessage); ?></textarea>
 								<button type="button" class="btn btn-default base3-chatbot-config-message-remove" data-base3-chatbot-message-remove="first_messages"><?php echo $e($t('remove', 'Remove')); ?></button>
 							</div>
 <?php } ?>
@@ -753,7 +760,8 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 			add: root.querySelector('[data-base3-chatbot-message-add="first_messages"]'),
 			label: <?php echo json_encode($t('first_message_item_label', 'First assistant message'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
 			placeholder: <?php echo json_encode($t('first_message_placeholder', 'How can I help you?'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-			idPrefix: <?php echo json_encode($formId . '_first_message_dynamic_', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+			idPrefix: <?php echo json_encode($formId . '_first_message_dynamic_', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+			multiline: true
 		}
 	};
 	Object.keys(messageLists).forEach(function(key) {
@@ -830,7 +838,7 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 
 		var row = document.createElement('div');
 		var label = document.createElement('label');
-		var input = document.createElement('input');
+		var input = document.createElement(config.multiline ? 'textarea' : 'input');
 		var remove = document.createElement('button');
 		var inputId = config.idPrefix + config.counter;
 		config.counter += 1;
@@ -841,7 +849,11 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 		label.appendChild(document.createTextNode(config.label + ' ' + config.counter));
 
 		input.id = inputId;
-		input.type = 'text';
+		if (config.multiline) {
+			input.rows = 2;
+		} else {
+			input.type = 'text';
+		}
 		input.name = key + '[]';
 		input.className = 'form-control';
 		input.value = value || '';

@@ -76,6 +76,18 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertArrayNotHasKey('use_threads', $settings);
 	}
 
+	public function testNormalizationPreservesMultilineFirstMessagesWithoutLengthLimit(): void {
+		$message = "First paragraph.\n\nSecond paragraph.\n" . str_repeat('x', 800);
+		$settings = $this->createDisplay()->normalizeTestSettings([
+			'chatbot_backend' => 'runtime:missionbay',
+			'first_message_mode' => 'random',
+			'first_messages' => [$message],
+			'ai_notice_text' => 'AI can make mistakes.'
+		]);
+
+		$this->assertSame([$message], $settings['first_messages'] ?? null);
+	}
+
 	public function testRemovedFixedFirstMessageModeNormalizesToUserStartsChatAndPreservesMessages(): void {
 		$settings = $this->createDisplay()->normalizeTestSettings([
 			'chatbot_backend' => 'runtime:missionbay',

@@ -32,6 +32,18 @@ final class ChatbotOpeningMessageServiceTest extends TestCase {
 		]));
 	}
 
+	public function testRandomFirstMessagePreservesLineBreaksWithoutLengthLimit(): void {
+		$textTaskService = $this->createMock(IAgentTextTaskService::class);
+		$textTaskService->expects($this->never())->method('executeTextTask');
+		$service = $this->createService($textTaskService);
+		$message = "First paragraph.\n\nSecond paragraph.\n" . str_repeat('x', 800);
+
+		$this->assertSame($message, $service->createAssistantMessage([
+			'first_message_mode' => 'random',
+			'first_messages' => [$message]
+		]));
+	}
+
 	public function testContextualModeIncludesContextAndToolProfilesWithoutExecutingTools(): void {
 		$textTaskService = $this->createMock(IAgentTextTaskService::class);
 		$textTaskService->expects($this->once())
