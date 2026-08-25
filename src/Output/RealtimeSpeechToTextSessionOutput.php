@@ -31,6 +31,8 @@ use Throwable;
  */
 final class RealtimeSpeechToTextSessionOutput implements IOutput {
 
+	private const DISABLED_SERVICE = 'off';
+
 	public function __construct(
 		private readonly IRequest $request,
 		private readonly ISettingsStore $settingsStore,
@@ -48,11 +50,13 @@ final class RealtimeSpeechToTextSessionOutput implements IOutput {
 		}
 
 		$language = trim((string)$this->request->request('language', ''));
+		$context = $this->normalizeContext((string)$this->request->request('context', ''));
 
 		try {
 			$serviceId = $this->getConfiguredServiceId();
+			$options = $context !== '' ? ['context' => $context] : [];
 			$session = $this->sessionService->createSession(
-				new RealtimeSpeechToTextSessionRequest($serviceId, $language)
+				new RealtimeSpeechToTextSessionRequest($serviceId, $language, $options)
 			);
 
 			return $this->encode([
@@ -83,11 +87,22 @@ final class RealtimeSpeechToTextSessionOutput implements IOutput {
 
 		$settings = $this->settingsStore->get($group, $name, []);
 		$serviceId = $this->normalizeTechnicalKey((string)($settings['speech_to_text_service'] ?? ''));
-		if($serviceId === '') {
-			throw new RuntimeException('No speech-to-text service is configured for this chatbot.');
+		if($serviceId === '' || $serviceId === self::DISABLED_SERVICE) {
+			throw new RuntimeException('Speech-to-text is disabled for this chatbot.');
 		}
 
 		return $serviceId;
+	}
+
+
+	private function normalizeContext(string $context): string {
+		$context = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', ' ', $context) ?? '';
+		$context = trim($context);
+		if(strlen($context) > 4000) {
+			$context = substr($context, -4000);
+		}
+
+		return $context;
 	}
 
 	private function normalizeTechnicalKey(string $value): string {

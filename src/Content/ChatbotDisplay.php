@@ -38,6 +38,7 @@ use UiFoundation\Api\IChatbotDisplay;
 class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	private const DEFAULT_AI_NOTICE = 'You are communicating with an AI system. AI-generated responses may be incorrect. Verify important information.';
+	private const DISABLED_VOICE_SERVICE = 'off';
 
 	private array $data = [];
 
@@ -88,6 +89,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'use_markdown' => true,
 			'use_icons' => true,
 			'use_voice' => true,
+			'use_dialog' => true,
 			'chat_history_enabled' => false,
 			'chat_history_panel_mode' => 'responsive',
 			'automatic_chat_titles' => false,
@@ -127,6 +129,16 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'language' => $this->getCurrentLanguage()
 		]);
 
+		$useVoice = $this->toBool($config['use_voice'] ?? $defaults['use_voice']);
+		$speechToTextService = $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''));
+		$textToSpeechService = $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? ''));
+		$speechToTextEnabled = $useVoice && $speechToTextService !== self::DISABLED_VOICE_SERVICE;
+		$textToSpeechEnabled = $useVoice && $textToSpeechService !== self::DISABLED_VOICE_SERVICE;
+		$dialogEnabled = $useVoice
+			&& $speechToTextEnabled
+			&& $textToSpeechEnabled
+			&& $this->toBool($config['use_dialog'] ?? $defaults['use_dialog']);
+
 		return [
 			'chatbot_backend' => $backend,
 			'service' => $this->getServiceIdFromBackend($backend),
@@ -136,7 +148,10 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'extensions' => $extensionConfig['plugins'],
 			'extension_plugin_options' => $extensionConfig['plugin_options'],
 			'use_icons' => $this->toBool($config['use_icons'] ?? $defaults['use_icons']),
-			'use_voice' => $this->toBool($config['use_voice'] ?? $defaults['use_voice']),
+			'use_voice' => $useVoice,
+			'use_dialog' => $dialogEnabled,
+			'speech_to_text_enabled' => $speechToTextEnabled,
+			'text_to_speech_enabled' => $textToSpeechEnabled,
 			'use_threads' => false,
 			'conversation_enabled' => $conversationEnabled,
 			'chat_history_enabled' => $historyEnabled,
@@ -171,8 +186,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'reference' => is_array($config['reference'] ?? null) ? $config['reference'] : [],
 			'reference_provider' => trim((string)($config['reference_provider'] ?? '')),
 			'default_lang' => trim((string)($config['default_lang'] ?? 'auto')),
-			'speech_to_text_service' => $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? '')),
-			'text_to_speech_service' => $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? '')),
+			'speech_to_text_service' => $speechToTextService,
+			'text_to_speech_service' => $textToSpeechService,
 			'additional_stylesheet' => trim($this->appearanceProvider->getStylesheet()),
 			'message_icons' => [
 				'user' => trim($this->appearanceProvider->getUserMessageIcon()),
@@ -218,7 +233,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	/** @param array<string,mixed> $config */
 	protected function buildSpeechToTextSessionUrl(array $config): string {
-		if ($this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? '')) === '') {
+		$serviceId = $this->normalizeTechnicalKey((string)($config['speech_to_text_service'] ?? ''));
+		if (empty($config['speech_to_text_enabled']) || $serviceId === '' || $serviceId === self::DISABLED_VOICE_SERVICE) {
 			return '';
 		}
 		$params = $this->getConfigIdentityParams($config);
@@ -230,7 +246,8 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	/** @param array<string,mixed> $config */
 	protected function buildTextToSpeechUrl(array $config): string {
-		if ($this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? '')) === '') {
+		$serviceId = $this->normalizeTechnicalKey((string)($config['text_to_speech_service'] ?? ''));
+		if (empty($config['text_to_speech_enabled']) || $serviceId === '' || $serviceId === self::DISABLED_VOICE_SERVICE) {
 			return '';
 		}
 		$params = $this->getConfigIdentityParams($config);
@@ -384,6 +401,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 				'use_markdown' => ['type' => 'boolean', 'default' => true],
 				'use_icons' => ['type' => 'boolean', 'default' => true],
 				'use_voice' => ['type' => 'boolean', 'default' => true],
+				'use_dialog' => ['type' => 'boolean', 'default' => true],
 				'chat_history_enabled' => ['type' => 'boolean', 'default' => true],
 				'chat_history_panel_mode' => [
 					'type' => 'string',

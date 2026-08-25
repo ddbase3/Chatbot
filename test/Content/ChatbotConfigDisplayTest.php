@@ -49,6 +49,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertSame('responsive', $defaults['chat_history_panel_mode'] ?? null);
 		$this->assertNotSame('', trim((string)($defaults['ai_notice_text'] ?? '')));
 		$this->assertSame('above_composer', $defaults['ai_notice_position'] ?? null);
+		$this->assertTrue($defaults['use_dialog'] ?? false);
 		$this->assertArrayNotHasKey('base_prompts', $defaults);
 		$this->assertArrayNotHasKey('use_threads', $defaults);
 	}
@@ -126,7 +127,8 @@ final class ChatbotConfigDisplayTest extends TestCase {
 				'chatbot_backend' => 'service:dummychatbotservice',
 				'speech_to_text_service' => 'mistral-default',
 				'text_to_speech_service' => 'openai-default',
-				'use_voice' => true
+				'use_voice' => true,
+				'use_dialog' => false
 			]);
 
 		$display = $this->createDisplay($settingsStore);
@@ -139,6 +141,22 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertSame('mistral-default', $settings['speech_to_text_service'] ?? null);
 		$this->assertSame('openai-default', $settings['text_to_speech_service'] ?? null);
 		$this->assertTrue($settings['use_voice'] ?? false);
+		$this->assertFalse($settings['use_dialog'] ?? true);
+	}
+
+
+	public function testNormalizationPreservesIndependentVoiceSelections(): void {
+		$settings = $this->createDisplay()->normalizeTestSettings([
+			'speech_to_text_service' => 'off',
+			'text_to_speech_service' => '',
+			'use_voice' => true,
+			'use_dialog' => false
+		]);
+
+		$this->assertSame('off', $settings['speech_to_text_service'] ?? null);
+		$this->assertSame('', $settings['text_to_speech_service'] ?? null);
+		$this->assertTrue($settings['use_voice'] ?? false);
+		$this->assertFalse($settings['use_dialog'] ?? true);
 	}
 
 	private function createDisplay(?ISettingsStore $settingsStore = null): TestableChatbotConfigDisplay {

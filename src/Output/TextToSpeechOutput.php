@@ -31,6 +31,8 @@ use Throwable;
  */
 final class TextToSpeechOutput implements IOutput {
 
+	private const DISABLED_SERVICE = 'off';
+
 	public function __construct(
 		private readonly IRequest $request,
 		private readonly ISettingsStore $settingsStore,
@@ -84,8 +86,8 @@ final class TextToSpeechOutput implements IOutput {
 
 		$settings = $this->settingsStore->get($group, $name, []);
 		$serviceId = $this->normalizeTechnicalKey((string)($settings['text_to_speech_service'] ?? ''));
-		if($serviceId === '') {
-			throw new RuntimeException('No text-to-speech service is configured for this chatbot.');
+		if($serviceId === '' || $serviceId === self::DISABLED_SERVICE) {
+			throw new RuntimeException('Text-to-speech is disabled for this chatbot.');
 		}
 
 		return $serviceId;

@@ -88,6 +88,33 @@ final class TextToSpeechOutputTest extends TestCase {
 		$data = json_decode($output->getOutput('audio'), true);
 
 		$this->assertSame('error', $data['status'] ?? null);
-		$this->assertSame('No text-to-speech service is configured for this chatbot.', $data['message'] ?? null);
+		$this->assertSame('Text-to-speech is disabled for this chatbot.', $data['message'] ?? null);
 	}
+
+	public function testOutputRejectsExplicitlyDisabledService(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('request')->willReturnCallback(
+			static fn(string $key, mixed $default = null): mixed => match($key) {
+				'config_group' => 'chatbot-two',
+				'config_name' => 'sidebar',
+				default => $default
+			}
+		);
+		$request->method('getJsonBody')->willReturn([
+			'text' => 'Hallo Welt'
+		]);
+		$settingsStore = $this->createStub(ISettingsStore::class);
+		$settingsStore->method('get')->willReturn([
+			'text_to_speech_service' => 'off'
+		]);
+		$service = $this->createMock(ITextToSpeechService::class);
+		$service->expects($this->never())->method('stream');
+		$output = new TextToSpeechOutput($request, $settingsStore, $service);
+
+		$data = json_decode($output->getOutput('audio'), true);
+
+		$this->assertSame('error', $data['status'] ?? null);
+		$this->assertSame('Text-to-speech is disabled for this chatbot.', $data['message'] ?? null);
+	}
+
 }

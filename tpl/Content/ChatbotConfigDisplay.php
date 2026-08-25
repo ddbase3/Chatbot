@@ -587,6 +587,11 @@ $firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
 						<input type="checkbox" name="use_voice" value="1"<?php echo $checked($values['use_voice'] ?? false); ?> />
 						<?php echo $e($t('feature_voice', 'Enable voice controls')); ?>
 					</label>
+					<label>
+						<input type="checkbox" name="use_dialog" value="1"<?php echo $checked($values['use_dialog'] ?? false); ?> />
+						<?php echo $e($t('feature_dialog', 'Enable alternating voice dialog')); ?>
+					</label>
+					<p class="base3-chatbot-config-help"><?php echo $e($t('dialog_help', 'When enabled, about three seconds of silence ends and sends the spoken turn. When disabled, only the microphone button ends recording.')); ?></p>
 				</div>
 			</div>
 
@@ -609,6 +614,7 @@ $firstMessageId = $formId . '_first_message_' . $firstMessageIndex;
 				<label for="<?php echo $e($formId); ?>_speech_to_text_service" class="base3-chatbot-config-label"><?php echo $e($t('speech_to_text_label', 'Speech-to-text service')); ?></label>
 				<div>
 					<select id="<?php echo $e($formId); ?>_speech_to_text_service" name="speech_to_text_service" class="form-control">
+						<option value="off"<?php echo $selected($currentSpeechToTextService, 'off'); ?>><?php echo $e($t('voice_service_off', 'Aus')); ?></option>
 						<option value=""<?php echo $selected($currentSpeechToTextService, ''); ?>><?php echo $e($t('speech_to_text_browser', 'Browser speech recognition')); ?></option>
 <?php foreach ($speechToTextServices as $speechService) {
 $speechServiceId = (string)($speechService['id'] ?? '');
@@ -616,7 +622,7 @@ if ($speechServiceId === '') continue;
 $speechServiceLabel = trim((string)($speechService['name'] ?? '')) ?: $speechServiceId;
 $driverLabel = trim((string)($speechService['driver'] ?? ''));
 ?>
-						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentSpeechToTextService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($driverLabel !== '' ? ' — ' . $driverLabel : '')); ?></option>
+						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentSpeechToTextService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($driverLabel !== '' ? ' / ' . $driverLabel : '')); ?></option>
 <?php } ?>
 					</select>
 					<p class="base3-chatbot-config-help"><?php echo $e($t('speech_to_text_help', 'A configured speech-to-text service is used for realtime voice input and displays interim transcripts while the user is speaking. Browser speech recognition remains available without a service.')); ?></p>
@@ -627,6 +633,7 @@ $driverLabel = trim((string)($speechService['driver'] ?? ''));
 				<label for="<?php echo $e($formId); ?>_text_to_speech_service" class="base3-chatbot-config-label"><?php echo $e($t('text_to_speech_label', 'Text-to-speech service')); ?></label>
 				<div>
 					<select id="<?php echo $e($formId); ?>_text_to_speech_service" name="text_to_speech_service" class="form-control">
+						<option value="off"<?php echo $selected($currentTextToSpeechService, 'off'); ?>><?php echo $e($t('voice_service_off', 'Aus')); ?></option>
 						<option value=""<?php echo $selected($currentTextToSpeechService, ''); ?>><?php echo $e($t('text_to_speech_browser', 'Browser speech synthesis')); ?></option>
 <?php foreach ($textToSpeechServices as $speechService) {
 $speechServiceId = (string)($speechService['id'] ?? '');
@@ -636,7 +643,7 @@ $driverLabel = trim((string)($speechService['driver'] ?? ''));
 $voiceLabel = trim((string)($speechService['voice'] ?? ''));
 $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($value): bool => $value !== ''));
 ?>
-						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentTextToSpeechService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($details !== [] ? ' — ' . implode(' / ', $details) : '')); ?></option>
+						<option value="<?php echo $e($speechServiceId); ?>"<?php echo $selected($currentTextToSpeechService, $speechServiceId); ?>><?php echo $e($speechServiceLabel . ($details !== [] ? ' / ' . implode(' / ', $details) : '')); ?></option>
 <?php } ?>
 					</select>
 					<p class="base3-chatbot-config-help"><?php echo $e($t('text_to_speech_help', 'A configured text-to-speech service streams assistant speech through the server. Browser speech synthesis remains available without a service.')); ?></p>
@@ -976,7 +983,7 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 			}
 		});
 
-		['use_markdown', 'use_icons', 'use_voice', 'chat_history_enabled', 'automatic_chat_titles'].forEach(function(key) {
+		['use_markdown', 'use_icons', 'use_voice', 'use_dialog', 'chat_history_enabled', 'automatic_chat_titles'].forEach(function(key) {
 			var field = root.querySelector('[name="' + key + '"]');
 
 			if (field) {

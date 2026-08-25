@@ -39,6 +39,7 @@ chatbot_backend
 use_markdown
 use_icons
 use_voice
+use_dialog
 chat_history_enabled
 chat_history_panel_mode
 automatic_chat_titles
@@ -55,6 +56,9 @@ default_lang
 speech_to_text_service
 text_to_speech_service
 ```
+
+
+`speech_to_text_service` and `text_to_speech_service` use an empty value for the browser implementation and `off` for a disabled function. A disabled speech function does not create its control in the chatbot. `use_dialog` enables alternating voice interaction only when both speech-to-text and text-to-speech are enabled. When disabled, speech-to-text stops only through the microphone control.
 
 `chat_history_panel_mode` accepts:
 

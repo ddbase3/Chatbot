@@ -77,6 +77,30 @@ final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 		$data = json_decode($output->getOutput('json'), true);
 
 		$this->assertSame('error', $data['status'] ?? null);
-		$this->assertSame('No speech-to-text service is configured for this chatbot.', $data['message'] ?? null);
+		$this->assertSame('Speech-to-text is disabled for this chatbot.', $data['message'] ?? null);
 	}
+
+	public function testOutputRejectsExplicitlyDisabledService(): void {
+		$request = $this->createMock(IRequest::class);
+		$request->method('request')->willReturnCallback(
+			static fn(string $key, mixed $default = null): mixed => match($key) {
+				'config_group' => 'chatbot-two',
+				'config_name' => 'sidebar',
+				default => $default
+			}
+		);
+		$settingsStore = $this->createStub(ISettingsStore::class);
+		$settingsStore->method('get')->willReturn([
+			'speech_to_text_service' => 'off'
+		]);
+		$service = $this->createMock(IRealtimeSpeechToTextSessionService::class);
+		$service->expects($this->never())->method('createSession');
+		$output = new RealtimeSpeechToTextSessionOutput($request, $settingsStore, $service);
+
+		$data = json_decode($output->getOutput('json'), true);
+
+		$this->assertSame('error', $data['status'] ?? null);
+		$this->assertSame('Speech-to-text is disabled for this chatbot.', $data['message'] ?? null);
+	}
+
 }

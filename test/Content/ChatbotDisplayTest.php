@@ -66,6 +66,9 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame([], $config['extension_plugin_options'] ?? null);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
+		$this->assertTrue($config['use_dialog'] ?? false);
+		$this->assertTrue($config['speech_to_text_enabled'] ?? false);
+		$this->assertTrue($config['text_to_speech_enabled'] ?? false);
 		$this->assertFalse($config['use_threads'] ?? true);
 		$this->assertFalse($config['conversation_enabled'] ?? true);
 		$this->assertSame('none', $config['first_message_mode'] ?? null);
@@ -171,6 +174,33 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('/service/texttospeech?config_group=chatbot-three&config_name=floating', $config['text_to_speech_url'] ?? null);
 		$this->assertTrue($config['use_icons'] ?? false);
 		$this->assertTrue($config['use_voice'] ?? false);
+		$this->assertTrue($config['use_dialog'] ?? false);
+		$this->assertTrue($config['speech_to_text_enabled'] ?? false);
+		$this->assertTrue($config['text_to_speech_enabled'] ?? false);
+	}
+
+	public function testDisabledVoiceSelectionsRemoveProviderEndpointsAndDialog(): void {
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay($chatbotDisplay);
+		$display->setData([
+			'speech_to_text_service' => 'off',
+			'text_to_speech_service' => 'off',
+			'use_voice' => true,
+			'use_dialog' => true,
+			'config_group' => 'chatbot-three',
+			'config_name' => 'floating'
+		]);
+
+		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
+
+		$this->assertSame('off', $config['speech_to_text_service'] ?? null);
+		$this->assertSame('off', $config['text_to_speech_service'] ?? null);
+		$this->assertFalse($config['speech_to_text_enabled'] ?? true);
+		$this->assertFalse($config['text_to_speech_enabled'] ?? true);
+		$this->assertFalse($config['use_dialog'] ?? true);
+		$this->assertSame('', $config['speech_to_text_session_url'] ?? null);
+		$this->assertSame('', $config['text_to_speech_url'] ?? null);
 	}
 
 	public function testGetSchemaUsesHostDefaultBackend(): void {
@@ -186,6 +216,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame(['auto', 'sse', 'rest'], $properties['transport_mode']['enum'] ?? null);
 		$this->assertArrayNotHasKey('use_mathjax', $properties);
 		$this->assertArrayHasKey('text_to_speech_service', $properties);
+		$this->assertSame(true, $properties['use_dialog']['default'] ?? null);
 		$this->assertNotContains('id', $schema['required'] ?? []);
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
 	}

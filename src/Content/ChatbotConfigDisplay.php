@@ -390,6 +390,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
+			'use_dialog' => $this->request->request('use_dialog') !== null,
 			'chat_history_enabled' => $this->request->request('chat_history_enabled') !== null,
 			'chat_history_panel_mode' => $this->normalizeEnum(
 				(string)$this->request->request('chat_history_panel_mode'),
@@ -455,6 +456,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_markdown' => $this->request->request('use_markdown') !== null,
 			'use_icons' => $this->request->request('use_icons') !== null,
 			'use_voice' => $this->request->request('use_voice') !== null,
+			'use_dialog' => $this->request->request('use_dialog') !== null,
 			'chat_history_enabled' => $this->request->request('chat_history_enabled') !== null,
 			'chat_history_panel_mode' => $this->normalizeEnum(
 				(string)$this->request->request('chat_history_panel_mode'),
@@ -763,6 +765,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_markdown' => true,
 			'use_icons' => true,
 			'use_voice' => true,
+			'use_dialog' => true,
 			'chat_history_enabled' => false,
 			'chat_history_panel_mode' => 'responsive',
 			'automatic_chat_titles' => false,
@@ -801,6 +804,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_markdown' => $this->toBool($settings['use_markdown'] ?? $defaults['use_markdown']),
 			'use_icons' => $this->toBool($settings['use_icons'] ?? $defaults['use_icons']),
 			'use_voice' => $this->toBool($settings['use_voice'] ?? $defaults['use_voice']),
+			'use_dialog' => $this->toBool($settings['use_dialog'] ?? $defaults['use_dialog']),
 			'chat_history_enabled' => $this->toBool($settings['chat_history_enabled'] ?? $defaults['chat_history_enabled']),
 			'chat_history_panel_mode' => $this->normalizeEnum(
 				(string)($settings['chat_history_panel_mode'] ?? $defaults['chat_history_panel_mode']),
@@ -854,6 +858,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'use_markdown' => $settings['use_markdown'],
 			'use_icons' => $settings['use_icons'],
 			'use_voice' => $settings['use_voice'],
+			'use_dialog' => $settings['use_dialog'],
 			'chat_history_enabled' => $settings['chat_history_enabled'],
 			'chat_history_panel_mode' => $settings['chat_history_panel_mode'],
 			'automatic_chat_titles' => $settings['automatic_chat_titles'],
