@@ -43,13 +43,19 @@ final class ChatbotTurnResult {
 	public static function interactionRequired(
 		string $status,
 		string $resumeHandle,
-		array $interactionRequests
+		array $interactionRequests,
+		string $expiresAt = '',
+		string $interactionId = '',
+		string $createdAt = ''
 	): self {
 		return new self('interaction_required', [
 			'id' => uniqid('msg_', true),
+			'interaction_id' => trim($interactionId),
 			'type' => 'interaction_required',
 			'status' => $status,
 			'resume_handle' => $resumeHandle,
+			'created_at' => trim($createdAt),
+			'expires_at' => trim($expiresAt),
 			'interaction_requests' => $interactionRequests,
 			'meta' => [
 				'timestamp' => gmdate('c')

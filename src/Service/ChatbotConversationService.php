@@ -165,19 +165,20 @@ final class ChatbotConversationService {
 		string $title,
 		array $reference = []
 	): ChatbotConversationClientState {
-		[, $request] = $this->createRequest($group, $name, $reference);
+		[, $request, $channelId] = $this->createRequest($group, $name, $reference);
 		$title = $this->normalizeTitle($title, 255);
 		if ($title === '') {
 			throw new \InvalidArgumentException('Conversation title must not be empty.');
 		}
 
-		return new ChatbotConversationClientState(
+		return $this->clientState(
 			$this->conversationService->renameConversation(
 				$request,
 				$this->requireConversationId($conversationId),
 				$title,
 				AgentConversation::TITLE_SOURCE_MANUAL
-			)
+			),
+			$channelId
 		);
 	}
 
@@ -210,7 +211,7 @@ final class ChatbotConversationService {
 		string $conversationId,
 		array $reference = []
 	): ChatbotConversationClientState {
-		[$settings, $request] = $this->createRequest($group, $name, $reference);
+		[$settings, $request, $channelId] = $this->createRequest($group, $name, $reference);
 		$conversationId = $this->requireConversationId($conversationId);
 		$state = $this->conversationService->getState($request, $conversationId);
 		$conversation = $state->getActiveConversation();
@@ -218,15 +219,15 @@ final class ChatbotConversationService {
 			throw new \RuntimeException('Conversation not found: ' . $conversationId);
 		}
 		if (!$this->toBool($settings['automatic_chat_titles'] ?? true)) {
-			return new ChatbotConversationClientState($state);
+			return $this->clientState($state, $channelId);
 		}
 		if ($conversation->getTitleSource() !== AgentConversation::TITLE_SOURCE_TEMPORARY) {
-			return new ChatbotConversationClientState($state);
+			return $this->clientState($state, $channelId);
 		}
 
 		[$userMessage, $assistantMessage] = $this->findInitialTurn($state->getMessages());
 		if ($userMessage === '' || $assistantMessage === '') {
-			return new ChatbotConversationClientState($state);
+			return $this->clientState($state, $channelId);
 		}
 
 		try {
@@ -247,13 +248,14 @@ final class ChatbotConversationService {
 				throw new \RuntimeException('Automatic chat title task returned an empty title.');
 			}
 
-			return new ChatbotConversationClientState(
+			return $this->clientState(
 				$this->conversationService->renameConversation(
 					$request,
 					$conversationId,
 					$title,
 					AgentConversation::TITLE_SOURCE_AUTOMATIC
-				)
+				),
+				$channelId
 			);
 		}
 		catch (Throwable $exception) {
@@ -263,7 +265,7 @@ final class ChatbotConversationService {
 				'chatbot_config_name' => $name,
 				'exception' => $exception
 			]);
-			return new ChatbotConversationClientState($state);
+			return $this->clientState($state, $channelId);
 		}
 	}
 
@@ -310,9 +312,16 @@ final class ChatbotConversationService {
 		}
 
 		$scopeId = AgentSuspensionScope::forConversation($channelId, $active->getId());
-		$pending = $scopeId !== '' ? $this->suspensionRepository->findPending($scopeId) : null;
+		$suspensions = $scopeId !== '' ? $this->suspensionRepository->findAll($scopeId) : [];
+		$pending = null;
+		foreach ($suspensions as $suspension) {
+			if ($suspension->isSuspended()) {
+				$pending = $suspension;
+				break;
+			}
+		}
 
-		return new ChatbotConversationClientState($state, null, $pending);
+		return new ChatbotConversationClientState($state, null, $pending, $suspensions);
 	}
 
 	/** @param array<string,mixed> $settings @param array<string,mixed> $reference */

@@ -154,25 +154,31 @@ final class ChatbotConversationServiceTest extends TestCase {
 			->willReturn($this->state($conversation));
 		$suspensionRepository = $this->createMock(IAgentSuspensionRepository::class);
 		$suspensionRepository->expects($this->once())
-			->method('findPending')
+			->method('findAll')
 			->with(AgentSuspensionScope::forConversation(
 				'chatbot:' . hash('sha256', "chatbot\0example"),
 				'conversation-1'
 			))
-			->willReturn(new AgentSuspensionState(
+			->willReturn([new AgentSuspensionState(
 				true,
 				AgentExecutionStatus::AWAITING_APPROVAL,
 				[
 					['id' => 'request-1', 'kind' => 'approval'],
 					['id' => 'request-2', 'kind' => 'approval']
 				],
-				'scope.resume'
-			));
+				'scope.resume',
+				'2026-08-27T07:00:00+00:00',
+				'2026-08-27T07:15:00+00:00',
+				AgentSuspensionState::LIFECYCLE_ACTIVE,
+				null,
+				'suspension-1'
+			)]);
 
 		$result = $this->createService($conversationRuntime, [], $suspensionRepository)
 			->getState('chatbot', 'example')
 			->toArray();
 
+		$this->assertSame('suspension-1', $result['pending_interaction']['id'] ?? null);
 		$this->assertSame('scope.resume', $result['pending_interaction']['resume_handle'] ?? null);
 		$this->assertSame(
 			AgentExecutionStatus::AWAITING_APPROVAL,
@@ -181,6 +187,7 @@ final class ChatbotConversationServiceTest extends TestCase {
 		$this->assertSame(2, count($result['pending_interaction']['interaction_requests'] ?? []));
 		$this->assertSame('request-1', $result['pending_interaction']['interaction_requests'][0]['id'] ?? null);
 		$this->assertSame('request-2', $result['pending_interaction']['interaction_requests'][1]['id'] ?? null);
+		$this->assertSame(1, count($result['interactions'] ?? []));
 	}
 
 	public function testManualRenameUsesManualTitleSource(): void {

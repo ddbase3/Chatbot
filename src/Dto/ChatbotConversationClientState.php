@@ -18,6 +18,9 @@
 namespace Chatbot\Dto;
 
 use AssistantFoundation\Dto\AgentConversationState;
+use AssistantFoundation\Dto\AgentInteractionRequest;
+use AssistantFoundation\Dto\AgentInteractionResponse;
+use AssistantFoundation\Dto\AgentSuspensionResolution;
 use AssistantFoundation\Dto\AgentSuspensionState;
 
 /**
@@ -25,10 +28,12 @@ use AssistantFoundation\Dto\AgentSuspensionState;
  */
 final class ChatbotConversationClientState {
 
+	/** @param array<int,AgentSuspensionState> $suspensions */
 	public function __construct(
 		private readonly AgentConversationState $state,
 		private readonly ?ChatbotConversationDraft $draft = null,
-		private readonly ?AgentSuspensionState $pendingSuspension = null
+		private readonly ?AgentSuspensionState $pendingSuspension = null,
+		private readonly array $suspensions = []
 	) {}
 
 	public function getState(): AgentConversationState {
@@ -43,24 +48,93 @@ final class ChatbotConversationClientState {
 		return $this->pendingSuspension;
 	}
 
+	/** @return array<int,AgentSuspensionState> */
+	public function getSuspensions(): array {
+		return $this->suspensions;
+	}
+
 	/** @return array<string,mixed> */
 	public function toArray(): array {
-		$pending = null;
-		if ($this->pendingSuspension instanceof AgentSuspensionState) {
-			$suspensionState = $this->pendingSuspension->toArray();
-			$pending = [
-				'status' => $suspensionState['status'],
-				'resume_handle' => $suspensionState['resume_handle'],
-				'interaction_requests' => $suspensionState['interaction_requests']
-			];
+		$pending = $this->pendingSuspension instanceof AgentSuspensionState
+			? $this->toClientSuspension($this->pendingSuspension)
+			: null;
+		$interactions = [];
+		foreach ($this->suspensions as $suspension) {
+			if ($suspension instanceof AgentSuspensionState) {
+				$interactions[] = $this->toClientSuspension($suspension);
+			}
 		}
 
 		return array_replace(
 			$this->state->toArray(),
 			[
 				'draft' => $this->draft?->toClientArray(),
-				'pending_interaction' => $pending
+				'pending_interaction' => $pending,
+				'interactions' => $interactions
 			]
 		);
+	}
+
+	/** @return array<string,mixed> */
+	private function toClientSuspension(AgentSuspensionState $suspension): array {
+		$resolution = $suspension->getResolution();
+
+		return [
+			'id' => $suspension->getId(),
+			'lifecycle' => $suspension->getLifecycle(),
+			'status' => $suspension->getStatus(),
+			'resume_handle' => $suspension->isSuspended() ? $suspension->getResumeHandle() : '',
+			'created_at' => $suspension->getCreatedAt(),
+			'expires_at' => $suspension->getExpiresAt(),
+			'interaction_requests' => array_values(array_filter(array_map(
+				fn(mixed $request): ?array => $this->toClientRequest($request),
+				$suspension->getInteractionRequests()
+			))),
+			'resolution' => $resolution instanceof AgentSuspensionResolution
+				? $this->toClientResolution($resolution)
+				: null
+		];
+	}
+
+	/** @return array<string,mixed>|null */
+	private function toClientRequest(mixed $request): ?array {
+		if ($request instanceof AgentInteractionRequest) {
+			return [
+				'id' => $request->getId(),
+				'kind' => $request->getKind(),
+				'title' => $request->getTitle(),
+				'message' => $request->getMessage(),
+				'summary' => $request->getSummary(),
+				'risk' => $request->getRisk()
+			];
+		}
+		if (!is_array($request)) {
+			return null;
+		}
+
+		return [
+			'id' => trim((string)($request['id'] ?? '')),
+			'kind' => trim((string)($request['kind'] ?? '')),
+			'title' => trim((string)($request['title'] ?? '')),
+			'message' => trim((string)($request['message'] ?? '')),
+			'summary' => is_array($request['summary'] ?? null) ? $request['summary'] : [],
+			'risk' => trim((string)($request['risk'] ?? ''))
+		];
+	}
+
+	/** @return array<string,mixed> */
+	private function toClientResolution(AgentSuspensionResolution $resolution): array {
+		return [
+			'outcome' => $resolution->getOutcome(),
+			'source' => $resolution->getSource(),
+			'resolved_at' => $resolution->getResolvedAt(),
+			'responses' => array_map(
+				static fn(AgentInteractionResponse $response): array => [
+					'request_id' => $response->getRequestId(),
+					'decision' => $response->getDecision()
+				],
+				$resolution->getResponses()
+			)
+		];
 	}
 }

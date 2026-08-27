@@ -110,7 +110,10 @@ abstract class AbstractChatbotService implements IChatbotService {
 					is_array($interaction['interaction_requests'] ?? null)
 						? $interaction['interaction_requests']
 						: []
-				)
+				),
+				trim((string)($interaction['expires_at'] ?? '')),
+				trim((string)($interaction['id'] ?? '')),
+				trim((string)($interaction['created_at'] ?? ''))
 			);
 		}
 
