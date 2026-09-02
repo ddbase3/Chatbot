@@ -13,4 +13,6 @@ interface IChatbotAppearanceProvider {
 	public function getThinkingIcon(): string;
 
 	public function getOpeningMessageIcon(): string;
+
+	public function getDomClasses(): array;
 }

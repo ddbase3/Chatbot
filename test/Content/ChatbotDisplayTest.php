@@ -86,6 +86,21 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('FAKE_CHATBOT_OUTPUT', $html);
 	}
 
+	public function testAppearanceProviderForwardsDomClassesToClientDisplay(): void {
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay(
+			$chatbotDisplay,
+			'missionbay',
+			[],
+			['root' => ['example-style']]
+		);
+
+		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
+
+		$this->assertSame(['root' => ['example-style']], $config['dom_classes'] ?? null);
+	}
+
 	public function testConversationMemoryExposesServerSideConversationEndpoints(): void {
 		$chatbotDisplay = new FakeChatbotDisplay();
 		$display = $this->createDisplay($chatbotDisplay, 'missionbay', [
@@ -221,11 +236,15 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertContains('chatbot_backend', $schema['required'] ?? []);
 	}
 
-	/** @param array<string,mixed> $storedSettings */
+	/**
+	 * @param array<string,mixed> $storedSettings
+	 * @param array<string,string|array<int,string>> $domClasses
+	 */
 	private function createDisplay(
 		FakeChatbotDisplay $chatbotDisplay,
 		string $defaultRuntime = 'missionbay',
-		array $storedSettings = []
+		array $storedSettings = [],
+		array $domClasses = []
 	): ChatbotDisplay {
 		$linkTargetService = $this->createStub(ILinkTargetService::class);
 		$linkTargetService->method('getLink')->willReturnCallback(
@@ -259,7 +278,8 @@ class ChatbotDisplayTest extends TestCase {
 				'',
 				'',
 				'plugin/Customer/assets/icons/thinking.svg',
-				'plugin/Customer/assets/icons/opening.svg'
+				'plugin/Customer/assets/icons/opening.svg',
+				$domClasses
 			)
 		);
 	}

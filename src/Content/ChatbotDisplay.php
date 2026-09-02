@@ -189,6 +189,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 			'speech_to_text_service' => $speechToTextService,
 			'text_to_speech_service' => $textToSpeechService,
 			'additional_stylesheet' => trim($this->appearanceProvider->getStylesheet()),
+			'dom_classes' => $this->appearanceProvider->getDomClasses(),
 			'message_icons' => [
 				'user' => trim($this->appearanceProvider->getUserMessageIcon()),
 				'assistant' => trim($this->appearanceProvider->getAssistantMessageIcon()),
