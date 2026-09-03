@@ -79,6 +79,7 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('', $config['message_icons']['assistant'] ?? null);
 		$this->assertSame('plugin/Customer/assets/icons/thinking.svg', $config['message_icons']['thinking'] ?? null);
 		$this->assertSame('plugin/Customer/assets/icons/opening.svg', $config['message_icons']['opening'] ?? null);
+		$this->assertSame([], $config['control_icons'] ?? null);
 		$this->assertSame('auto', $config['transport_mode'] ?? null);
 		$this->assertSame('auto', $config['default_lang'] ?? null);
 		$this->assertSame('html', $chatbotDisplay->getLastOutputFormat());
@@ -99,6 +100,28 @@ class ChatbotDisplayTest extends TestCase {
 		$config = $chatbotDisplay->getData();
 
 		$this->assertSame(['root' => ['example-style']], $config['dom_classes'] ?? null);
+	}
+
+	public function testAppearanceProviderForwardsControlIconsToClientDisplay(): void {
+		$chatbotDisplay = new FakeChatbotDisplay();
+		$display = $this->createDisplay(
+			$chatbotDisplay,
+			'missionbay',
+			[],
+			[],
+			[
+				'conversation_new' => 'plugin/Customer/assets/icons/new-chat.svg',
+				'voice_dialog' => 'plugin/Customer/assets/icons/dialog.svg'
+			]
+		);
+
+		$display->getOutput('html');
+		$config = $chatbotDisplay->getData();
+
+		$this->assertSame([
+			'conversation_new' => 'plugin/Customer/assets/icons/new-chat.svg',
+			'voice_dialog' => 'plugin/Customer/assets/icons/dialog.svg'
+		], $config['control_icons'] ?? null);
 	}
 
 	public function testConversationMemoryExposesServerSideConversationEndpoints(): void {
@@ -239,12 +262,14 @@ class ChatbotDisplayTest extends TestCase {
 	/**
 	 * @param array<string,mixed> $storedSettings
 	 * @param array<string,string|array<int,string>> $domClasses
+	 * @param array<string,string> $controlIcons
 	 */
 	private function createDisplay(
 		FakeChatbotDisplay $chatbotDisplay,
 		string $defaultRuntime = 'missionbay',
 		array $storedSettings = [],
-		array $domClasses = []
+		array $domClasses = [],
+		array $controlIcons = []
 	): ChatbotDisplay {
 		$linkTargetService = $this->createStub(ILinkTargetService::class);
 		$linkTargetService->method('getLink')->willReturnCallback(
@@ -279,7 +304,8 @@ class ChatbotDisplayTest extends TestCase {
 				'',
 				'plugin/Customer/assets/icons/thinking.svg',
 				'plugin/Customer/assets/icons/opening.svg',
-				$domClasses
+				$domClasses,
+				$controlIcons
 			)
 		);
 	}

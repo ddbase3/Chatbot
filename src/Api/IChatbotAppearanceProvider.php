@@ -15,4 +15,6 @@ interface IChatbotAppearanceProvider {
 	public function getOpeningMessageIcon(): string;
 
 	public function getDomClasses(): array;
+
+	public function getControlIcons(): array;
 }
