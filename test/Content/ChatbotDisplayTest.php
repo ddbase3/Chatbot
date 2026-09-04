@@ -79,6 +79,8 @@ class ChatbotDisplayTest extends TestCase {
 		$this->assertSame('', $config['message_icons']['assistant'] ?? null);
 		$this->assertSame('plugin/Customer/assets/icons/thinking.svg', $config['message_icons']['thinking'] ?? null);
 		$this->assertSame('plugin/Customer/assets/icons/opening.svg', $config['message_icons']['opening'] ?? null);
+		$this->assertSame('plugin/Customer/assets/icons/brand.svg', $config['initial_assistant_branding']['logo'] ?? null);
+		$this->assertSame('Ask <strong>KIM</strong>', $config['initial_assistant_branding']['title'] ?? null);
 		$this->assertSame([], $config['control_icons'] ?? null);
 		$this->assertSame('auto', $config['transport_mode'] ?? null);
 		$this->assertSame('auto', $config['default_lang'] ?? null);
@@ -305,7 +307,9 @@ class ChatbotDisplayTest extends TestCase {
 				'plugin/Customer/assets/icons/thinking.svg',
 				'plugin/Customer/assets/icons/opening.svg',
 				$domClasses,
-				$controlIcons
+				$controlIcons,
+				'plugin/Customer/assets/icons/brand.svg',
+				'Ask <strong>KIM</strong>'
 			)
 		);
 	}

@@ -196,6 +196,10 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 				'assistant' => trim($this->appearanceProvider->getAssistantMessageIcon()),
 				'thinking' => trim($this->appearanceProvider->getThinkingIcon()),
 				'opening' => trim($this->appearanceProvider->getOpeningMessageIcon())
+			],
+			'initial_assistant_branding' => [
+				'logo' => trim($this->appearanceProvider->getInitialAssistantMessageLogo()),
+				'title' => trim($this->appearanceProvider->getInitialAssistantMessageTitle())
 			]
 		];
 	}

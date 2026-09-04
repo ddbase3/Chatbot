@@ -13,7 +13,9 @@ final class StaticChatbotAppearanceProvider implements IChatbotAppearanceProvide
 		private readonly string $thinkingIcon = '',
 		private readonly string $openingMessageIcon = '',
 		private readonly array $domClasses = [],
-		private readonly array $controlIcons = []
+		private readonly array $controlIcons = [],
+		private readonly string $initialAssistantMessageLogo = '',
+		private readonly string $initialAssistantMessageTitle = ''
 	) {}
 
 	public function getStylesheet(): string {
@@ -34,6 +36,14 @@ final class StaticChatbotAppearanceProvider implements IChatbotAppearanceProvide
 
 	public function getOpeningMessageIcon(): string {
 		return $this->openingMessageIcon;
+	}
+
+	public function getInitialAssistantMessageLogo(): string {
+		return $this->initialAssistantMessageLogo;
+	}
+
+	public function getInitialAssistantMessageTitle(): string {
+		return $this->initialAssistantMessageTitle;
 	}
 
 	public function getDomClasses(): array {
