@@ -20,6 +20,7 @@ namespace Chatbot\Service;
 use AssistantFoundation\Api\IAgentEventSink;
 use AssistantFoundation\Api\IAgentExecutionService;
 use AssistantFoundation\Dto\AgentExecutionRequest;
+use AssistantFoundation\Dto\AgentExecutionStatus;
 use AssistantFoundation\Dto\AgentExecutionResult;
 use AssistantFoundation\Dto\AgentInteractionRequest;
 use Base3\Api\IRequest;
@@ -101,6 +102,9 @@ abstract class AbstractChatbotService implements IChatbotService {
 
 		$output = $result->getOutput();
 		$assistantNodeId = $this->getAssistantNodeId($chatbotSettings);
+		if ($this->isCancelledExecution($result, $output, $assistantNodeId)) {
+			return ChatbotTurnResult::cancelled();
+		}
 		$interaction = $this->extractInteractionRequired($result, $output, $assistantNodeId);
 		if ($interaction !== null) {
 			return ChatbotTurnResult::interactionRequired(
@@ -166,6 +170,7 @@ abstract class AbstractChatbotService implements IChatbotService {
 				$turn->getConfigName()
 			),
 			'conversation_id' => $turn->getConversationId(),
+			'turn_id' => $turn->getTurnId(),
 			'chatbot_config_group' => $turn->getConfigGroup(),
 			'chatbot_config_name' => $turn->getConfigName(),
 			'chatbot_config' => $chatbotSettings
@@ -294,6 +299,39 @@ abstract class AbstractChatbotService implements IChatbotService {
 		$nodeId = $this->getChatbotSettingString($chatbotSettings, 'agent_components_assistant_node', 'assistant');
 
 		return $nodeId !== '' ? $nodeId : 'assistant';
+	}
+
+
+	/** @param array<string,mixed> $output */
+	protected function isCancelledExecution(
+		AgentExecutionResult $result,
+		array $output,
+		string $assistantNodeId
+	): bool {
+		if ($result->getAgentResult()?->getStatus() === AgentExecutionStatus::CANCELLED) {
+			return true;
+		}
+
+		$candidates = [];
+		if (isset($output[$assistantNodeId]) && is_array($output[$assistantNodeId])) {
+			$candidates[] = $output[$assistantNodeId];
+		}
+		if (isset($output['assistant']) && is_array($output['assistant'])) {
+			$candidates[] = $output['assistant'];
+		}
+		foreach ($output as $nodeOutput) {
+			if (is_array($nodeOutput)) {
+				$candidates[] = $nodeOutput;
+			}
+		}
+
+		foreach ($candidates as $candidate) {
+			if (trim((string)($candidate['status'] ?? '')) === AgentExecutionStatus::CANCELLED) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/** @param array<string,mixed> $output @return array<string,mixed>|null */

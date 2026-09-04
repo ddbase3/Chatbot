@@ -33,6 +33,7 @@ final class ChatbotTurnRequest {
 		);
 		$payload['resume'] = $this->normalizeResume($payload);
 		$payload['conversation_id'] = $this->normalizeTechnicalId($payload['conversation_id'] ?? null, 100);
+		$payload['turn_id'] = $this->normalizeTechnicalId($payload['turn_id'] ?? null, 100);
 		unset($payload['conversation_channel_id']);
 		$this->payload = $payload;
 	}
@@ -97,6 +98,10 @@ final class ChatbotTurnRequest {
 
 	public function getConversationId(): string {
 		return $this->getString('conversation_id');
+	}
+
+	public function getTurnId(): string {
+		return $this->getString('turn_id');
 	}
 
 

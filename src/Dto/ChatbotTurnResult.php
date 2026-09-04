@@ -63,6 +63,19 @@ final class ChatbotTurnResult {
 		]);
 	}
 
+
+	public static function cancelled(): self {
+		return new self('cancelled', [
+			'id' => '',
+			'type' => 'cancelled',
+			'status' => 'cancelled',
+			'text' => '',
+			'meta' => [
+				'timestamp' => gmdate('c')
+			]
+		]);
+	}
+
 	public static function error(string $message): self {
 		return new self('error', [
 			'id' => uniqid('msg_', true),

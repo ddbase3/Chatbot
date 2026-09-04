@@ -28,6 +28,7 @@ use Base3\Api\IRequest;
 use Base3\Language\Api\ILanguage;
 use Base3\Logger\Api\ILogger;
 use Base3\Settings\Api\ISettingsStore;
+use Base3\State\Api\IStateStore;
 use Base3\Session\Api\ISession;
 use Chatbot\Api\IChatbotAppearanceProvider;
 use Chatbot\Api\IChatbotTurnRequestStore;
@@ -39,6 +40,7 @@ use Chatbot\Service\ChatbotOpeningMessageService;
 use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotServiceRegistry;
 use Chatbot\Service\ChatbotTurnRequestFactory;
+use Chatbot\Service\ChatbotTurnCancellationService;
 use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\SessionChatbotConversationDraftStore;
 use Chatbot\Service\SessionChatbotTurnRequestStore;
@@ -107,8 +109,16 @@ class ChatbotPlugin implements IPlugin {
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			)
 			->set(
+				ChatbotTurnCancellationService::class,
+				fn($c) => new ChatbotTurnCancellationService($c->get(IStateStore::class)),
+				IContainer::SHARED | IContainer::NOOVERWRITE
+			)
+			->set(
 				ChatbotTurnResponder::class,
-				fn($c) => new ChatbotTurnResponder($c->get(ILanguage::class)),
+				fn($c) => new ChatbotTurnResponder(
+					$c->get(ILanguage::class),
+					$c->get(ChatbotTurnCancellationService::class)
+				),
 				IContainer::SHARED | IContainer::NOOVERWRITE
 			)
 			->set(

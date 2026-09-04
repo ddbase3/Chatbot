@@ -8,9 +8,11 @@ use AssistantRuntime\Service\CollectingAgentEventSink;
 use Base3\Api\IRequest;
 use Base3\Language\Api\ILanguage;
 use Base3\Settings\Api\ISettingsStore;
+use Base3\State\Api\IStateStore;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Service\ChatbotOpeningMessageService;
 use Chatbot\Service\ChatbotSettingsService;
+use Chatbot\Service\ChatbotTurnCancellationService;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\DummyChatbotService;
@@ -93,7 +95,10 @@ final class DummyChatbotServiceTest extends TestCase {
 		return new DummyChatbotService(
 			$request,
 			new ChatbotTurnRequestFactory($request),
-			new ChatbotTurnResponder($this->createStub(ILanguage::class)),
+			new ChatbotTurnResponder(
+				$this->createStub(ILanguage::class),
+				new ChatbotTurnCancellationService($this->createStub(IStateStore::class))
+			),
 			$settingsService,
 			new ChatbotOpeningMessageService(
 				$this->createStub(IAgentTextTaskService::class),

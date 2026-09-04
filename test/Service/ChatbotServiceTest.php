@@ -15,6 +15,7 @@ use Base3\Api\IClassMap;
 use Base3\Api\IRequest;
 use Base3\Language\Api\ILanguage;
 use Base3\Settings\Api\ISettingsStore;
+use Base3\State\Api\IStateStore;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Service\ChatbotConversationChannelResolver;
 use Chatbot\Service\ChatbotExtensionRegistry;
@@ -22,6 +23,7 @@ use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotOpeningMessageService;
 use Chatbot\Service\ChatbotSettingsService;
 use Chatbot\Service\ChatbotService;
+use Chatbot\Service\ChatbotTurnCancellationService;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -81,7 +83,7 @@ final class ChatbotServiceTest extends TestCase {
 					return ($inputs['prompt'] ?? null) === 'Hello'
 						&& ($inputs['mode'] ?? null) === 'chat';
 				}),
-				$this->isInstanceOf(CollectingAgentEventSink::class)
+				$this->isInstanceOf(IAgentEventSink::class)
 			)
 			->willReturn(new AgentExecutionResult([
 				'assistant' => [
@@ -234,7 +236,10 @@ final class ChatbotServiceTest extends TestCase {
 			$settingsService,
 			$executionService ?? $this->createStub(IAgentExecutionService::class),
 			new ChatbotTurnRequestFactory($request),
-			new ChatbotTurnResponder($this->createStub(ILanguage::class)),
+			new ChatbotTurnResponder(
+				$this->createStub(ILanguage::class),
+				new ChatbotTurnCancellationService($this->createStub(IStateStore::class))
+			),
 			new ChatbotConversationChannelResolver(),
 			$extensionService ?? $this->createExtensionService(false),
 			$openingMessageService

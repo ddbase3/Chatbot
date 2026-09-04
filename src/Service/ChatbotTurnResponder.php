@@ -31,7 +31,8 @@ use Throwable;
 final class ChatbotTurnResponder {
 
 	public function __construct(
-		private readonly ILanguage $language
+		private readonly ILanguage $language,
+		private readonly ChatbotTurnCancellationService $cancellationService
 	) {}
 
 	public static function getName(): string {
@@ -47,11 +48,26 @@ final class ChatbotTurnResponder {
 			header('Content-Type: application/json; charset=UTF-8');
 		}
 
+		$this->releaseSessionLock();
+		$sink = new CancellableAgentEventSink(
+			new CollectingAgentEventSink(),
+			$this->cancellationService,
+			$request->getTurnId()
+		);
+
 		try {
-			$result = $service->executeTurn($request, new CollectingAgentEventSink());
+			$result = $service->executeTurn($request, $sink);
+			if ($sink->isCancelled() || $result->getType() === 'cancelled') {
+				$result = ChatbotTurnResult::cancelled();
+			}
 		}
 		catch (Throwable $exception) {
-			$result = ChatbotTurnResult::error('[Chatbot runtime error] ' . $exception->getMessage());
+			$result = $sink->isCancelled()
+				? ChatbotTurnResult::cancelled()
+				: ChatbotTurnResult::error('[Chatbot runtime error] ' . $exception->getMessage());
+		}
+		finally {
+			$this->clearCancellation($request->getTurnId());
 		}
 
 		$json = json_encode(
@@ -65,30 +81,50 @@ final class ChatbotTurnResponder {
 	}
 
 	public function respondSse(IChatbotService $service, ChatbotTurnRequest $request): string {
-		$sink = new SseAgentEventSink();
-		$sink->start();
+		$transportSink = new SseAgentEventSink();
+		$transportSink->start();
+		$this->releaseSessionLock();
+
+		$sink = new CancellableAgentEventSink(
+			$transportSink,
+			$this->cancellationService,
+			$request->getTurnId()
+		);
 
 		try {
 			$result = $service->executeTurn($request, $sink);
-			$this->emitTerminalFallbacks($sink, $result);
+			if ($sink->isCancelled() || $result->getType() === 'cancelled') {
+				$transportSink->finish('cancelled');
+			}
+			else {
+				$this->emitTerminalFallbacks($transportSink, $result);
+			}
 		}
 		catch (Throwable $exception) {
-			$userMessage = $this->getUserMessage(
-				'runtime_error',
-				'A technical error occurred. The request could not be completed.'
-			);
-			if (!$sink->hasEmitted('token')) {
-				$sink->emit(new AgentExecutionEvent('token', ['text' => $userMessage]));
+			if ($sink->isCancelled()) {
+				$transportSink->finish('cancelled');
 			}
-			if (!$sink->hasEmitted('error')) {
-				$sink->emit(new AgentExecutionEvent('error', [
-					'message' => $exception->getMessage(),
-					'user_message' => $userMessage,
-					'type' => get_class($exception),
-					'code' => $exception->getCode()
-				]));
+			else {
+				$userMessage = $this->getUserMessage(
+					'runtime_error',
+					'A technical error occurred. The request could not be completed.'
+				);
+				if (!$transportSink->hasEmitted('token')) {
+					$transportSink->emit(new AgentExecutionEvent('token', ['text' => $userMessage]));
+				}
+				if (!$transportSink->hasEmitted('error')) {
+					$transportSink->emit(new AgentExecutionEvent('error', [
+						'message' => $exception->getMessage(),
+						'user_message' => $userMessage,
+						'type' => get_class($exception),
+						'code' => $exception->getCode()
+					]));
+				}
+				$transportSink->finish('error');
 			}
-			$sink->finish('error');
+		}
+		finally {
+			$this->clearCancellation($request->getTurnId());
 		}
 
 		return '';
@@ -147,6 +183,10 @@ final class ChatbotTurnResponder {
 
 	/** @param array<string,mixed> $payload */
 	private function resolveTerminalStatus(ChatbotTurnResult $result, array $payload): ?string {
+		if ($result->getType() === 'cancelled') {
+			return 'cancelled';
+		}
+
 		if ($result->getType() === 'error') {
 			return 'error';
 		}
@@ -157,5 +197,19 @@ final class ChatbotTurnResponder {
 		}
 
 		return null;
+	}
+
+	private function releaseSessionLock(): void {
+		if (session_status() === PHP_SESSION_ACTIVE) {
+			session_write_close();
+		}
+	}
+
+	private function clearCancellation(string $turnId): void {
+		try {
+			$this->cancellationService->clear($turnId);
+		}
+		catch (Throwable) {
+		}
 	}
 }

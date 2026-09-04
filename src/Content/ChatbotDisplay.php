@@ -30,6 +30,7 @@ use Chatbot\Output\ChatbotConversationMaterializeOutput;
 use Chatbot\Output\ChatbotConversationRenameOutput;
 use Chatbot\Output\ChatbotConversationStateOutput;
 use Chatbot\Output\ChatbotConversationTitleOutput;
+use Chatbot\Output\ChatbotTurnCancelOutput;
 use Chatbot\Service\ChatbotExtensionService;
 use Chatbot\Service\ChatbotSettingsService;
 use Throwable;
@@ -62,6 +63,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 		$config = $this->getClientConfig();
 		$config['service_url'] = $this->buildServiceUrl($config);
 		$config['turn_prepare_url'] = $this->buildTurnPrepareUrl();
+		$config['turn_cancel_url'] = $this->buildTurnCancelUrl();
 		$config['speech_to_text_session_url'] = $this->buildSpeechToTextSessionUrl($config);
 		$config['text_to_speech_url'] = $this->buildTextToSpeechUrl($config);
 		$config = array_merge($config, $this->buildConversationUrls($config));
@@ -235,6 +237,10 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 	protected function buildTurnPrepareUrl(): string {
 		return $this->linkTargetService->getLink(['name' => 'chatbotturnprepare']);
+	}
+
+	protected function buildTurnCancelUrl(): string {
+		return $this->linkTargetService->getLink(['name' => ChatbotTurnCancelOutput::getName()]);
 	}
 
 	/** @param array<string,mixed> $config */

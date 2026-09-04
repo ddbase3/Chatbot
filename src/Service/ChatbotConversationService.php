@@ -412,6 +412,9 @@ final class ChatbotConversationService {
 		$userMessage = '';
 		$assistantMessage = '';
 		foreach ($messages as $message) {
+			if (strtolower(trim((string)($message['status'] ?? ''))) === 'cancelled') {
+				continue;
+			}
 			$role = strtolower(trim((string)($message['role'] ?? '')));
 			$content = $this->normalizePlainText((string)($message['content'] ?? ''), 1200);
 			if ($content === '') {

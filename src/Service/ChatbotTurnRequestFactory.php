@@ -43,6 +43,7 @@ final class ChatbotTurnRequestFactory {
 			'config_name' => $this->readValue('config_name'),
 			'transport_mode' => $this->readValue('transport_mode'),
 			'conversation_id' => $this->readValue('conversation_id'),
+			'turn_id' => $this->readValue('turn_id'),
 			'reference' => $this->readValue('reference'),
 			'reference_format' => $this->readValue('reference_format'),
 			'resume' => $this->readValue('resume'),
