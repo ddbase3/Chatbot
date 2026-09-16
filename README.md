@@ -186,3 +186,8 @@ An empty STT or TTS selection keeps the corresponding browser speech provider ac
 ## License
 
 GPL-3.0. See `LICENSE`.
+
+## Documentation
+
+- [Frequently Asked Questions](docs/faq.md)
+- [Privacy and data processing](PRIVACY.md)
