@@ -17,6 +17,7 @@
 
 namespace Chatbot\Content;
 
+use Base3\Api\IAssetResolver;
 use Base3\Api\IClassMap;
 use Base3\Api\IDisplay;
 use Base3\Api\IMvcView;
@@ -25,6 +26,7 @@ use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
 use JsonException;
+use RuntimeException;
 use AssistantFoundation\Api\IAgentConfigFormService;
 use AssistantFoundation\Api\IAgentRuntimeRegistry;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
@@ -57,6 +59,7 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	public function __construct(
 		private readonly IMvcView $view,
+		private readonly IAssetResolver $assetResolver,
 		private readonly IRequest $request,
 		private readonly ISettingsStore $settingsStore,
 		private readonly ILinkTargetService $linkTargetService,
@@ -125,7 +128,8 @@ class ChatbotConfigDisplay implements IDisplay {
 			'form_id' => $context['form_id'],
 			'selected_runtime' => $runtimeActive ? $runtimeId : $this->agentRuntimeSelector->getDefaultRuntimeId(),
 			'show_runtime_selector' => false,
-			'runtime_active' => $runtimeActive
+			'runtime_active' => $runtimeActive,
+			'chatbot_resources' => $this->getResourcesConfig()
 		]);
 
 		return $this->view->loadTemplate();
@@ -141,6 +145,29 @@ class ChatbotConfigDisplay implements IDisplay {
 		$this->postedValues = null;
 		$this->postedSettings = null;
 		$this->translations = [];
+	}
+
+	protected function getResourcesConfig(): array {
+		$config = is_array($this->data['resources'] ?? null) ? $this->data['resources'] : [];
+		$endpoints = is_array($config['endpoints'] ?? null) ? $config['endpoints'] : [];
+
+		if (empty($config['enabled'])) {
+			throw new RuntimeException('Chatbot resources configuration is missing or disabled.');
+		}
+
+		if ($endpoints === []) {
+			throw new RuntimeException('Chatbot resources endpoints are missing.');
+		}
+
+		return [
+			'enabled' => true,
+			'endpoints' => $endpoints,
+			'max_file_size' => max(1, (int)($config['max_file_size'] ?? 50 * 1024 * 1024)),
+			'module_url' => $this->assetResolver->resolve('plugin/ClientStack/assets/filemanager/index.js'),
+			'css_url' => $this->assetResolver->resolve('plugin/ClientStack/assets/filemanager/styles/filemanager.css'),
+			'section_label' => $this->translate('resources_section', 'Resources'),
+			'help' => $this->translate('resources_help', 'Upload files that belong to this chatbot configuration.')
+		];
 	}
 
 	protected function prepareTranslations(): void {

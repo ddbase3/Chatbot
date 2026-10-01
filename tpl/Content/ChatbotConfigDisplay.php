@@ -1000,9 +1000,22 @@ $details = array_values(array_filter([$driverLabel, $voiceLabel], static fn($val
 		updateReferenceFields();
 	}
 
-	function save(event) {
+	async function save(event) {
 		if (event) {
 			event.preventDefault();
+		}
+
+		var resourcesFileManager = root.__base3ChatbotResourcesFileManager || null;
+		if (resourcesFileManager) {
+			try {
+				await resourcesFileManager.waitForUploads();
+			} catch (error) {
+				renderMessages([{
+					type: 'danger',
+					text: saveErrorPrefix + ' ' + (error && error.message ? error.message : String(error))
+				}]);
+				return;
+			}
 		}
 
 		button.disabled = true;
