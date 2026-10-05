@@ -163,6 +163,7 @@ class ChatbotConfigDisplay implements IDisplay {
 			'enabled' => true,
 			'endpoints' => $endpoints,
 			'max_file_size' => max(1, (int)($config['max_file_size'] ?? 50 * 1024 * 1024)),
+			'accept' => trim((string)($config['accept'] ?? '')),
 			'module_url' => $this->assetResolver->resolve('plugin/ClientStack/assets/filemanager/index.js'),
 			'css_url' => $this->assetResolver->resolve('plugin/ClientStack/assets/filemanager/styles/filemanager.css'),
 			'section_label' => $this->translate('resources_section', 'Resources'),
