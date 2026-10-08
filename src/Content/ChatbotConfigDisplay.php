@@ -172,7 +172,7 @@ class ChatbotConfigDisplay implements IDisplay {
 	}
 
 	protected function prepareTranslations(): void {
-		$this->view->setPath(DIR_PLUGIN . 'Chatbot');
+		$this->view->setPath(dirname(__DIR__, 2));
 		$this->view->loadBricks('Configuration');
 		$translations = $this->view->getBricks('chatbot_configuration');
 		$this->translations = is_array($translations) ? $translations : [];

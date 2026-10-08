@@ -352,7 +352,7 @@ class ChatbotDisplay implements IDisplay, ISchemaProvider {
 
 		$language = $this->getCurrentLanguage();
 
-		$basePath = defined('DIR_PLUGIN') ? DIR_PLUGIN . 'Chatbot/lang/Configuration/' : '';
+		$basePath = dirname(__DIR__, 2) . '/lang/Configuration/';
 		$files = $basePath === ''
 			? []
 			: array_values(array_unique([$basePath . $language . '.ini', $basePath . 'en.ini']));
