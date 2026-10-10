@@ -48,7 +48,6 @@ final class ChatbotTurnResponder {
 			header('Content-Type: application/json; charset=UTF-8');
 		}
 
-		$this->releaseSessionLock();
 		$sink = new CancellableAgentEventSink(
 			new CollectingAgentEventSink(),
 			$this->cancellationService,
@@ -83,7 +82,6 @@ final class ChatbotTurnResponder {
 	public function respondSse(IChatbotService $service, ChatbotTurnRequest $request): string {
 		$transportSink = new SseAgentEventSink();
 		$transportSink->start();
-		$this->releaseSessionLock();
 
 		$sink = new CancellableAgentEventSink(
 			$transportSink,
@@ -197,12 +195,6 @@ final class ChatbotTurnResponder {
 		}
 
 		return null;
-	}
-
-	private function releaseSessionLock(): void {
-		if (session_status() === PHP_SESSION_ACTIVE) {
-			session_write_close();
-		}
 	}
 
 	private function clearCancellation(string $turnId): void {
