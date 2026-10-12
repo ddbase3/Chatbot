@@ -20,6 +20,7 @@ namespace Chatbot\Service;
 use AssistantFoundation\Dto\AgentExecutionEvent;
 use AssistantRuntime\Service\CollectingAgentEventSink;
 use Base3\Language\Api\ILanguage;
+use Base3\Logger\Api\ILogger;
 use Chatbot\Api\IChatbotService;
 use Chatbot\Dto\ChatbotTurnRequest;
 use Chatbot\Dto\ChatbotTurnResult;
@@ -32,7 +33,8 @@ final class ChatbotTurnResponder {
 
 	public function __construct(
 		private readonly ILanguage $language,
-		private readonly ChatbotTurnCancellationService $cancellationService
+		private readonly ChatbotTurnCancellationService $cancellationService,
+		private readonly ILogger $logger
 	) {}
 
 	public static function getName(): string {
@@ -61,9 +63,13 @@ final class ChatbotTurnResponder {
 			}
 		}
 		catch (Throwable $exception) {
-			$result = $sink->isCancelled()
-				? ChatbotTurnResult::cancelled()
-				: ChatbotTurnResult::error('[Chatbot runtime error] ' . $exception->getMessage());
+			if ($sink->isCancelled()) {
+				$result = ChatbotTurnResult::cancelled();
+			}
+			else {
+				$this->logExecutionFailure($exception, $service, $request, 'rest');
+				$result = ChatbotTurnResult::error('[Chatbot runtime error] ' . $exception->getMessage());
+			}
 		}
 		finally {
 			$this->clearCancellation($request->getTurnId());
@@ -103,6 +109,7 @@ final class ChatbotTurnResponder {
 				$transportSink->finish('cancelled');
 			}
 			else {
+				$this->logExecutionFailure($exception, $service, $request, 'sse');
 				$userMessage = $this->getUserMessage(
 					'runtime_error',
 					'A technical error occurred. The request could not be completed.'
@@ -195,6 +202,26 @@ final class ChatbotTurnResponder {
 		}
 
 		return null;
+	}
+
+	private function logExecutionFailure(
+		Throwable $exception,
+		IChatbotService $service,
+		ChatbotTurnRequest $request,
+		string $transport
+	): void {
+		$this->logger->error(
+			'Chatbot ' . strtoupper($transport) . ' turn failed '
+				. '(service=' . get_class($service)
+				. ', config=' . $request->getConfigGroup() . '/' . $request->getConfigName()
+				. ', turn=' . $request->getTurnId() . '): '
+				. get_class($exception) . ': ' . $exception->getMessage()
+				. ' at ' . $exception->getFile() . ':' . $exception->getLine(),
+			[
+				'scope' => 'chatbot',
+				'exception' => $exception
+			]
+		);
 	}
 
 	private function clearCancellation(string $turnId): void {

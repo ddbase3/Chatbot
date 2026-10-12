@@ -7,6 +7,7 @@ use AssistantFoundation\Api\IAgentTextTaskService;
 use AssistantRuntime\Service\CollectingAgentEventSink;
 use Base3\Api\IRequest;
 use Base3\Language\Api\ILanguage;
+use Base3\Logger\Api\ILogger;
 use Base3\Settings\Api\ISettingsStore;
 use Base3\State\Api\IStateStore;
 use Chatbot\Dto\ChatbotTurnRequest;
@@ -97,7 +98,8 @@ final class DummyChatbotServiceTest extends TestCase {
 			new ChatbotTurnRequestFactory($request),
 			new ChatbotTurnResponder(
 				$this->createStub(ILanguage::class),
-				new ChatbotTurnCancellationService($this->createStub(IStateStore::class))
+				new ChatbotTurnCancellationService($this->createStub(IStateStore::class)),
+				$this->createStub(ILogger::class)
 			),
 			$settingsService,
 			new ChatbotOpeningMessageService(
