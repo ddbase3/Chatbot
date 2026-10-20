@@ -5,6 +5,7 @@ namespace Chatbot\Test\Content;
 use AssistantFoundation\Api\IAgentConfigFormService;
 use AssistantFoundation\Api\IAgentRuntimeRegistry;
 use AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\Api\IAssetResolver;
 use Base3\Api\IClassMap;
 use Base3\Api\IMvcView;
 use Base3\Api\IRequest;
@@ -12,6 +13,7 @@ use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotConfigDisplay;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class ChatbotConfigDisplayTest extends TestCase {
 
@@ -159,6 +161,41 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$this->assertFalse($settings['use_dialog'] ?? true);
 	}
 
+	public function testResourcesAreOptionalWhenHostDoesNotConfigureThem(): void {
+		$display = $this->createDisplay();
+		$this->assertSame(['enabled' => false], $display->getTestResourcesConfig());
+
+		$display->setData(['resources' => ['enabled' => false]]);
+		$this->assertSame(['enabled' => false], $display->getTestResourcesConfig());
+	}
+
+	public function testEnabledResourcesRequireEndpoints(): void {
+		$display = $this->createDisplay();
+		$display->setData(['resources' => ['enabled' => true]]);
+
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage('Chatbot resources endpoints are missing.');
+		$display->getTestResourcesConfig();
+	}
+
+	public function testEnabledResourcesPreserveHostEndpoints(): void {
+		$endpoints = ['list' => '/files/list', 'upload' => '/files/upload'];
+		$display = $this->createDisplay();
+		$display->setData(['resources' => [
+			'enabled' => true,
+			'endpoints' => $endpoints,
+			'max_file_size' => 2048,
+			'accept' => '.pdf'
+		]]);
+
+		$config = $display->getTestResourcesConfig();
+		$this->assertTrue($config['enabled']);
+		$this->assertSame($endpoints, $config['endpoints']);
+		$this->assertSame(2048, $config['max_file_size']);
+		$this->assertSame('.pdf', $config['accept']);
+		$this->assertSame('/assets/plugin/ClientStack/assets/filemanager/index.js', $config['module_url']);
+	}
+
 	private function createDisplay(?ISettingsStore $settingsStore = null): TestableChatbotConfigDisplay {
 		$linkTargetService = $this->createStub(ILinkTargetService::class);
 		$linkTargetService->method('getLink')->willReturn('/service/chatbotconfigdisplay');
@@ -170,8 +207,14 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$agentRuntimeSelector->method('getDefaultRuntimeId')->willReturn('missionbay');
 		$agentRuntimeSelector->method('selectRuntimeId')->willReturn('missionbay');
 
+		$assetResolver = $this->createStub(IAssetResolver::class);
+		$assetResolver->method('resolve')->willReturnCallback(
+			static fn(string $path): string => '/assets/' . $path
+		);
+
 		return new TestableChatbotConfigDisplay(
 			$this->createStub(IMvcView::class),
+			$assetResolver,
 			$this->createStub(IRequest::class),
 			$settingsStore ?? $this->createStub(ISettingsStore::class),
 			$linkTargetService,
@@ -184,6 +227,11 @@ final class ChatbotConfigDisplayTest extends TestCase {
 }
 
 final class TestableChatbotConfigDisplay extends ChatbotConfigDisplay {
+
+	/** @return array<string,mixed> */
+	public function getTestResourcesConfig(): array {
+		return $this->getResourcesConfig();
+	}
 
 	/** @return array<string,mixed> */
 	public function getTestContext(): array {

@@ -261,6 +261,21 @@ Extension enablement is stored as technical boolean settings under `chatbot-exte
 
 Each installed extension plugin can introduce additional data processing. For example, a map renderer may contact an external tile service. Such behavior belongs in the privacy documentation of the extension component.
 
+## Optional configuration file uploads
+
+`ChatbotConfigDisplay` receives the file-manager enablement flag and endpoint URLs
+from the host's `setData()` input, independently from persisted chatbot settings.
+When missing or disabled, the file-manager section is not rendered and Chatbot
+makes no file-manager request through that section. The manager host currently
+leaves this section disabled because it supplies no upload/list endpoints.
+
+When enabled with non-empty endpoints, the rendered client uses the ClientStack
+file-manager module. File metadata and uploaded content can then be sent to the
+host-configured endpoints. Chatbot does not implement their authorization,
+storage, deletion, retention, logging or recipient policies; those must be
+verified and documented with the actual endpoint implementation. Enabling a
+file-manager widget is not itself a server-side access grant.
+
 ## Data minimization guidance
 
 For a privacy-conscious deployment:

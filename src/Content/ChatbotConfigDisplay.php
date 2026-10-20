@@ -149,12 +149,11 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	protected function getResourcesConfig(): array {
 		$config = is_array($this->data['resources'] ?? null) ? $this->data['resources'] : [];
-		$endpoints = is_array($config['endpoints'] ?? null) ? $config['endpoints'] : [];
-
 		if (empty($config['enabled'])) {
-			throw new RuntimeException('Chatbot resources configuration is missing or disabled.');
+			return ['enabled' => false];
 		}
 
+		$endpoints = is_array($config['endpoints'] ?? null) ? $config['endpoints'] : [];
 		if ($endpoints === []) {
 			throw new RuntimeException('Chatbot resources endpoints are missing.');
 		}

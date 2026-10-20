@@ -165,6 +165,22 @@ The Dummy Chatbot Service also uses the canonical opening-message configuration.
 
 ClientStack owns the browser implementation. The ModularChatbot is the active implementation and receives optional response extensions through the generic extension configuration supplied by Chatbot.
 
+## Optional configuration resources
+
+`ChatbotConfigDisplay` accepts an optional `resources` entry in its `setData()` input.
+If it is absent or has `enabled: false`, the agent-runtime form omits the file upload
+section and continues to render the remaining chatbot configuration. This state does
+not create an upload endpoint or enable server-side file access.
+
+When the host explicitly sets `enabled: true`, it must also supply a non-empty
+`endpoints` array with its own authorized file-management endpoints. Missing
+endpoints remain a configuration error. Resource files and access control remain
+owned by the configured host backend, not by Chatbot. This option is display
+configuration, not part of the persisted `ISettingsStore` chatbot settings. A
+host that loads this display through AJAX must pass the same trusted display
+configuration on that request; a URL query parameter alone is not a resource
+authorization mechanism.
+
 ## Speech services per chatbot instance
 
 `ChatbotConfigDisplay` stores speech selections in the SettingsStore record identified by `config_group` and `config_name`. The public `ChatbotDisplay` uses the same identity and never exposes provider service IDs to the browser.
