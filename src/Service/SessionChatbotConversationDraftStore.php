@@ -25,8 +25,8 @@ use Chatbot\Dto\ChatbotConversationDraft;
  */
 final class SessionChatbotConversationDraftStore {
 
-	private const SESSION_KEY = 'chatbot_conversation_drafts';
-	private const TTL_SECONDS = 3600;
+	public const SESSION_KEY = 'chatbot_conversation_drafts';
+	public const TTL_SECONDS = 3600;
 
 	public function __construct(private readonly ISession $session) {}
 

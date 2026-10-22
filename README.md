@@ -207,3 +207,7 @@ GPL-3.0. See `LICENSE`.
 
 - [Frequently Asked Questions](docs/faq.md)
 - [Privacy and data processing](PRIVACY.md)
+
+### Temporary chat-session diagnostic
+
+`TransientChatSessionDiagnosticCheck` is a read-only `IDiagnosticCheck` for the privacy scope. It examines expired prepared turns in the **current native PHP session** and draft records in the **current BASE3 session** using the TTL constants already owned by their respective stores. The check does not call cleanup methods or mutate either store, and returns only aggregate counts. It reports `failed` for expired entries in the inspected session, `warning` when none are found because other sessions and physical session-storage cleanup cannot be inspected, and `not_applicable` if no session is active. The check is not a system-wide proof of session deletion. Texts and remediation are translated in Chatbot's own `lang/DiagnosticChecks` files.

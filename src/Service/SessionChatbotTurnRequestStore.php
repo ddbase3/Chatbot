@@ -26,8 +26,8 @@ use RuntimeException;
  */
 final class SessionChatbotTurnRequestStore implements IChatbotTurnRequestStore {
 
-	private const SESSION_KEY = 'chatbot_pending_turns';
-	private const TTL_SECONDS = 300;
+	public const SESSION_KEY = 'chatbot_pending_turns';
+	public const TTL_SECONDS = 300;
 
 	public static function getName(): string {
 		return 'sessionchatbotturnrequeststore';
