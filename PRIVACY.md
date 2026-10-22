@@ -304,6 +304,7 @@ Before production use, the installation should document at least:
 - deletion behavior including backups,
 - enabled response extensions and any additional external browser requests they introduce.
 
-### Read-only session diagnostic
+### Session-backend deletion verification
 
-`TransientChatSessionDiagnosticCheck` can read the current request's PHP session entries for prepared turns and the current BASE3 session's conversation drafts, checking only their expiration timestamps. It neither claims nor deletes entries, and reports only aggregate overdue counts. It does not access the sessions of other users, discover the host's session storage or verify physical expiry in that storage. A clean current session is therefore reported with `warning` rather than as a successful installation-wide privacy check. Results may be displayed in the protected BASE3 diagnostics UI and copied by the administrator; session content and identifiers are never placed into its result. No new persistence or outbound requests are introduced.
+The previous read-only `TransientChatSessionDiagnosticCheck` examined only the currently authenticated administrator's PHP and BASE3 session. Because this cannot verify physical deletion across a host installation, it is no longer exposed as a privacy check. The existing temporary stores and their TTL constants remain unchanged. A deployment must verify expiration, backend-wide garbage collection, backup retention and session deletion in the actual host session backend; the new system-wide persistent-conversation checks belong to MissionBay. No session content is exported by the replacement diagnostics.
+

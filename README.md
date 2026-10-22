@@ -208,6 +208,6 @@ GPL-3.0. See `LICENSE`.
 - [Frequently Asked Questions](docs/faq.md)
 - [Privacy and data processing](PRIVACY.md)
 
-### Temporary chat-session diagnostic
+### System-wide diagnostics only
 
-`TransientChatSessionDiagnosticCheck` is a read-only `IDiagnosticCheck` for the privacy scope. It examines expired prepared turns in the **current native PHP session** and draft records in the **current BASE3 session** using the TTL constants already owned by their respective stores. The check does not call cleanup methods or mutate either store, and returns only aggregate counts. It reports `failed` for expired entries in the inspected session, `warning` when none are found because other sessions and physical session-storage cleanup cannot be inspected, and `not_applicable` if no session is active. The check is not a system-wide proof of session deletion. Texts and remediation are translated in Chatbot's own `lang/DiagnosticChecks` files.
+The former `TransientChatSessionDiagnosticCheck` has been retired because it only examined the current administrator session and therefore could not support installation-wide privacy reporting. The session-backed turn and draft stores remain unchanged. Actual physical session expiration and backend-wide cleanup must be verified through the owning host session backend. MissionBay provides separate system-wide checks for persistent conversation ownership and removed chatbot configuration references.
