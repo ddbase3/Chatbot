@@ -28,12 +28,11 @@ use Chatbot\Service\ChatbotTurnCancellationService;
 use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \Chatbot\Service\ChatbotService
- */
 #[AllowMockObjectsWithoutExpectations]
+#[CoversClass(\Chatbot\Service\ChatbotService::class)]
 final class ChatbotServiceTest extends TestCase {
 
 	public function testGetNameReturnsTechnicalName(): void {

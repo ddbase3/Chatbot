@@ -18,12 +18,11 @@ use Chatbot\Service\ChatbotTurnRequestFactory;
 use Chatbot\Service\ChatbotTurnResponder;
 use Chatbot\Service\DummyChatbotService;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @covers \Chatbot\Service\DummyChatbotService
- */
 #[AllowMockObjectsWithoutExpectations]
+#[CoversClass(\Chatbot\Service\DummyChatbotService::class)]
 final class DummyChatbotServiceTest extends TestCase {
 
 	public function testGetNameReturnsTechnicalName(): void {
