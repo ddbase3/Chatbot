@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 final class ChatbotTurnRequestFactoryTest extends TestCase {
 
 	public function testConversationChannelIsNotAcceptedFromTheBrowser(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('get')->willReturnCallback(
 			static fn(string $key): mixed => $key === 'conversation_channel_id' ? 'forged-query-channel' : null
 		);

@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 final class TextToSpeechOutputTest extends TestCase {
 
 	public function testOutputStreamsThroughServiceFromChatbotConfiguration(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
 				'config_group' => 'chatbot-two',
@@ -35,30 +35,7 @@ final class TextToSpeechOutputTest extends TestCase {
 			->willReturn([
 				'text_to_speech_service' => 'openai-default'
 			]);
-		$service = new class implements ITextToSpeechService {
-			public ?TextToSpeechRequest $request = null;
-			public int $streamCalls = 0;
-
-			public function synthesize(TextToSpeechRequest $request): TextToSpeechResult {
-				return new TextToSpeechResult(
-					'audio/mpeg',
-					new AudioMedia('complete', 'audio/mpeg', 0.0, 0)
-				);
-			}
-
-			public function stream(
-				TextToSpeechRequest $request,
-				ITextToSpeechStream $stream
-			): TextToSpeechResult {
-				$this->request = $request;
-				$this->streamCalls += 1;
-				$stream->start('audio/mpeg', ['provider' => 'test']);
-				$stream->write('audio-');
-				$stream->write('data');
-
-				return new TextToSpeechResult('audio/mpeg', null, ['provider' => 'test']);
-			}
-		};
+		$service = new TextToSpeechOutputTestDouble1();
 		$output = new TextToSpeechOutput($request, $settingsStore, $service);
 
 		$this->assertSame('audio-data', $output->getOutput('audio'));
@@ -69,7 +46,7 @@ final class TextToSpeechOutputTest extends TestCase {
 	}
 
 	public function testOutputRejectsChatbotWithoutConfiguredService(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
 				'config_group' => 'chatbot-two',
@@ -92,7 +69,7 @@ final class TextToSpeechOutputTest extends TestCase {
 	}
 
 	public function testOutputRejectsExplicitlyDisabledService(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
 				'config_group' => 'chatbot-two',
@@ -118,3 +95,5 @@ final class TextToSpeechOutputTest extends TestCase {
 	}
 
 }
+
+require_once __DIR__ . '/TextToSpeechOutputTestDouble1.php';

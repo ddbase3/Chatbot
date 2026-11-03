@@ -50,7 +50,7 @@ final class ChatbotConversationOutputTest extends TestCase {
 			)
 			->willReturn(new AgentConversationState([$conversation], $conversation, [], 'assistant'));
 
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('allRequest')->willReturn([
 			'config_group' => 'forged-body-group',
 			'config_name' => 'forged-body-name',
@@ -80,7 +80,7 @@ final class ChatbotConversationOutputTest extends TestCase {
 	}
 
 	public function testMutationRejectsGetRequest(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('server')->willReturnCallback(static fn(string $key, mixed $default = null): mixed =>
 			$key === 'REQUEST_METHOD' ? 'GET' : $default
 		);
@@ -115,18 +115,7 @@ final class ChatbotConversationOutputTest extends TestCase {
 		$language = $this->createStub(ILanguage::class);
 		$language->method('getLanguage')->willReturn('en');
 
-		$session = new class implements ISession {
-			private array $data = [];
-			private bool $started = false;
-			public function started(): bool { return $this->started; }
-			public function getId(): string { return 'output-test'; }
-			public function start(): bool { $this->started = true; return true; }
-			public function destroy(): bool { $this->data = []; return true; }
-			public function get(string $key, mixed $default = null): mixed { return $this->data[$key] ?? $default; }
-			public function set(string $key, mixed $value): void { $this->data[$key] = $value; }
-			public function has(string $key): bool { return array_key_exists($key, $this->data); }
-			public function remove(string $key): void { unset($this->data[$key]); }
-		};
+		$session = new ChatbotConversationOutputTestDouble1();
 
 		return new ChatbotConversationService(
 			$conversationRuntime,
@@ -140,3 +129,5 @@ final class ChatbotConversationOutputTest extends TestCase {
 		);
 	}
 }
+
+require_once __DIR__ . '/ChatbotConversationOutputTestDouble1.php';

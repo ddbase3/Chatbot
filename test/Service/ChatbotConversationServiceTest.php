@@ -286,44 +286,4 @@ final class ChatbotConversationServiceTest extends TestCase {
 	}
 }
 
-final class ChatbotDraftSessionStub implements ISession {
-
-	/** @var array<string,mixed> */
-	private array $data = [];
-	private bool $started = false;
-
-	public function started(): bool {
-		return $this->started;
-	}
-
-	public function getId(): string {
-		return 'chatbot-draft-test';
-	}
-
-	public function start(): bool {
-		$this->started = true;
-		return true;
-	}
-
-	public function destroy(): bool {
-		$this->data = [];
-		$this->started = false;
-		return true;
-	}
-
-	public function get(string $key, mixed $default = null): mixed {
-		return $this->data[$key] ?? $default;
-	}
-
-	public function set(string $key, mixed $value): void {
-		$this->data[$key] = $value;
-	}
-
-	public function has(string $key): bool {
-		return array_key_exists($key, $this->data);
-	}
-
-	public function remove(string $key): void {
-		unset($this->data[$key]);
-	}
-}
+require_once __DIR__ . '/ChatbotDraftSessionStub.php';

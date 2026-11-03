@@ -125,7 +125,7 @@ final class ChatbotConfigDisplayTest extends TestCase {
 		$settingsStore
 			->expects($this->once())
 			->method('get')
-			->with('uihk-chatbot', 'default', $this->isType('array'))
+			->with('uihk-chatbot', 'default', $this->isArray())
 			->willReturn([
 				'chatbot_backend' => 'service:dummychatbotservice',
 				'speech_to_text_service' => 'mistral-default',
@@ -228,33 +228,4 @@ final class ChatbotConfigDisplayTest extends TestCase {
 	}
 }
 
-final class TestableChatbotConfigDisplay extends ChatbotConfigDisplay {
-
-	/** @return array<string,mixed> */
-	public function getTestResourcesConfig(): array {
-		return $this->getResourcesConfig();
-	}
-
-	/** @return array<string,mixed> */
-	public function getTestContext(): array {
-		return $this->getContext(false);
-	}
-
-	/**
-	 * @param array<string,mixed> $context
-	 * @return array<string,mixed>
-	 */
-	public function loadTestSettings(array $context): array {
-		return $this->loadSettings($context);
-	}
-
-	/** @return array<string,mixed> */
-	public function getTestDefaultSettings(): array {
-		return $this->getDefaultSettings();
-	}
-
-	/** @param array<string,mixed> $settings @return array<string,mixed> */
-	public function normalizeTestSettings(array $settings): array {
-		return $this->normalizeSettings($settings);
-	}
-}
+require_once __DIR__ . '/TestableChatbotConfigDisplay.php';

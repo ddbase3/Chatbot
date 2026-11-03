@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 
 	public function testOutputUsesServiceFromChatbotConfiguration(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
 				'config_group' => 'chatbot-two',
@@ -30,25 +30,7 @@ final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 			->willReturn([
 				'speech_to_text_service' => 'mistral-default'
 			]);
-		$service = new class implements IRealtimeSpeechToTextSessionService {
-			public ?RealtimeSpeechToTextSessionRequest $request = null;
-
-			public function createSession(RealtimeSpeechToTextSessionRequest $request): RealtimeSpeechToTextSession {
-				$this->request = $request;
-
-				return new RealtimeSpeechToTextSession(
-					'mistral',
-					'websocket',
-					'wss://api.mistral.ai/v1/audio/transcriptions/realtime?model=test',
-					'rt_test',
-					'2026-07-26T12:00:00Z',
-					'test',
-					'pcm_s16le',
-					16000,
-					['targetStreamingDelayMs' => 480]
-				);
-			}
-		};
+		$service = new RealtimeSpeechToTextSessionOutputTestDouble1();
 		$output = new RealtimeSpeechToTextSessionOutput($request, $settingsStore, $service);
 
 		$data = json_decode($output->getOutput('json'), true);
@@ -61,7 +43,7 @@ final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 	}
 
 	public function testOutputRejectsChatbotWithoutConfiguredService(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
 				'config_group' => 'chatbot-two',
@@ -81,7 +63,7 @@ final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 	}
 
 	public function testOutputRejectsExplicitlyDisabledService(): void {
-		$request = $this->createMock(IRequest::class);
+		$request = $this->createStub(IRequest::class);
 		$request->method('request')->willReturnCallback(
 			static fn(string $key, mixed $default = null): mixed => match($key) {
 				'config_group' => 'chatbot-two',
@@ -104,3 +86,5 @@ final class RealtimeSpeechToTextSessionOutputTest extends TestCase {
 	}
 
 }
+
+require_once __DIR__ . '/RealtimeSpeechToTextSessionOutputTestDouble1.php';
