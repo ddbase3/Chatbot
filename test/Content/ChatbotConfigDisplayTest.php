@@ -9,6 +9,7 @@ use Base3\Api\IAssetResolver;
 use Base3\Api\IClassMap;
 use Base3\Api\IMvcView;
 use Base3\Api\IRequest;
+use Base3\Authorization\Api\IAuthorizationService;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Content\ChatbotConfigDisplay;
@@ -221,7 +222,8 @@ final class ChatbotConfigDisplayTest extends TestCase {
 			$this->createStub(IClassMap::class),
 			$agentConfigFormService,
 			$this->createStub(IAgentRuntimeRegistry::class),
-			$agentRuntimeSelector
+			$agentRuntimeSelector,
+			$this->createStub(IAuthorizationService::class)
 		);
 	}
 }

@@ -211,3 +211,9 @@ GPL-3.0. See `LICENSE`.
 ### System-wide diagnostics only
 
 The former `TransientChatSessionDiagnosticCheck` has been retired because it only examined the current administrator session and therefore could not support installation-wide privacy reporting. The session-backed turn and draft stores remain unchanged. Actual physical session expiration and backend-wide cleanup must be verified through the owning host session backend. MissionBay provides separate system-wide checks for persistent conversation ownership and removed chatbot configuration references.
+
+## Discoverable chatbot settings
+
+`Chatbot\SettingsTab\ChatbotSettingsTab` supplies the first-level Settings group. `ChatbotconfigSettingsTab` contributes a configuration subtab for the default `chatbot/default` dataset. It uses the established `UiFoundation\Api\ISettingsTab` and `IClassMap` discovery path; no manual tab list is required.
+
+The subtab implements `IFeature` and defaults to the BASE3 `administration` audience. Both Settings visibility and direct `ChatbotConfigDisplay` access use the existing `IAuthorizationService`. The display continues to support host-provided instance configuration through `setData()`. Host-specific chatbot instances, including ILIAS UIHook instances, must be contributed by their host plugin with the correct instance data; the generic default tab does not replace such host-specific configuration. UI labels belong exclusively to `Chatbot/lang/Settings/`.

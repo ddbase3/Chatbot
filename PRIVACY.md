@@ -308,3 +308,6 @@ Before production use, the installation should document at least:
 
 The previous read-only `TransientChatSessionDiagnosticCheck` examined only the currently authenticated administrator's PHP and BASE3 session. Because this cannot verify physical deletion across a host installation, it is no longer exposed as a privacy check. The existing temporary stores and their TTL constants remain unchanged. A deployment must verify expiration, backend-wide garbage collection, backup retention and session deletion in the actual host session backend; the new system-wide persistent-conversation checks belong to MissionBay. No session content is exported by the replacement diagnostics.
 
+## Settings navigation and access control
+
+The default chatbot configuration can now be opened through a discoverable Settings tab. `ChatbotConfigDisplay` checks the matching BASE3 feature permission on every direct output request before reading or writing the dataset. The tab does not create additional storage; the existing named `ISettingsStore` dataset remains authoritative. A host may expose a different chatbot instance through separately supplied trusted display data. User/group membership and feature decisions are evaluated by the configured BASE3 authorization service; this plugin does not persist a second permissions model.

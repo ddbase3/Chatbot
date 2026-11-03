@@ -22,6 +22,10 @@ use Base3\Api\IClassMap;
 use Base3\Api\IDisplay;
 use Base3\Api\IMvcView;
 use Base3\Api\IRequest;
+use Base3\Authorization\Api\IAuthorizationService;
+use Base3\Authorization\Dto\AuthorizationRequest;
+use Base3\Usermanager\Permission;
+use Chatbot\SettingsTab\ChatbotconfigSettingsTab;
 use Base3\LinkTarget\Api\ILinkTargetService;
 use Base3\Settings\Api\ISettingsStore;
 use Chatbot\Api\IChatbotService;
@@ -66,7 +70,8 @@ class ChatbotConfigDisplay implements IDisplay {
 		private readonly IClassMap $classMap,
 		private readonly IAgentConfigFormService $agentConfigFormService,
 		private readonly IAgentRuntimeRegistry $agentRuntimeRegistry,
-		private readonly IAgentRuntimeSelector $agentRuntimeSelector
+		private readonly IAgentRuntimeSelector $agentRuntimeSelector,
+		private readonly IAuthorizationService $authorization
 	) {}
 
 	public static function getName(): string {
@@ -79,6 +84,13 @@ class ChatbotConfigDisplay implements IDisplay {
 
 	public function getOutput(string $out = 'html', bool $final = false): string {
 		$out = strtolower(trim($out));
+		if (!$this->authorization->decide(new AuthorizationRequest(
+			$this->authorization->getDefaultAuthority(),
+			Permission::for('feature', ChatbotconfigSettingsTab::getName())
+		))->isAllowed()) {
+			http_response_code(403);
+			return '';
+		}
 		$this->prepareTranslations();
 
 		if ($out === 'json') {
