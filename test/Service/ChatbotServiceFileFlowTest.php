@@ -150,3 +150,5 @@ final class ChatbotServiceFileFlowTest extends TestCase {
 		);
 	}
 }
+
+require_once __DIR__ . '/ChatbotServiceFlowFilesTestDouble.php';

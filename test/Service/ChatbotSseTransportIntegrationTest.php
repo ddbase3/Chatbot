@@ -171,26 +171,29 @@ final class ChatbotSseTransportIntegrationTest extends TestCase {
 	}
 
 	private function executeProbe(string $scenario): string {
-		$root = dirname(__DIR__, 4);
+		$autoloaderFile = (new \ReflectionClass(\Base3\Core\Autoloader::class))->getFileName();
+		$this->assertIsString($autoloaderFile);
+		$pluginRoot = dirname(__DIR__, 3);
 		$program = <<<'PHP'
-$root = $argv[1];
+$autoloaderFile = $argv[1];
+$pluginRoot = $argv[2];
 putenv('DEBUG=0');
-define('DIR_ROOT', $root . '/');
-define('DIR_SRC', DIR_ROOT . 'src/');
-define('DIR_PLUGIN', DIR_ROOT . 'plugin/');
+define('DIR_ROOT', dirname($autoloaderFile, 3) . '/');
+define('DIR_SRC', dirname($autoloaderFile, 2) . '/');
+define('DIR_PLUGIN', $pluginRoot . '/');
 define('DIR_TEST', DIR_ROOT . 'test/');
 define('DIR_TMP', sys_get_temp_dir() . '/');
-require DIR_SRC . 'Core/Autoloader.php';
+require $autoloaderFile;
 \Base3\Core\Autoloader::register();
-\Chatbot\Test\Service\ChatbotSseTransportProbe::run($argv[2]);
+\Chatbot\Test\Service\ChatbotSseTransportProbe::run($argv[3]);
 PHP;
 
-		$command = [PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, $root, $scenario];
+		$command = [PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, $autoloaderFile, $pluginRoot, $scenario];
 		$process = proc_open($command, [
 			0 => ['pipe', 'r'],
 			1 => ['pipe', 'w'],
 			2 => ['pipe', 'w']
-		], $pipes, $root);
+		], $pipes, dirname($autoloaderFile, 3));
 		$this->assertTrue(is_resource($process));
 		fclose($pipes[0]);
 		$stdout = stream_get_contents($pipes[1]);

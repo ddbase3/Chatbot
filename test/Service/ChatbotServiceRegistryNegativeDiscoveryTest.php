@@ -76,3 +76,7 @@ final class ChatbotServiceRegistryNegativeDiscoveryTest extends TestCase {
 		}
 	}
 }
+
+require_once __DIR__ . '/ChatbotServiceWithoutNameFixture.php';
+
+require_once __DIR__ . '/ChatbotServiceRegistryTestDouble.php';

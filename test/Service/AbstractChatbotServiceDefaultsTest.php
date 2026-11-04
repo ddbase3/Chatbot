@@ -126,3 +126,5 @@ final class AbstractChatbotServiceDefaultsTest extends TestCase {
 		);
 	}
 }
+
+require_once __DIR__ . '/ChatbotBareServiceFixture.php';

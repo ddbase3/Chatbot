@@ -96,3 +96,5 @@ final class ChatbotTurnPreparationIntegrationTest extends TestCase {
 		return new ChatbotTurnPrepareOutput($request, $store, new ChatbotServiceRegistry($map), $links);
 	}
 }
+
+require_once __DIR__ . '/../Service/ChatbotServiceRegistryTestDouble.php';
