@@ -11,7 +11,7 @@ final class ChatbotSettingsTabBehaviorTest extends TestCase {
 	public function testTechnicalNameAndRootNavigationContract(): void {
 		$tab = new ChatbotSettingsTab($this->createStub(ITranslation::class));
 		$this->assertSame('chatbotsettingstab', ChatbotSettingsTab::getName());
-		$this->assertSame(40, $tab->getOrder());
+		$this->assertSame(38, $tab->getOrder());
 		$this->assertNull($tab->getParentTabName());
 		$this->assertNull($tab->getDisplayName());
 		$this->assertNull($tab->getDisplayData());
