@@ -217,3 +217,19 @@ The former `TransientChatSessionDiagnosticCheck` has been retired because it onl
 `Chatbot\SettingsTab\ChatbotSettingsTab` supplies the first-level Settings group. `ChatbotconfigSettingsTab` contributes a configuration subtab for the default `chatbot/default` dataset. It uses the established `UiFoundation\Api\ISettingsTab` and `IClassMap` discovery path; no manual tab list is required.
 
 The subtab implements `IFeature` and defaults to the BASE3 `administration` audience. Both Settings visibility and direct `ChatbotConfigDisplay` access use the existing `IAuthorizationService`. The display continues to support host-provided instance configuration through `setData()`. Host-specific chatbot instances, including ILIAS UIHook instances, must be contributed by their host plugin with the correct instance data; the generic default tab does not replace such host-specific configuration. UI labels belong exclusively to `Chatbot/lang/Settings/`.
+
+
+## Phase 2: Project-owned configuration display data (2026-11-05)
+
+`ChatbotconfigSettingsTab` now accepts an optional constructor argument
+`chatbotConfigDisplayData` (an array). When provided by the project DI
+composition, it returns the array through the existing `ISettingsTab`
+`getDisplayData()` contract. `SettingsDisplay` applies the data to the existing
+`ChatbotConfigDisplay` and its resource section. Nothing is persisted in a
+second settings location. Existing installations that do not compose such
+data continue using the original default `chatbot/default` behavior.
+
+The BASE3 Chat project supplies the `chatbot/default` identity and the existing
+ClientStack FileManager endpoint URLs. Other hosts supply their own trusted
+display data without creating separate Settings tabs or configuring endpoints
+from request parameters.

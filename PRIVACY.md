@@ -311,3 +311,12 @@ The previous read-only `TransientChatSessionDiagnosticCheck` examined only the c
 ## Settings navigation and access control
 
 The default chatbot configuration can now be opened through a discoverable Settings tab. `ChatbotConfigDisplay` checks the matching BASE3 feature permission on every direct output request before reading or writing the dataset. The tab does not create additional storage; the existing named `ISettingsStore` dataset remains authoritative. A host may expose a different chatbot instance through separately supplied trusted display data. User/group membership and feature decisions are evaluated by the configured BASE3 authorization service; this plugin does not persist a second permissions model.
+
+
+## Phase 2 chatbot Settings context (2026-11-05)
+
+The configuration Settings tab may receive project-composed display data
+including URLs to an independently authorized FileManager. This is passed via
+the existing `setData()` contract without copying configuration records,
+storage owners or uploaded bytes into Chatbot. The storage and endpoint owner
+remain accountable for access decisions, retention, export and deletion.

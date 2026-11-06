@@ -25,6 +25,20 @@ final class ChatbotconfigSettingsTabAuthorizationTest extends TestCase {
 		$this->assertSame('chatbotconfigsettingstab', $tab->getPermissions()[0]->permission);
 	}
 
+	public function testProjectComposedDisplayDataKeepsChatbotAndResourcesTogether(): void {
+		$data = [
+			'group' => 'chatbot',
+			'name' => 'default',
+			'resources' => ['enabled' => true, 'endpoints' => ['list' => '/filemanager?fm_action=list']]
+		];
+		$tab = new ChatbotconfigSettingsTab(
+			$this->createStub(ITranslation::class),
+			$this->createStub(IAuthorizationService::class),
+			$data
+		);
+		self::assertSame($data, $tab->getDisplayData());
+	}
+
 	public function testOnlyExplicitAllowShowsConfigurationTab(): void {
 		foreach ([AuthorizationDecision::allow(), AuthorizationDecision::deny(), AuthorizationDecision::indeterminate()] as $decision) {
 			$tab = $this->newTabWithDecision($decision);
