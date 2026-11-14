@@ -15,36 +15,36 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot;
+namespace Base3\Chatbot;
 
-use Base3\Api\IClassMap;
-use Base3\Api\IContainer;
-use Base3\Api\IPlugin;
-use AssistantFoundation\Api\IAgentConversationService;
-use AssistantFoundation\Api\IAgentTextTaskService;
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use AssistantFoundation\Api\IAgentSuspensionRepository;
-use Base3\Api\IRequest;
-use Base3\Language\Api\ILanguage;
-use Base3\Logger\Api\ILogger;
-use Base3\Settings\Api\ISettingsStore;
-use Base3\State\Api\IStateStore;
-use Base3\Session\Api\ISession;
-use Chatbot\Api\IChatbotAppearanceProvider;
-use Chatbot\Api\IChatbotTurnRequestStore;
-use Chatbot\Service\ChatbotConversationChannelResolver;
-use Chatbot\Service\ChatbotConversationService;
-use Chatbot\Service\ChatbotExtensionRegistry;
-use Chatbot\Service\ChatbotExtensionService;
-use Chatbot\Service\ChatbotOpeningMessageService;
-use Chatbot\Service\ChatbotSettingsService;
-use Chatbot\Service\ChatbotServiceRegistry;
-use Chatbot\Service\ChatbotTurnRequestFactory;
-use Chatbot\Service\ChatbotTurnCancellationService;
-use Chatbot\Service\ChatbotTurnResponder;
-use Chatbot\Service\SessionChatbotConversationDraftStore;
-use Chatbot\Service\SessionChatbotTurnRequestStore;
-use Chatbot\Service\StaticChatbotAppearanceProvider;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\CoreFoundation\Api\IPlugin;
+use Base3\AssistantFoundation\Api\IAgentConversationService;
+use Base3\AssistantFoundation\Api\IAgentTextTaskService;
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\AssistantFoundation\Api\IAgentSuspensionRepository;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\Logger\Api\ILogger;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\CoreFoundation\Session\Api\ISession;
+use Base3\Chatbot\Api\IChatbotAppearanceProvider;
+use Base3\Chatbot\Api\IChatbotTurnRequestStore;
+use Base3\Chatbot\Service\ChatbotConversationChannelResolver;
+use Base3\Chatbot\Service\ChatbotConversationService;
+use Base3\Chatbot\Service\ChatbotExtensionRegistry;
+use Base3\Chatbot\Service\ChatbotExtensionService;
+use Base3\Chatbot\Service\ChatbotOpeningMessageService;
+use Base3\Chatbot\Service\ChatbotSettingsService;
+use Base3\Chatbot\Service\ChatbotServiceRegistry;
+use Base3\Chatbot\Service\ChatbotTurnRequestFactory;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
+use Base3\Chatbot\Service\ChatbotTurnResponder;
+use Base3\Chatbot\Service\SessionChatbotConversationDraftStore;
+use Base3\Chatbot\Service\SessionChatbotTurnRequestStore;
+use Base3\Chatbot\Service\StaticChatbotAppearanceProvider;
 
 class ChatbotPlugin implements IPlugin {
 

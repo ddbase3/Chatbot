@@ -15,13 +15,13 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Dto;
+namespace Base3\Chatbot\Dto;
 
-use AssistantFoundation\Dto\AgentConversationState;
-use AssistantFoundation\Dto\AgentInteractionRequest;
-use AssistantFoundation\Dto\AgentInteractionResponse;
-use AssistantFoundation\Dto\AgentSuspensionResolution;
-use AssistantFoundation\Dto\AgentSuspensionState;
+use Base3\AssistantFoundation\Dto\AgentConversationState;
+use Base3\AssistantFoundation\Dto\AgentInteractionRequest;
+use Base3\AssistantFoundation\Dto\AgentInteractionResponse;
+use Base3\AssistantFoundation\Dto\AgentSuspensionResolution;
+use Base3\AssistantFoundation\Dto\AgentSuspensionState;
 
 /**
  * Client-facing conversation state with an optional unsaved draft.

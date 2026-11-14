@@ -15,15 +15,15 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Dto\AgentExecutionEvent;
-use AssistantRuntime\Service\CollectingAgentEventSink;
-use Base3\Language\Api\ILanguage;
-use Base3\Logger\Api\ILogger;
-use Chatbot\Api\IChatbotService;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Dto\ChatbotTurnResult;
+use Base3\AssistantFoundation\Dto\AgentExecutionEvent;
+use Base3\AssistantRuntime\Service\CollectingAgentEventSink;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\Logger\Api\ILogger;
+use Base3\Chatbot\Api\IChatbotService;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Dto\ChatbotTurnResult;
 use Throwable;
 
 /**

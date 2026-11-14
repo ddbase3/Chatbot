@@ -15,9 +15,9 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\ITextToSpeechStream;
+use Base3\AssistantFoundation\Api\ITextToSpeechStream;
 use LogicException;
 
 final class HttpTextToSpeechStream implements ITextToSpeechStream {

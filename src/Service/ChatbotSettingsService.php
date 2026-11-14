@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use Base3\Settings\Api\ISettingsStore;
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
 
 /**
  * Canonical access to one configured chatbot settings dataset.

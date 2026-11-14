@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use Chatbot\Api\IChatbotTurnRequestStore;
-use Chatbot\Dto\PendingChatbotTurn;
+use Base3\Chatbot\Api\IChatbotTurnRequestStore;
+use Base3\Chatbot\Dto\PendingChatbotTurn;
 use RuntimeException;
 
 /**

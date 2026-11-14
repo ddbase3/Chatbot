@@ -15,14 +15,14 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAgentEventSink;
-use AssistantFoundation\Dto\AgentExecutionEvent;
-use Base3\Api\IRequest;
-use Chatbot\Api\IChatbotService;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Dto\ChatbotTurnResult;
+use Base3\AssistantFoundation\Api\IAgentEventSink;
+use Base3\AssistantFoundation\Dto\AgentExecutionEvent;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\Chatbot\Api\IChatbotService;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Dto\ChatbotTurnResult;
 
 /**
  * Dummy / UI-test service without external dependencies.

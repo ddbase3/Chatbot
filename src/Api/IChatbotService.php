@@ -15,12 +15,12 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Api;
+namespace Base3\Chatbot\Api;
 
-use AssistantFoundation\Api\IAgentEventSink;
-use Base3\Api\IOutput;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Dto\ChatbotTurnResult;
+use Base3\AssistantFoundation\Api\IAgentEventSink;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Dto\ChatbotTurnResult;
 
 /**
  * Routable chatbot backend with explicit turn execution.

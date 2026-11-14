@@ -1,29 +1,44 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test\Service;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Api\IAgentEventSink;
-use AssistantFoundation\Api\IAgentExecutionService;
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use AssistantFoundation\Api\IAgentTextTaskService;
-use AssistantFoundation\Dto\AgentExecutionRequest;
-use AssistantFoundation\Dto\AgentExecutionResult;
-use Base3\Api\IClassMap;
-use Base3\Api\IRequest;
-use Base3\Language\Api\ILanguage;
-use Base3\Logger\Api\ILogger;
-use Base3\Settings\Api\ISettingsStore;
-use Base3\State\Api\IStateStore;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Service\ChatbotConversationChannelResolver;
-use Chatbot\Service\ChatbotExtensionRegistry;
-use Chatbot\Service\ChatbotExtensionService;
-use Chatbot\Service\ChatbotOpeningMessageService;
-use Chatbot\Service\ChatbotService;
-use Chatbot\Service\ChatbotSettingsService;
-use Chatbot\Service\ChatbotTurnCancellationService;
-use Chatbot\Service\ChatbotTurnRequestFactory;
-use Chatbot\Service\ChatbotTurnResponder;
+namespace Base3\Chatbot\Test\Service;
+
+use Base3\AssistantFoundation\Api\IAgentEventSink;
+use Base3\AssistantFoundation\Api\IAgentExecutionService;
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\AssistantFoundation\Api\IAgentTextTaskService;
+use Base3\AssistantFoundation\Dto\AgentExecutionRequest;
+use Base3\AssistantFoundation\Dto\AgentExecutionResult;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\Logger\Api\ILogger;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Service\ChatbotConversationChannelResolver;
+use Base3\Chatbot\Service\ChatbotExtensionRegistry;
+use Base3\Chatbot\Service\ChatbotExtensionService;
+use Base3\Chatbot\Service\ChatbotOpeningMessageService;
+use Base3\Chatbot\Service\ChatbotService;
+use Base3\Chatbot\Service\ChatbotSettingsService;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
+use Base3\Chatbot\Service\ChatbotTurnRequestFactory;
+use Base3\Chatbot\Service\ChatbotTurnResponder;
 use PHPUnit\Framework\TestCase;
 
 final class ChatbotServiceFlowConfigurationTest extends TestCase {

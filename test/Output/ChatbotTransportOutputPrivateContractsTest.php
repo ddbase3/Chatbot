@@ -1,17 +1,32 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test\Output;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
-use AssistantFoundation\Api\ITextToSpeechService;
-use Base3\Api\IRequest;
-use Base3\Settings\Api\ISettingsStore;
-use Base3\State\Api\IStateStore;
-use Chatbot\Output\ChatbotTurnCancelOutput;
-use Chatbot\Output\ChatbotTurnPrepareOutput;
-use Chatbot\Output\RealtimeSpeechToTextSessionOutput;
-use Chatbot\Output\TextToSpeechOutput;
-use Chatbot\Service\ChatbotTurnCancellationService;
+namespace Base3\Chatbot\Test\Output;
+
+use Base3\AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
+use Base3\AssistantFoundation\Api\ITextToSpeechService;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\Chatbot\Output\ChatbotTurnCancelOutput;
+use Base3\Chatbot\Output\ChatbotTurnPrepareOutput;
+use Base3\Chatbot\Output\RealtimeSpeechToTextSessionOutput;
+use Base3\Chatbot\Output\TextToSpeechOutput;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;

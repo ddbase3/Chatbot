@@ -15,7 +15,7 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
 /**
  * Resolves the canonical server-side conversation channel of one chatbot.

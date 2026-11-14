@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Api;
+namespace Base3\Chatbot\Api;
 
-use Base3\Api\IBase;
-use Chatbot\Dto\PendingChatbotTurn;
+use Base3\CoreFoundation\Api\IBase;
+use Base3\Chatbot\Dto\PendingChatbotTurn;
 
 /**
  * Stores large POST payloads until EventSource claims them by opaque id.

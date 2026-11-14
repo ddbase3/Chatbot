@@ -15,7 +15,7 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Dto;
+namespace Base3\Chatbot\Dto;
 
 /**
  * Transient, session-scoped conversation draft that has not been persisted as a chat yet.

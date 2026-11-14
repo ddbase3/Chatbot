@@ -1,28 +1,43 @@
 <?php declare(strict_types=1);
 
-namespace Test\Chatbot\Service;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use AssistantFoundation\Api\IAgentTextTaskService;
-use AssistantRuntime\Service\CollectingAgentEventSink;
-use Base3\Api\IRequest;
-use Base3\Language\Api\ILanguage;
-use Base3\Logger\Api\ILogger;
-use Base3\Settings\Api\ISettingsStore;
-use Base3\State\Api\IStateStore;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Service\ChatbotOpeningMessageService;
-use Chatbot\Service\ChatbotSettingsService;
-use Chatbot\Service\ChatbotTurnCancellationService;
-use Chatbot\Service\ChatbotTurnRequestFactory;
-use Chatbot\Service\ChatbotTurnResponder;
-use Chatbot\Service\DummyChatbotService;
+namespace Base3\Chatbot\Test\Service;
+
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\AssistantFoundation\Api\IAgentTextTaskService;
+use Base3\AssistantRuntime\Service\CollectingAgentEventSink;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\Logger\Api\ILogger;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Service\ChatbotOpeningMessageService;
+use Base3\Chatbot\Service\ChatbotSettingsService;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
+use Base3\Chatbot\Service\ChatbotTurnRequestFactory;
+use Base3\Chatbot\Service\ChatbotTurnResponder;
+use Base3\Chatbot\Service\DummyChatbotService;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 #[AllowMockObjectsWithoutExpectations]
-#[CoversClass(\Chatbot\Service\DummyChatbotService::class)]
+#[CoversClass(\Base3\Chatbot\Service\DummyChatbotService::class)]
 final class DummyChatbotServiceTest extends TestCase {
 
 	public function testGetNameReturnsTechnicalName(): void {

@@ -1,19 +1,34 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use Base3\Api\IContainer;
-use Chatbot\Api\IChatbotTurnRequestStore;
-use Chatbot\ChatbotPlugin;
-use Chatbot\Service\ChatbotConversationChannelResolver;
-use Chatbot\Service\ChatbotConversationService;
-use Chatbot\Service\ChatbotOpeningMessageService;
-use Chatbot\Service\ChatbotSettingsService;
-use Chatbot\Service\ChatbotServiceRegistry;
-use Chatbot\Service\ChatbotTurnRequestFactory;
-use Chatbot\Service\ChatbotTurnResponder;
-use Chatbot\Service\SessionChatbotConversationDraftStore;
-use Chatbot\Service\SessionChatbotTurnRequestStore;
+namespace Base3\Chatbot\Test;
+
+use Base3\CoreFoundation\Api\IContainer;
+use Base3\Chatbot\Api\IChatbotTurnRequestStore;
+use Base3\Chatbot\ChatbotPlugin;
+use Base3\Chatbot\Service\ChatbotConversationChannelResolver;
+use Base3\Chatbot\Service\ChatbotConversationService;
+use Base3\Chatbot\Service\ChatbotOpeningMessageService;
+use Base3\Chatbot\Service\ChatbotSettingsService;
+use Base3\Chatbot\Service\ChatbotServiceRegistry;
+use Base3\Chatbot\Service\ChatbotTurnRequestFactory;
+use Base3\Chatbot\Service\ChatbotTurnResponder;
+use Base3\Chatbot\Service\SessionChatbotConversationDraftStore;
+use Base3\Chatbot\Service\SessionChatbotTurnRequestStore;
 use PHPUnit\Framework\TestCase;
 
 class FakeContainer implements IContainer {

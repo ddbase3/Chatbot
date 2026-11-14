@@ -1,19 +1,34 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test\Service;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Dto\AgentExecutionEvent;
+namespace Base3\Chatbot\Test\Service;
+
+use Base3\AssistantFoundation\Dto\AgentExecutionEvent;
 use Base3\Core\Request;
 use Base3\Core\ServiceLocator;
-use Base3\State\No\NoStateStore;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Dto\PendingChatbotTurn;
-use Chatbot\Output\ChatbotTurnStreamOutput;
-use Chatbot\Service\ChatbotServiceRegistry;
-use Chatbot\Service\ChatbotTurnCancellationService;
-use Chatbot\Service\ChatbotTurnResponder;
-use Chatbot\Service\SessionChatbotTurnRequestStore;
-use Chatbot\Service\SseAgentEventSink;
+use Base3\Core\State\No\NoStateStore;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Dto\PendingChatbotTurn;
+use Base3\Chatbot\Output\ChatbotTurnStreamOutput;
+use Base3\Chatbot\Service\ChatbotServiceRegistry;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
+use Base3\Chatbot\Service\ChatbotTurnResponder;
+use Base3\Chatbot\Service\SessionChatbotTurnRequestStore;
+use Base3\Chatbot\Service\SseAgentEventSink;
 use RuntimeException;
 
 /**

@@ -1,19 +1,34 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test\Content;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use Base3\Api\IClassMap;
-use Base3\Language\Api\ILanguage;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Base3\Settings\Api\ISettingsStore;
-use Chatbot\Content\ChatbotDisplay;
-use Chatbot\Service\StaticChatbotAppearanceProvider;
-use Chatbot\Service\ChatbotExtensionRegistry;
-use Chatbot\Service\ChatbotExtensionService;
-use Chatbot\Service\ChatbotSettingsService;
+namespace Base3\Chatbot\Test\Content;
+
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\Chatbot\Content\ChatbotDisplay;
+use Base3\Chatbot\Service\StaticChatbotAppearanceProvider;
+use Base3\Chatbot\Service\ChatbotExtensionRegistry;
+use Base3\Chatbot\Service\ChatbotExtensionService;
+use Base3\Chatbot\Service\ChatbotSettingsService;
 use PHPUnit\Framework\TestCase;
-use UiFoundation\Api\IChatbotDisplay;
+use Base3\UiFoundation\Api\IChatbotDisplay;
 
 class FakeChatbotDisplay implements IChatbotDisplay {
 

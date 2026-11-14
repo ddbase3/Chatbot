@@ -4,7 +4,7 @@ Chatbot provides a configurable BASE3 chat application that is independent of th
 
 ## Runtime boundary
 
-`Chatbot\Service\AbstractChatbotService` calls `AssistantFoundation\Api\IAgentExecutionService::execute()` for every agent-backed turn.
+`Base3\Chatbot\Service\AbstractChatbotService` calls `Base3\AssistantFoundation\Api\IAgentExecutionService::execute()` for every agent-backed turn.
 
 - REST uses a collecting event sink and formats the terminal result as JSON.
 - SSE uses the Chatbot-owned `SseAgentEventSink`.
@@ -161,7 +161,7 @@ The Dummy Chatbot Service also uses the canonical opening-message configuration.
 
 ## Public display
 
-`Chatbot\Content\ChatbotDisplay` remains the stable public BASE3 display. It resolves the chatbot backend, SettingsStore identity, feature configuration and service URLs, then delegates rendering to `UiFoundation\Api\IChatbotDisplay`.
+`Base3\Chatbot\Content\ChatbotDisplay` remains the stable public BASE3 display. It resolves the chatbot backend, SettingsStore identity, feature configuration and service URLs, then delegates rendering to `Base3\UiFoundation\Api\IChatbotDisplay`.
 
 ClientStack owns the browser implementation. The ModularChatbot is the active implementation and receives optional response extensions through the generic extension configuration supplied by Chatbot.
 
@@ -214,7 +214,7 @@ The former `TransientChatSessionDiagnosticCheck` has been retired because it onl
 
 ## Discoverable chatbot settings
 
-`Chatbot\SettingsTab\ChatbotSettingsTab` supplies the first-level Settings group. `ChatbotconfigSettingsTab` contributes a configuration subtab for the default `chatbot/default` dataset. It uses the established `UiFoundation\Api\ISettingsTab` and `IClassMap` discovery path; no manual tab list is required.
+`Base3\Chatbot\SettingsTab\ChatbotSettingsTab` supplies the first-level Settings group. `ChatbotconfigSettingsTab` contributes a configuration subtab for the default `chatbot/default` dataset. It uses the established `Base3\UiFoundation\Api\ISettingsTab` and `IClassMap` discovery path; no manual tab list is required.
 
 The subtab implements `IFeature` and defaults to the BASE3 `administration` audience. Both Settings visibility and direct `ChatbotConfigDisplay` access use the existing `IAuthorizationService`. The display continues to support host-provided instance configuration through `setData()`. Host-specific chatbot instances, including ILIAS UIHook instances, must be contributed by their host plugin with the correct instance data; the generic default tab does not replace such host-specific configuration. UI labels belong exclusively to `Chatbot/lang/Settings/`.
 

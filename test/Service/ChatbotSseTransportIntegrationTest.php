@@ -1,6 +1,21 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test\Service;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
+
+namespace Base3\Chatbot\Test\Service;
 
 use PHPUnit\Framework\TestCase;
 
@@ -171,21 +186,20 @@ final class ChatbotSseTransportIntegrationTest extends TestCase {
 	}
 
 	private function executeProbe(string $scenario): string {
-		$autoloaderFile = (new \ReflectionClass(\Base3\Core\Autoloader::class))->getFileName();
+		$autoloaderFile = (new \ReflectionClass(\Base3\Bootstrap\Autoloader::class))->getFileName();
 		$this->assertIsString($autoloaderFile);
 		$pluginRoot = dirname(__DIR__, 3);
 		$program = <<<'PHP'
 $autoloaderFile = $argv[1];
 $pluginRoot = $argv[2];
 putenv('DEBUG=0');
-define('DIR_ROOT', dirname($autoloaderFile, 3) . '/');
-define('DIR_SRC', dirname($autoloaderFile, 2) . '/');
+define('DIR_ROOT', dirname($autoloaderFile, 2) . '/');
 define('DIR_PLUGIN', $pluginRoot . '/');
 define('DIR_TEST', DIR_ROOT . 'test/');
 define('DIR_TMP', sys_get_temp_dir() . '/');
 require $autoloaderFile;
-\Base3\Core\Autoloader::register();
-\Chatbot\Test\Service\ChatbotSseTransportProbe::run($argv[3]);
+\Base3\Bootstrap\Autoloader::register();
+\Base3\Chatbot\Test\Service\ChatbotSseTransportProbe::run($argv[3]);
 PHP;
 
 		$command = [PHP_BINARY, '-d', 'display_errors=stderr', '-r', $program, $autoloaderFile, $pluginRoot, $scenario];
@@ -193,7 +207,7 @@ PHP;
 			0 => ['pipe', 'r'],
 			1 => ['pipe', 'w'],
 			2 => ['pipe', 'w']
-		], $pipes, dirname($autoloaderFile, 3));
+		], $pipes, dirname($autoloaderFile, 2));
 		$this->assertTrue(is_resource($process));
 		fclose($pipes[0]);
 		$stdout = stream_get_contents($pipes[1]);

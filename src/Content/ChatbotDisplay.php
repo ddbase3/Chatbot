@@ -15,26 +15,26 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Content;
+namespace Base3\Chatbot\Content;
 
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use Base3\Api\IDisplay;
-use Base3\Api\ISchemaProvider;
-use Base3\Language\Api\ILanguage;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Chatbot\Api\IChatbotAppearanceProvider;
-use Chatbot\Output\ChatbotConversationActivateOutput;
-use Chatbot\Output\ChatbotConversationCreateOutput;
-use Chatbot\Output\ChatbotConversationDeleteOutput;
-use Chatbot\Output\ChatbotConversationMaterializeOutput;
-use Chatbot\Output\ChatbotConversationRenameOutput;
-use Chatbot\Output\ChatbotConversationStateOutput;
-use Chatbot\Output\ChatbotConversationTitleOutput;
-use Chatbot\Output\ChatbotTurnCancelOutput;
-use Chatbot\Service\ChatbotExtensionService;
-use Chatbot\Service\ChatbotSettingsService;
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\CoreFoundation\Api\IDisplay;
+use Base3\CoreFoundation\Api\ISchemaProvider;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\Chatbot\Api\IChatbotAppearanceProvider;
+use Base3\Chatbot\Output\ChatbotConversationActivateOutput;
+use Base3\Chatbot\Output\ChatbotConversationCreateOutput;
+use Base3\Chatbot\Output\ChatbotConversationDeleteOutput;
+use Base3\Chatbot\Output\ChatbotConversationMaterializeOutput;
+use Base3\Chatbot\Output\ChatbotConversationRenameOutput;
+use Base3\Chatbot\Output\ChatbotConversationStateOutput;
+use Base3\Chatbot\Output\ChatbotConversationTitleOutput;
+use Base3\Chatbot\Output\ChatbotTurnCancelOutput;
+use Base3\Chatbot\Service\ChatbotExtensionService;
+use Base3\Chatbot\Service\ChatbotSettingsService;
 use Throwable;
-use UiFoundation\Api\IChatbotDisplay;
+use Base3\UiFoundation\Api\IChatbotDisplay;
 
 class ChatbotDisplay implements IDisplay, ISchemaProvider {
 

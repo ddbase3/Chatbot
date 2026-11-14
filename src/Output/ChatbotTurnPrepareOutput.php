@@ -15,15 +15,15 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Output;
+namespace Base3\Chatbot\Output;
 
-use Base3\Api\IOutput;
-use Base3\Api\IRequest;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Chatbot\Api\IChatbotTurnRequestStore;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Dto\PendingChatbotTurn;
-use Chatbot\Service\ChatbotServiceRegistry;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\Chatbot\Api\IChatbotTurnRequestStore;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Dto\PendingChatbotTurn;
+use Base3\Chatbot\Service\ChatbotServiceRegistry;
 use Throwable;
 
 /**

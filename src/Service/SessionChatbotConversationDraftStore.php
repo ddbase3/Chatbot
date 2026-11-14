@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use Base3\Session\Api\ISession;
-use Chatbot\Dto\ChatbotConversationDraft;
+use Base3\CoreFoundation\Session\Api\ISession;
+use Base3\Chatbot\Dto\ChatbotConversationDraft;
 
 /**
  * Session-backed transient drafts. Drafts are not part of conversation history.

@@ -15,12 +15,12 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Output;
+namespace Base3\Chatbot\Output;
 
-use Base3\Api\IOutput;
-use Base3\Api\IOutputSchemaProvider;
-use Base3\Api\IRequest;
-use Chatbot\Service\ChatbotConversationService;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IOutputSchemaProvider;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\Chatbot\Service\ChatbotConversationService;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;

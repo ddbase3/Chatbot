@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use Base3\Api\IRequest;
-use Chatbot\Dto\ChatbotTurnRequest;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
 
 /**
  * Creates explicit chatbot turn requests from the current HTTP request.

@@ -15,9 +15,9 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use Base3\State\Api\IStateStore;
+use Base3\CoreFoundation\State\Api\IStateStore;
 use RuntimeException;
 
 /**

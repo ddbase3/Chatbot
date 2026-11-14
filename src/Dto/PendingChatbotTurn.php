@@ -15,7 +15,7 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Dto;
+namespace Base3\Chatbot\Dto;
 
 /**
  * One prepared, single-use chatbot turn waiting for its SSE connection.

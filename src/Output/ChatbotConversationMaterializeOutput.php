@@ -15,7 +15,7 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Output;
+namespace Base3\Chatbot\Output;
 
 final class ChatbotConversationMaterializeOutput extends AbstractChatbotConversationOutput {
 

@@ -15,19 +15,19 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAgentConversationService;
-use AssistantFoundation\Api\IAgentTextTaskService;
-use AssistantFoundation\Api\IAgentSuspensionRepository;
-use AssistantFoundation\Dto\AgentConversation;
-use AssistantFoundation\Dto\AgentConversationRequest;
-use AssistantFoundation\Dto\AgentConversationState;
-use AssistantFoundation\Dto\AgentTextTaskRequest;
-use AssistantFoundation\Dto\AgentSuspensionScope;
-use Base3\Logger\Api\ILogger;
-use Chatbot\Dto\ChatbotConversationClientState;
-use Chatbot\Dto\ChatbotConversationDraft;
+use Base3\AssistantFoundation\Api\IAgentConversationService;
+use Base3\AssistantFoundation\Api\IAgentTextTaskService;
+use Base3\AssistantFoundation\Api\IAgentSuspensionRepository;
+use Base3\AssistantFoundation\Dto\AgentConversation;
+use Base3\AssistantFoundation\Dto\AgentConversationRequest;
+use Base3\AssistantFoundation\Dto\AgentConversationState;
+use Base3\AssistantFoundation\Dto\AgentTextTaskRequest;
+use Base3\AssistantFoundation\Dto\AgentSuspensionScope;
+use Base3\CoreFoundation\Logger\Api\ILogger;
+use Base3\Chatbot\Dto\ChatbotConversationClientState;
+use Base3\Chatbot\Dto\ChatbotConversationDraft;
 use Throwable;
 
 /**

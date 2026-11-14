@@ -15,18 +15,18 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAgentEventSink;
-use AssistantFoundation\Api\IAgentExecutionService;
-use AssistantFoundation\Dto\AgentExecutionRequest;
-use AssistantFoundation\Dto\AgentExecutionStatus;
-use AssistantFoundation\Dto\AgentExecutionResult;
-use AssistantFoundation\Dto\AgentInteractionRequest;
-use Base3\Api\IRequest;
-use Chatbot\Api\IChatbotService;
-use Chatbot\Dto\ChatbotTurnRequest;
-use Chatbot\Dto\ChatbotTurnResult;
+use Base3\AssistantFoundation\Api\IAgentEventSink;
+use Base3\AssistantFoundation\Api\IAgentExecutionService;
+use Base3\AssistantFoundation\Dto\AgentExecutionRequest;
+use Base3\AssistantFoundation\Dto\AgentExecutionStatus;
+use Base3\AssistantFoundation\Dto\AgentExecutionResult;
+use Base3\AssistantFoundation\Dto\AgentInteractionRequest;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\Chatbot\Api\IChatbotService;
+use Base3\Chatbot\Dto\ChatbotTurnRequest;
+use Base3\Chatbot\Dto\ChatbotTurnResult;
 use Throwable;
 
 abstract class AbstractChatbotService implements IChatbotService {

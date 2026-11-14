@@ -15,13 +15,13 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Output;
+namespace Base3\Chatbot\Output;
 
-use AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
-use AssistantFoundation\Dto\RealtimeSpeechToTextSessionRequest;
-use Base3\Api\IOutput;
-use Base3\Api\IRequest;
-use Base3\Settings\Api\ISettingsStore;
+use Base3\AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
+use Base3\AssistantFoundation\Dto\RealtimeSpeechToTextSessionRequest;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
 use RuntimeException;
 use Throwable;
 

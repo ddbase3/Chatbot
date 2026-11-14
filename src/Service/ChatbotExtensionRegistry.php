@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAssistantResponseExtension;
-use Base3\Api\IClassMap;
+use Base3\AssistantFoundation\Api\IAssistantResponseExtension;
+use Base3\CoreFoundation\Api\IClassMap;
 use RuntimeException;
 
 final class ChatbotExtensionRegistry {

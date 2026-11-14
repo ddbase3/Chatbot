@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use Base3\Api\IClassMap;
-use Chatbot\Api\IChatbotService;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\Chatbot\Api\IChatbotService;
 use RuntimeException;
 
 /**

@@ -15,25 +15,25 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Content;
+namespace Base3\Chatbot\Content;
 
-use Base3\Api\IAssetResolver;
-use Base3\Api\IClassMap;
-use Base3\Api\IDisplay;
-use Base3\Api\IMvcView;
-use Base3\Api\IRequest;
-use Base3\Authorization\Api\IAuthorizationService;
-use Base3\Authorization\Dto\AuthorizationRequest;
-use Base3\Usermanager\Permission;
-use Chatbot\SettingsTab\ChatbotconfigSettingsTab;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Base3\Settings\Api\ISettingsStore;
-use Chatbot\Api\IChatbotService;
+use Base3\CoreFoundation\Api\IAssetResolver;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Api\IDisplay;
+use Base3\CoreFoundation\Api\IMvcView;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Authorization\Api\IAuthorizationService;
+use Base3\CoreFoundation\Authorization\Dto\AuthorizationRequest;
+use Base3\CoreFoundation\Usermanager\Permission;
+use Base3\Chatbot\SettingsTab\ChatbotconfigSettingsTab;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\Chatbot\Api\IChatbotService;
 use JsonException;
 use RuntimeException;
-use AssistantFoundation\Api\IAgentConfigFormService;
-use AssistantFoundation\Api\IAgentRuntimeRegistry;
-use AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\AssistantFoundation\Api\IAgentConfigFormService;
+use Base3\AssistantFoundation\Api\IAgentRuntimeRegistry;
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
 use Throwable;
 
 /**

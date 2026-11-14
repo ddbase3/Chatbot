@@ -15,14 +15,14 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Output;
+namespace Base3\Chatbot\Output;
 
-use AssistantFoundation\Api\ITextToSpeechService;
-use AssistantFoundation\Dto\TextToSpeechRequest;
-use Base3\Api\IOutput;
-use Base3\Api\IRequest;
-use Base3\Settings\Api\ISettingsStore;
-use Chatbot\Service\HttpTextToSpeechStream;
+use Base3\AssistantFoundation\Api\ITextToSpeechService;
+use Base3\AssistantFoundation\Dto\TextToSpeechRequest;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\Chatbot\Service\HttpTextToSpeechStream;
 use RuntimeException;
 use Throwable;
 

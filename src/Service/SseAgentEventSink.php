@@ -15,10 +15,10 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAgentEventSink;
-use AssistantFoundation\Dto\AgentExecutionEvent;
+use Base3\AssistantFoundation\Api\IAgentEventSink;
+use Base3\AssistantFoundation\Dto\AgentExecutionEvent;
 
 /**
  * Chatbot-owned Server-Sent Events sink.

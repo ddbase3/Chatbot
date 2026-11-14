@@ -15,7 +15,7 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Dto;
+namespace Base3\Chatbot\Dto;
 
 /**
  * Immutable input for one chatbot turn.

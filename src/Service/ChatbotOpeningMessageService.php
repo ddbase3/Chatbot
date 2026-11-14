@@ -15,11 +15,11 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAgentTextTaskService;
-use AssistantFoundation\Dto\AgentTextTaskRequest;
-use Base3\Language\Api\ILanguage;
+use Base3\AssistantFoundation\Api\IAgentTextTaskService;
+use Base3\AssistantFoundation\Dto\AgentTextTaskRequest;
+use Base3\CoreFoundation\Language\Api\ILanguage;
 
 /**
  * Creates the independent heading and first assistant message of a new chat.

@@ -15,12 +15,12 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Service;
+namespace Base3\Chatbot\Service;
 
-use AssistantFoundation\Api\IAssistantResponseExtension;
-use AssistantFoundation\Api\IAssistantResponseExtensionExamples;
-use AssistantFoundation\Dto\AssistantResponseClientPlugin;
-use Base3\Settings\Api\ISettingsStore;
+use Base3\AssistantFoundation\Api\IAssistantResponseExtension;
+use Base3\AssistantFoundation\Api\IAssistantResponseExtensionExamples;
+use Base3\AssistantFoundation\Dto\AssistantResponseClientPlugin;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
 use RuntimeException;
 
 final class ChatbotExtensionService {

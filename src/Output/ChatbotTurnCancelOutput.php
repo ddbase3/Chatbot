@@ -15,11 +15,11 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Output;
+namespace Base3\Chatbot\Output;
 
-use Base3\Api\IOutput;
-use Base3\Api\IRequest;
-use Chatbot\Service\ChatbotTurnCancellationService;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
 use Throwable;
 
 /**

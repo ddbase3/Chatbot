@@ -1,44 +1,59 @@
 <?php declare(strict_types=1);
 
-namespace Chatbot\Test\Output;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Api\IAgentConversationService;
-use AssistantFoundation\Api\IAgentRuntimeSelector;
-use AssistantFoundation\Api\IAgentSuspensionRepository;
-use AssistantFoundation\Api\IAgentTextTaskService;
-use AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
-use AssistantFoundation\Api\ITextToSpeechService;
-use Base3\Api\IClassMap;
-use Base3\Api\IOutput;
-use Base3\Api\IOutputSchemaProvider;
-use Base3\Api\IRequest;
-use Base3\Language\Api\ILanguage;
-use Base3\LinkTarget\Api\ILinkTargetService;
-use Base3\Logger\Api\ILogger;
-use Base3\Settings\Api\ISettingsStore;
-use Base3\State\Api\IStateStore;
-use Chatbot\Api\IChatbotTurnRequestStore;
-use Chatbot\Output\ChatbotConversationActivateOutput;
-use Chatbot\Output\ChatbotConversationCreateOutput;
-use Chatbot\Output\ChatbotConversationDeleteOutput;
-use Chatbot\Output\ChatbotConversationMaterializeOutput;
-use Chatbot\Output\ChatbotConversationRenameOutput;
-use Chatbot\Output\ChatbotConversationStateOutput;
-use Chatbot\Output\ChatbotConversationTitleOutput;
-use Chatbot\Output\ChatbotTurnCancelOutput;
-use Chatbot\Output\ChatbotTurnPrepareOutput;
-use Chatbot\Output\ChatbotTurnStreamOutput;
-use Chatbot\Output\RealtimeSpeechToTextSessionOutput;
-use Chatbot\Output\TextToSpeechOutput;
-use Chatbot\Service\ChatbotConversationChannelResolver;
-use Chatbot\Service\ChatbotConversationService;
-use Chatbot\Service\ChatbotOpeningMessageService;
-use Chatbot\Service\ChatbotServiceRegistry;
-use Chatbot\Service\ChatbotSettingsService;
-use Chatbot\Service\ChatbotTurnCancellationService;
-use Chatbot\Service\ChatbotTurnResponder;
-use Chatbot\Service\SessionChatbotConversationDraftStore;
-use Chatbot\Test\Service\ChatbotDraftSessionStub;
+namespace Base3\Chatbot\Test\Output;
+
+use Base3\AssistantFoundation\Api\IAgentConversationService;
+use Base3\AssistantFoundation\Api\IAgentRuntimeSelector;
+use Base3\AssistantFoundation\Api\IAgentSuspensionRepository;
+use Base3\AssistantFoundation\Api\IAgentTextTaskService;
+use Base3\AssistantFoundation\Api\IRealtimeSpeechToTextSessionService;
+use Base3\AssistantFoundation\Api\ITextToSpeechService;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Api\IOutput;
+use Base3\CoreFoundation\Api\IOutputSchemaProvider;
+use Base3\CoreFoundation\Api\IRequest;
+use Base3\CoreFoundation\Language\Api\ILanguage;
+use Base3\CoreFoundation\LinkTarget\Api\ILinkTargetService;
+use Base3\CoreFoundation\Logger\Api\ILogger;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\CoreFoundation\State\Api\IStateStore;
+use Base3\Chatbot\Api\IChatbotTurnRequestStore;
+use Base3\Chatbot\Output\ChatbotConversationActivateOutput;
+use Base3\Chatbot\Output\ChatbotConversationCreateOutput;
+use Base3\Chatbot\Output\ChatbotConversationDeleteOutput;
+use Base3\Chatbot\Output\ChatbotConversationMaterializeOutput;
+use Base3\Chatbot\Output\ChatbotConversationRenameOutput;
+use Base3\Chatbot\Output\ChatbotConversationStateOutput;
+use Base3\Chatbot\Output\ChatbotConversationTitleOutput;
+use Base3\Chatbot\Output\ChatbotTurnCancelOutput;
+use Base3\Chatbot\Output\ChatbotTurnPrepareOutput;
+use Base3\Chatbot\Output\ChatbotTurnStreamOutput;
+use Base3\Chatbot\Output\RealtimeSpeechToTextSessionOutput;
+use Base3\Chatbot\Output\TextToSpeechOutput;
+use Base3\Chatbot\Service\ChatbotConversationChannelResolver;
+use Base3\Chatbot\Service\ChatbotConversationService;
+use Base3\Chatbot\Service\ChatbotOpeningMessageService;
+use Base3\Chatbot\Service\ChatbotServiceRegistry;
+use Base3\Chatbot\Service\ChatbotSettingsService;
+use Base3\Chatbot\Service\ChatbotTurnCancellationService;
+use Base3\Chatbot\Service\ChatbotTurnResponder;
+use Base3\Chatbot\Service\SessionChatbotConversationDraftStore;
+use Base3\Chatbot\Test\Service\ChatbotDraftSessionStub;
 use PHPUnit\Framework\TestCase;
 
 final class ChatbotOutputDiscoveryContractsTest extends TestCase {

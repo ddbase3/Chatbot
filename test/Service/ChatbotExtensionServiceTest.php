@@ -1,14 +1,29 @@
 <?php declare(strict_types=1);
 
-namespace Test\Chatbot\Service;
+/***********************************************************************
+ * This file is part of Chatbot for BASE3 Framework.
+ *
+ * Chatbot extends the BASE3 framework with a modular API
+ * foundation for flow-based chatbot services and interfaces.
+ * It provides reusable components for AI-driven conversations.
+ *
+ * Developed by Daniel Dahme
+ * Licensed under GPL-3.0
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * https://base3.de/v/chatbot
+ * https://github.com/ddbase3/Chatbot
+ **********************************************************************/
 
-use AssistantFoundation\Api\IAssistantResponseExtension;
-use AssistantFoundation\Api\IAssistantResponseExtensionExamples;
-use AssistantFoundation\Dto\AssistantResponseClientPlugin;
-use Base3\Api\IClassMap;
-use Base3\Settings\Api\ISettingsStore;
-use Chatbot\Service\ChatbotExtensionRegistry;
-use Chatbot\Service\ChatbotExtensionService;
+namespace Base3\Chatbot\Test\Service;
+
+use Base3\AssistantFoundation\Api\IAssistantResponseExtension;
+use Base3\AssistantFoundation\Api\IAssistantResponseExtensionExamples;
+use Base3\AssistantFoundation\Dto\AssistantResponseClientPlugin;
+use Base3\CoreFoundation\Api\IClassMap;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
+use Base3\Chatbot\Service\ChatbotExtensionRegistry;
+use Base3\Chatbot\Service\ChatbotExtensionService;
 use PHPUnit\Framework\TestCase;
 
 final class ChatbotExtensionServiceTest extends TestCase {

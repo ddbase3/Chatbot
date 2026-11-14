@@ -15,7 +15,7 @@
  * https://github.com/ddbase3/Chatbot
  **********************************************************************/
 
-namespace Chatbot\Dto;
+namespace Base3\Chatbot\Dto;
 
 /**
  * Normalized terminal chatbot result used by REST and SSE responders.
