@@ -2,7 +2,7 @@
 	"manifestVersion": 1,
 	"name": "Chatbot",
 	"namespace": "Base3\\Chatbot",
-	"version": "4.23.0",
+	"version": "5.0.0",
 	"description": "Configurable BASE3 chat application independent of the concrete agent runtime.",
 	"license": "GPL-3.0-or-later",
 	"maintainers": [
@@ -14,11 +14,11 @@
 	],
 	"repository": "https://github.com/ddbase3/Chatbot",
 	"dependencies": {
-		"Core": ">=4.10.0",
-		"CoreFoundation": ">=4.10.0",
-		"AssistantFoundation": ">=4.17.0",
-		"AssistantRuntime": ">=4.5.0",
-		"UiFoundation": ">=4.3.0",
-		"ClientStack": ">=4.23.0"
+		"Core": ">=5.0.0",
+		"CoreFoundation": ">=5.0.0",
+		"AssistantFoundation": ">=5.0.0",
+		"AssistantRuntime": ">=5.0.0",
+		"UiFoundation": ">=5.0.0",
+		"ClientStack": ">=5.0.0"
 	}
 }
